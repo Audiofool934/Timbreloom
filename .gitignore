@@ -9,8 +9,12 @@ data/uploads/
 data/jobs/
 data/voices/
 data/smoke/
+data/transcripts/
 data/outputs/*.wav
 !data/README.md
 !data/outputs/.gitkeep
 models/*
 !models/README.md
+.env
+.env.*
+!.env.example

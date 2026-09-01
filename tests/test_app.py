@@ -3,13 +3,13 @@ import os
 import wave
 from datetime import datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
 
 os.environ["TIMBRELOOM_PRELOAD"] = "0"
 
 from fastapi.testclient import TestClient
 
 import app
+from timbreloom.providers import TTSResult
 from timbreloom.segmentation import SEGMENT_ESTIMATED_TOKEN_LIMIT, segment_text
 
 
@@ -31,6 +31,32 @@ def test_health_does_not_load_model() -> None:
     assert payload["privacy"] == "localhost-only"
     assert payload["model"] == app.MODEL_ID
     assert payload["sampling_temperature"] == 1.0
+    provider_ids = {provider["id"] for provider in payload["providers"]}
+    assert provider_ids == {"local-qwen-tts", "local-whisper-asr", "gemini-text"}
+
+
+def test_provider_response_never_exposes_gemini_key(monkeypatch) -> None:
+    secret = "gemini-test-secret-that-must-not-leak"
+    monkeypatch.setenv("GEMINI_API_KEY", secret)
+
+    response = client.get("/api/providers")
+
+    assert response.status_code == 200
+    assert secret not in response.text
+    assert "GEMINI_API_KEY" not in response.text
+
+
+def test_gemini_requires_explicit_cloud_confirmation() -> None:
+    response = client.post(
+        f"/api/transcripts/{'a' * 32}/gemini",
+        json={
+            "segment_id": "seg-00001",
+            "task": "punctuation",
+            "confirm_cloud": False,
+        },
+    )
+    assert response.status_code == 400
+    assert "明确确认" in response.json()["detail"]
 
 
 def test_generate_rejects_unsupported_file_before_model_load() -> None:
@@ -54,17 +80,17 @@ def test_text_validation_collapses_whitespace() -> None:
 def test_segment_generation_uses_temperature_one(monkeypatch, tmp_path: Path) -> None:
     received: dict[str, object] = {}
 
-    class FakeModel:
-        def generate(self, **kwargs):
-            received.update(kwargs)
-            yield SimpleNamespace(
-                audio=app.mx.zeros((2_400,)),
+    class FakeProvider:
+        def synthesize(self, request):
+            received["request"] = request
+            return TTSResult(
+                duration_seconds=0.1,
+                generation_seconds=0.01,
+                peak_memory_gb=0.1,
                 sample_rate=24_000,
-                peak_memory_usage=0.1,
             )
 
-    monkeypatch.setattr(app, "get_model", lambda: FakeModel())
-    monkeypatch.setattr(app, "audio_write", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "_tts_provider", FakeProvider())
 
     app._generate_segment(
         reference_path=tmp_path / "reference.wav",
@@ -74,8 +100,9 @@ def test_segment_generation_uses_temperature_one(monkeypatch, tmp_path: Path) ->
         output_path=tmp_path / "output.wav",
     )
 
-    assert received["temperature"] == 1.0
-    assert received["max_tokens"] == app.GENERATION_TOKEN_LIMIT
+    request = received["request"]
+    assert request.temperature == 1.0
+    assert request.max_tokens == app.GENERATION_TOKEN_LIMIT
 
 
 def test_long_text_segmentation_is_lossless_and_groups_sentences() -> None:

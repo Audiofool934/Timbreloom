@@ -15,14 +15,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import mlx.core as mx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from mlx_audio.audio_io import write as audio_write
-from mlx_audio.tts.utils import load_model
+from pydantic import BaseModel, Field
 
+from timbreloom.asr_service import ASRService
 from timbreloom.audio import stitch_wav_files, wav_duration
+from timbreloom.media import extract_voice_clip
+from timbreloom.providers import (
+    AcceleratorCoordinator,
+    GeminiTextProvider,
+    LocalQwenTTSProvider,
+    LocalWhisperASRProvider,
+    TTSRequest,
+)
 from timbreloom.segmentation import (
     AUDIO_TOKENS_PER_SECOND,
     GENERATION_TOKEN_LIMIT,
@@ -30,6 +37,7 @@ from timbreloom.segmentation import (
     TextSegment,
     segment_text,
 )
+from timbreloom.transcripts import selected_segment_range
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -39,6 +47,7 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 OUTPUT_DIR = DATA_DIR / "outputs"
 VOICE_DIR = DATA_DIR / "voices"
 JOB_DIR = DATA_DIR / "jobs"
+TRANSCRIPT_DIR = DATA_DIR / "transcripts"
 
 MODEL_ID = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16"
 DEFAULT_MODEL_DIR = APP_ROOT / "models" / "Qwen3-TTS-12Hz-0.6B-Base-bf16"
@@ -46,7 +55,14 @@ MODEL_SOURCE = os.getenv(
     "TIMBRELOOM_MODEL",
     str(DEFAULT_MODEL_DIR),
 )
+ASR_MODEL_ID = "mlx-community/whisper-large-v3-turbo-q4"
+ASR_MODEL_REVISION = "660c343bbf4e52ac257f0b7d952e5388e6f93bef"
+DEFAULT_ASR_MODEL_DIR = APP_ROOT / "models" / "Whisper-large-v3-turbo-q4"
+ASR_MODEL_SOURCE = Path(
+    os.getenv("TIMBRELOOM_ASR_MODEL", str(DEFAULT_ASR_MODEL_DIR))
+)
 MAX_UPLOAD_BYTES = 40 * 1024 * 1024
+MAX_ASR_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024
 MIN_REFERENCE_SECONDS = 2.0
 MAX_REFERENCE_SECONDS = 30.0
 MAX_REFERENCE_TEXT_CHARS = 2_000
@@ -56,6 +72,26 @@ MAX_GENERATION_ATTEMPTS = 2
 SAMPLING_TEMPERATURE = 1.0
 MAX_SEGMENT_AUDIO_SECONDS = GENERATION_TOKEN_LIMIT / AUDIO_TOKENS_PER_SECOND
 ALLOWED_SUFFIXES = {".wav", ".mp3", ".m4a", ".aac", ".flac", ".caf", ".ogg", ".webm"}
+ALLOWED_ASR_SUFFIXES = ALLOWED_SUFFIXES | {
+    ".mp4",
+    ".mov",
+    ".mkv",
+    ".avi",
+    ".m4v",
+}
+ASR_LANGUAGES = {
+    "auto": None,
+    "zh": "zh",
+    "en": "en",
+    "ja": "ja",
+    "ko": "ko",
+    "de": "de",
+    "fr": "fr",
+    "es": "es",
+    "it": "it",
+    "pt": "pt",
+    "ru": "ru",
+}
 LANGUAGES = {
     "auto",
     "chinese",
@@ -70,14 +106,19 @@ LANGUAGES = {
     "italian",
 }
 
-for directory in (UPLOAD_DIR, OUTPUT_DIR, VOICE_DIR, JOB_DIR):
+for directory in (UPLOAD_DIR, OUTPUT_DIR, VOICE_DIR, JOB_DIR, TRANSCRIPT_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
-_model: Any | None = None
-_model_status = "idle"
-_model_error: str | None = None
-_model_lock = threading.Lock()
-_generation_lock = threading.Lock()
+_accelerator = AcceleratorCoordinator()
+_tts_provider = LocalQwenTTSProvider(MODEL_ID, MODEL_SOURCE, _accelerator)
+_asr_provider = LocalWhisperASRProvider(
+    ASR_MODEL_ID,
+    ASR_MODEL_SOURCE,
+    _accelerator,
+    before_load=_tts_provider.unload,
+)
+_gemini_provider = GeminiTextProvider()
+_asr_service = ASRService(TRANSCRIPT_DIR, _asr_provider)
 _voice_storage_lock = threading.Lock()
 _jobs_lock = threading.Lock()
 
@@ -107,36 +148,33 @@ class GenerationJob:
     cancel_event: threading.Event = field(default_factory=threading.Event)
 
 
+class TranscriptSegmentPatch(BaseModel):
+    id: str = Field(min_length=1, max_length=64)
+    text: str = Field(min_length=1, max_length=10_000)
+
+
+class TranscriptPatch(BaseModel):
+    segments: list[TranscriptSegmentPatch] = Field(min_length=1, max_length=2_000)
+
+
+class GeminiTransformRequest(BaseModel):
+    segment_id: str = Field(min_length=1, max_length=64)
+    task: str = Field(min_length=1, max_length=32)
+    target_language: str = Field(default="", max_length=80)
+    confirm_cloud: bool = False
+
+
 _jobs: dict[str, GenerationJob] = {}
 
 
-def _set_model_status(status: str, error: str | None = None) -> None:
-    global _model_status, _model_error
-    _model_status = status
-    _model_error = error
-
-
 def get_model() -> Any:
-    global _model
-    if _model is not None:
-        return _model
-
-    with _model_lock:
-        if _model is not None:
-            return _model
-        _set_model_status("loading")
-        try:
-            _model = load_model(MODEL_SOURCE)
-            _set_model_status("ready")
-            return _model
-        except Exception as exc:
-            _set_model_status("error", str(exc))
-            raise
+    """Compatibility wrapper for scripts that preload the local Qwen provider."""
+    return _tts_provider.get_model()
 
 
 def _preload_safely() -> None:
     try:
-        get_model()
+        _tts_provider.preload()
     except Exception:
         return
 
@@ -150,7 +188,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Timbreloom",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -164,23 +202,34 @@ def index() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
+    tts_descriptor = _tts_provider.descriptor
+    asr_descriptor = _asr_provider.descriptor
+    gemini_descriptor = _gemini_provider.descriptor
     return {
-        "ok": _model_status != "error",
+        "ok": _tts_provider.status != "error" and asr_descriptor.configured,
         "model": MODEL_ID,
         "model_source": "project-local" if Path(MODEL_SOURCE).is_dir() else MODEL_SOURCE,
-        "model_status": _model_status,
-        "model_loaded": _model is not None,
-        "error": _model_error,
+        "model_status": _tts_provider.status,
+        "model_loaded": _tts_provider.loaded,
+        "error": _tts_provider.error,
         "privacy": "localhost-only",
         "saved_voices": len(_list_voice_profiles()),
+        "saved_transcripts": len(_asr_service.list_transcripts()),
         "generation_token_limit": GENERATION_TOKEN_LIMIT,
         "sampling_temperature": SAMPLING_TEMPERATURE,
+        "active_local_workload": _accelerator.active,
+        "providers": [
+            tts_descriptor.public(),
+            asr_descriptor.public(),
+            gemini_descriptor.public(),
+        ],
     }
 
 
 @app.post("/api/preload")
 def preload() -> dict[str, Any]:
     try:
+        _tts_provider.preload()
         model = get_model()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"模型加载失败：{exc}") from exc
@@ -243,6 +292,52 @@ async def _read_upload(upload: UploadFile) -> bytes:
     if not payload:
         raise ValueError("参考录音为空。")
     return payload
+
+
+async def _save_upload_stream(
+    upload: UploadFile,
+    destination: Path,
+    max_bytes: int,
+) -> int:
+    total = 0
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with destination.open("xb") as output:
+            while True:
+                chunk = await upload.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail="转录媒体不能超过 2 GB。",
+                    )
+                output.write(chunk)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+    finally:
+        await upload.close()
+    if total == 0:
+        destination.unlink(missing_ok=True)
+        raise ValueError("转录媒体为空。")
+    return total
+
+
+def _validate_asr_suffix(filename: str | None) -> str:
+    suffix = Path(filename or "").suffix.lower()
+    if suffix not in ALLOWED_ASR_SUFFIXES:
+        allowed = "、".join(sorted(ALLOWED_ASR_SUFFIXES))
+        raise ValueError(f"不支持该转录格式。可用格式：{allowed}")
+    return suffix
+
+
+def _validate_asr_language(language: str) -> str:
+    normalized = language.strip().lower()
+    if normalized not in ASR_LANGUAGES:
+        raise ValueError("不支持该 ASR 语言选项。")
+    return normalized
 
 
 def _normalize_audio(source: Path, destination: Path) -> float:
@@ -339,6 +434,49 @@ def _list_voice_profiles() -> list[dict[str, Any]]:
     return profiles
 
 
+def _persist_voice_profile(
+    *,
+    name: str,
+    reference_text: str,
+    normalized_audio: Path,
+    original_filename: str,
+    duration_seconds: float,
+    source: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    with _voice_storage_lock:
+        if any(
+            profile.get("name", "").casefold() == name.casefold()
+            for profile in _list_voice_profiles()
+        ):
+            raise FileExistsError("已经存在同名音色。")
+
+        voice_id = uuid.uuid4().hex
+        profile_dir = VOICE_DIR / voice_id
+        profile_dir.mkdir(parents=True, exist_ok=False)
+        try:
+            shutil.copyfile(normalized_audio, profile_dir / "reference.wav")
+            profile = {
+                "id": voice_id,
+                "name": name,
+                "original_filename": original_filename,
+                "reference_text": reference_text,
+                "duration_seconds": round(duration_seconds, 2),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if source:
+                profile["source"] = source
+            temporary = profile_dir / "profile.json.tmp"
+            temporary.write_text(
+                json.dumps(profile, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            temporary.replace(profile_dir / "profile.json")
+            return profile
+        except Exception:
+            shutil.rmtree(profile_dir, ignore_errors=True)
+            raise
+
+
 @app.get("/api/voices")
 def list_voices() -> dict[str, Any]:
     return {"voices": [_public_voice_profile(profile) for profile in _list_voice_profiles()]}
@@ -362,42 +500,31 @@ async def create_voice(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    with _voice_storage_lock:
-        if any(profile.get("name", "").casefold() == name.casefold() for profile in _list_voice_profiles()):
-            raise HTTPException(status_code=409, detail="已经存在同名音色。")
-
-    voice_id = uuid.uuid4().hex
-    profile_dir = VOICE_DIR / voice_id
-    profile_dir.mkdir(parents=True, exist_ok=False)
-    source_path = profile_dir / f"source{suffix}"
-    reference_path = profile_dir / "reference.wav"
+    temporary_dir = UPLOAD_DIR / f"voice-{uuid.uuid4().hex}"
+    temporary_dir.mkdir(parents=True, exist_ok=False)
+    source_path = temporary_dir / f"source{suffix}"
+    reference_path = temporary_dir / "reference.wav"
     source_path.write_bytes(payload)
 
     try:
         duration = await asyncio.to_thread(_normalize_audio, source_path, reference_path)
-        profile = {
-            "id": voice_id,
-            "name": name,
-            "original_filename": reference_audio.filename or f"reference{suffix}",
-            "reference_text": reference_text,
-            "duration_seconds": round(duration, 2),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        temp_metadata = profile_dir / "profile.json.tmp"
-        temp_metadata.write_text(
-            json.dumps(profile, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        profile = await asyncio.to_thread(
+            _persist_voice_profile,
+            name=name,
+            reference_text=reference_text,
+            normalized_audio=reference_path,
+            original_filename=reference_audio.filename or f"reference{suffix}",
+            duration_seconds=duration,
         )
-        temp_metadata.replace(profile_dir / "profile.json")
         return {"ok": True, "voice": _public_voice_profile(profile)}
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
-        shutil.rmtree(profile_dir, ignore_errors=True)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        shutil.rmtree(profile_dir, ignore_errors=True)
         raise HTTPException(status_code=500, detail=f"保存音色失败：{exc}") from exc
     finally:
-        source_path.unlink(missing_ok=True)
+        shutil.rmtree(temporary_dir, ignore_errors=True)
 
 
 @app.delete("/api/voices/{voice_id}")
@@ -417,6 +544,273 @@ def delete_voice(voice_id: str) -> dict[str, Any]:
 
     shutil.rmtree(Path(profile["audio_path"]).parent)
     return {"ok": True}
+
+
+@app.get("/api/providers")
+def list_providers() -> dict[str, Any]:
+    return {
+        "providers": [
+            _tts_provider.descriptor.public(),
+            _asr_provider.descriptor.public(),
+            _gemini_provider.descriptor.public(),
+        ],
+        "active_local_workload": _accelerator.active,
+    }
+
+
+@app.post("/api/providers/gemini/check")
+async def check_gemini_provider() -> dict[str, Any]:
+    if not _gemini_provider.configured:
+        raise HTTPException(status_code=503, detail="没有配置 GEMINI_API_KEY。")
+    try:
+        return await asyncio.to_thread(_gemini_provider.check_connection)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Gemini 连接检查失败：{exc}") from exc
+
+
+@app.post("/api/asr/jobs", status_code=202)
+async def create_asr_job(
+    media: UploadFile = File(...),
+    language: str = Form("auto"),
+    initial_prompt: str = Form(""),
+) -> dict[str, Any]:
+    try:
+        language = _validate_asr_language(language)
+        suffix = _validate_asr_suffix(media.filename)
+        initial_prompt = " ".join(initial_prompt.strip().split())
+        if len(initial_prompt) > 1_000:
+            raise ValueError("词汇提示不能超过 1,000 个字符。")
+    except ValueError as exc:
+        await media.close()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    job_id = uuid.uuid4().hex
+    transcript_dir = TRANSCRIPT_DIR / job_id
+    transcript_dir.mkdir(parents=True, exist_ok=False)
+    source_path = transcript_dir / f"source{suffix}"
+    source_filename = Path(media.filename or f"media{suffix}").name
+    try:
+        source_bytes = await _save_upload_stream(
+            media,
+            source_path,
+            MAX_ASR_UPLOAD_BYTES,
+        )
+        job = _asr_service.create_job(
+            job_id=job_id,
+            transcript_dir=transcript_dir,
+            source_path=source_path,
+            source_filename=source_filename,
+            source_bytes=source_bytes,
+            requested_language=language,
+            initial_prompt=initial_prompt,
+        )
+        _asr_service.launch(job)
+        return _asr_service.snapshot(job)
+    except HTTPException:
+        shutil.rmtree(transcript_dir, ignore_errors=True)
+        raise
+    except ValueError as exc:
+        shutil.rmtree(transcript_dir, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        shutil.rmtree(transcript_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail=f"建立转录任务失败：{exc}") from exc
+
+
+@app.get("/api/asr/jobs/{job_id}")
+def get_asr_job(job_id: str) -> dict[str, Any]:
+    try:
+        job = _asr_service.get_job(job_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _asr_service.snapshot(job)
+
+
+@app.post("/api/asr/jobs/{job_id}/cancel")
+def cancel_asr_job(job_id: str) -> dict[str, Any]:
+    try:
+        job = _asr_service.cancel(job_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _asr_service.snapshot(job)
+
+
+@app.get("/api/transcripts")
+def list_transcripts() -> dict[str, Any]:
+    return {"transcripts": _asr_service.list_transcripts()}
+
+
+@app.get("/api/transcripts/{transcript_id}")
+def get_transcript(transcript_id: str) -> dict[str, Any]:
+    try:
+        transcript = _asr_service.get_transcript(transcript_id)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    transcript["audio_url"] = f"/api/transcripts/{transcript_id}/audio"
+    transcript["export_urls"] = {
+        export_format: f"/api/transcripts/{transcript_id}/export/{export_format}"
+        for export_format in ("txt", "srt", "vtt")
+    }
+    return transcript
+
+
+@app.patch("/api/transcripts/{transcript_id}")
+def update_transcript(
+    transcript_id: str,
+    patch: TranscriptPatch,
+) -> dict[str, Any]:
+    updates = {segment.id: segment.text for segment in patch.segments}
+    try:
+        transcript = _asr_service.update_transcript(transcript_id, updates)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "transcript": transcript}
+
+
+@app.get("/api/transcripts/{transcript_id}/audio")
+def get_transcript_audio(transcript_id: str) -> FileResponse:
+    try:
+        transcript_dir = _asr_service.transcript_dir(transcript_id)
+        _asr_service.get_transcript(transcript_id)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    audio_path = transcript_dir / "audio.wav"
+    if not audio_path.is_file():
+        raise HTTPException(status_code=404, detail="转录音频不存在。")
+    return FileResponse(audio_path, media_type="audio/wav")
+
+
+@app.get("/api/transcripts/{transcript_id}/export/{export_format}")
+def export_transcript(transcript_id: str, export_format: str) -> FileResponse:
+    try:
+        path = _asr_service.export(transcript_id, export_format)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    media_types = {
+        "txt": "text/plain; charset=utf-8",
+        "srt": "application/x-subrip; charset=utf-8",
+        "vtt": "text/vtt; charset=utf-8",
+    }
+    return FileResponse(
+        path,
+        media_type=media_types[export_format.lower()],
+        filename=f"{transcript_id}.{export_format.lower()}",
+    )
+
+
+@app.post("/api/transcripts/{transcript_id}/voices", status_code=201)
+async def create_voice_from_transcript(
+    transcript_id: str,
+    name: str = Form(...),
+    segment_ids: str = Form(...),
+) -> dict[str, Any]:
+    try:
+        name = _normalize_voice_name(name)
+        parsed_ids = json.loads(segment_ids)
+        if not isinstance(parsed_ids, list) or not all(
+            isinstance(segment_id, str) for segment_id in parsed_ids
+        ):
+            raise ValueError("转录片段选择格式无效。")
+        transcript = _asr_service.get_transcript(transcript_id)
+        start, end, reference_text = selected_segment_range(transcript, parsed_ids)
+        reference_text = _normalize_text(
+            reference_text,
+            "参考录音文字",
+            MAX_REFERENCE_TEXT_CHARS,
+        )
+        duration = end - start
+        if duration < MIN_REFERENCE_SECONDS:
+            raise ValueError(
+                f"所选片段只有 {duration:.1f} 秒，至少需要 {MIN_REFERENCE_SECONDS:.0f} 秒。"
+            )
+        if duration > MAX_REFERENCE_SECONDS:
+            raise ValueError(
+                f"所选片段有 {duration:.1f} 秒，最多选择 {MAX_REFERENCE_SECONDS:.0f} 秒。"
+            )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    temporary_dir = UPLOAD_DIR / f"transcript-voice-{uuid.uuid4().hex}"
+    temporary_dir.mkdir(parents=True, exist_ok=False)
+    clip_path = temporary_dir / "reference.wav"
+    try:
+        source_audio = _asr_service.transcript_dir(transcript_id) / "audio.wav"
+        await asyncio.to_thread(
+            extract_voice_clip,
+            source_audio,
+            clip_path,
+            start,
+            end,
+        )
+        actual_duration = wav_duration(clip_path)
+        profile = await asyncio.to_thread(
+            _persist_voice_profile,
+            name=name,
+            reference_text=reference_text,
+            normalized_audio=clip_path,
+            original_filename=f"{transcript['source_filename']}-clip.wav",
+            duration_seconds=actual_duration,
+            source={
+                "type": "transcript",
+                "transcript_id": transcript_id,
+                "segment_ids": parsed_ids,
+                "start_seconds": round(start, 3),
+                "end_seconds": round(end, 3),
+            },
+        )
+        return {"ok": True, "voice": _public_voice_profile(profile)}
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"从转录创建音色失败：{exc}") from exc
+    finally:
+        shutil.rmtree(temporary_dir, ignore_errors=True)
+
+
+@app.post("/api/transcripts/{transcript_id}/gemini")
+async def transform_transcript_with_gemini(
+    transcript_id: str,
+    request: GeminiTransformRequest,
+) -> dict[str, Any]:
+    if not request.confirm_cloud:
+        raise HTTPException(
+            status_code=400,
+            detail="必须明确确认后才能把所选文字发送到 Gemini。",
+        )
+    if not _gemini_provider.configured:
+        raise HTTPException(status_code=503, detail="没有配置 GEMINI_API_KEY。")
+    try:
+        transcript = _asr_service.get_transcript(transcript_id)
+        segment = next(
+            item for item in transcript["segments"] if item["id"] == request.segment_id
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StopIteration as exc:
+        raise HTTPException(status_code=404, detail="转录片段不存在。") from exc
+
+    try:
+        result = await asyncio.to_thread(
+            _gemini_provider.transform,
+            segment["text"],
+            request.task,
+            request.target_language,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Gemini 处理失败：{exc}") from exc
+    result["segment_id"] = request.segment_id
+    result["cloud_request"] = True
+    return result
 
 
 @app.post("/api/segments/preview")
@@ -445,40 +839,22 @@ def _generate_segment(
     language: str,
     output_path: Path,
 ) -> dict[str, float]:
-    started = time.perf_counter()
-    with _generation_lock:
-        model = get_model()
-        results = list(
-            model.generate(
-                text=target_text.strip(),
-                ref_audio=str(reference_path),
-                ref_text=reference_text,
-                lang_code=language,
-                temperature=SAMPLING_TEMPERATURE,
-                max_tokens=GENERATION_TOKEN_LIMIT,
-                verbose=False,
-                stream=False,
-            )
+    result = _tts_provider.synthesize(
+        TTSRequest(
+            reference_audio=reference_path,
+            reference_text=reference_text,
+            text=target_text,
+            language=language,
+            output_path=output_path,
+            temperature=SAMPLING_TEMPERATURE,
+            max_tokens=GENERATION_TOKEN_LIMIT,
+            max_audio_seconds=MAX_SEGMENT_AUDIO_SECONDS,
         )
-
-    if not results:
-        raise RuntimeError("模型没有返回音频。")
-    audio_parts = [result.audio for result in results if result.audio.size > 0]
-    if not audio_parts:
-        raise RuntimeError("模型返回了空音频。")
-
-    audio = audio_parts[0] if len(audio_parts) == 1 else mx.concatenate(audio_parts)
-    mx.eval(audio)
-    sample_rate = int(results[0].sample_rate)
-    generated_duration = int(audio.shape[0]) / sample_rate
-    if generated_duration >= MAX_SEGMENT_AUDIO_SECONDS - 1.0:
-        raise RuntimeError("分段音频接近 1,024 token 上限，为避免截断已停止。")
-    peak_memory = max(float(result.peak_memory_usage) for result in results)
-    audio_write(output_path, audio, sample_rate, format="wav")
+    )
     return {
-        "duration_seconds": generated_duration,
-        "generation_seconds": time.perf_counter() - started,
-        "peak_memory_gb": peak_memory,
+        "duration_seconds": result.duration_seconds,
+        "generation_seconds": result.generation_seconds,
+        "peak_memory_gb": result.peak_memory_gb,
     }
 
 

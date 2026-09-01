@@ -9,7 +9,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from app import RUNTIME_DIR, _run_generation
+from app import DATA_DIR, _run_generation
 
 
 REFERENCE_TEXT = "This is a clean reference recording for a local voice cloning test."
@@ -21,7 +21,7 @@ def main() -> None:
     if say is None:
         raise RuntimeError("The macOS say command is required for the smoke test.")
 
-    smoke_dir = RUNTIME_DIR / "smoke"
+    smoke_dir = DATA_DIR / "smoke"
     smoke_dir.mkdir(parents=True, exist_ok=True)
     reference = smoke_dir / "reference.aiff"
     subprocess.run(
