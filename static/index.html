@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Timbreloom</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/static/styles.css?v=3" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <a class="brand" href="/" aria-label="Timbreloom 首页">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span>TIMBRELOOM</span>
+        </a>
+        <div class="model-state" id="modelState" data-state="loading">
+          <span class="state-dot"></span>
+          <span id="modelStateText">正在检查模型</span>
+        </div>
+      </header>
+
+      <section class="hero">
+        <p class="eyebrow">私密 · 本机 · 长文本</p>
+        <h1>一句声音，<br />持续说下去。</h1>
+        <p class="lede">把一种声音，织进每句话。参考录音仅在这台 Mac 上处理。保存一次音色，之后可以持续生成长文本。系统按语义组合多句，每段最多 1,024 个音频 token，再在本机拼接为一个完整 WAV。</p>
+      </section>
+
+      <form id="cloneForm" class="workspace">
+        <section class="panel reference-panel">
+          <div class="panel-heading">
+            <span class="step">01</span>
+            <div>
+              <h2>参考声音</h2>
+              <p>使用已保存音色，或上传 5 至 15 秒清晰人声。</p>
+            </div>
+          </div>
+
+          <div class="voice-library">
+            <label class="select-field">
+              <span>音色来源</span>
+              <select id="voiceSelect" aria-label="音色来源">
+                <option value="">本次上传新录音</option>
+              </select>
+            </label>
+            <button id="deleteVoiceButton" class="quiet-button danger-button" type="button" hidden>删除音色</button>
+          </div>
+
+          <section id="savedVoiceCard" class="saved-voice-card" hidden>
+            <span class="saved-label">SAVED VOICE</span>
+            <strong id="savedVoiceName">-</strong>
+            <p id="savedVoiceMeta">-</p>
+            <p id="savedVoiceTranscript">-</p>
+          </section>
+
+          <div id="uploadVoiceFields">
+            <label class="dropzone" id="dropzone" for="referenceAudio">
+              <input
+                id="referenceAudio"
+                type="file"
+                accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.caf,.ogg,.webm"
+                required
+              />
+              <span class="upload-icon" aria-hidden="true">＋</span>
+              <strong id="fileTitle">拖入录音，或点击选择</strong>
+              <span id="fileMeta">WAV、M4A、MP3、FLAC · 最大 40 MB</span>
+            </label>
+
+            <label class="field">
+              <span>录音对应文字</span>
+              <textarea
+                id="referenceText"
+                rows="4"
+                maxlength="2000"
+                placeholder="逐字填写参考录音里说的内容，标点也尽量准确。"
+                required
+              ></textarea>
+            </label>
+
+            <div class="save-voice-row">
+              <label class="field compact-field">
+                <span>保存这个音色</span>
+                <input id="voiceName" type="text" maxlength="80" placeholder="例如：我的普通话" />
+              </label>
+              <button id="saveVoiceButton" class="quiet-button save-voice-button" type="button">保存音色</button>
+            </div>
+            <p id="voiceSaveStatus" class="inline-status" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section class="panel target-panel">
+          <div class="panel-heading">
+            <span class="step">02</span>
+            <div>
+              <h2>长文本</h2>
+              <p>多句组合分段，不设置日常使用中的短段落上限。</p>
+            </div>
+          </div>
+
+          <label class="field target-field">
+            <span>希望它说什么</span>
+            <textarea
+              id="targetText"
+              rows="12"
+              placeholder="粘贴一段、一个章节，或者更长的内容。标点和段落会用于寻找自然分段位置。"
+              required
+            ></textarea>
+            <small><b id="targetCount">0</b> 字 · <span id="segmentEstimate">等待输入</span></small>
+          </label>
+
+          <details class="prosody-guide">
+            <summary>
+              <span>语气写法</span>
+              <strong>TEMPERATURE 1.0</strong>
+            </summary>
+            <div class="prosody-guide-body">
+              <p>当前 Base 克隆模型没有隐藏的情绪标签。请使用正常文字和标点引导语气，不要加入 <code>[开心]</code>、<code>[laugh]</code> 或 <code>&lt;prosody&gt;</code>，它们可能会被直接念出来。</p>
+              <dl>
+                <div><dt>犹豫、稍作延长</dt><dd>啊……我还没想好。</dd></div>
+                <div><dt>惊讶、强调</dt><dd>啊？！真的成功了！</dd></div>
+                <div><dt>疑问、上扬</dt><dd>啊？你刚才说什么？</dd></div>
+                <div><dt>笑声、叹气</dt><dd>哈哈……原来是这样。／唉……算了。</dd></div>
+              </dl>
+              <p class="prosody-note"><code>～</code> 和省略号只能提供语义提示，不能保证某个字精确持续 1 至 2 秒。</p>
+            </div>
+          </details>
+
+          <div class="controls">
+            <label class="select-field">
+              <span>语言</span>
+              <select id="language">
+                <option value="auto">自动识别</option>
+                <option value="chinese">中文</option>
+                <option value="english">English</option>
+                <option value="japanese">日本語</option>
+                <option value="korean">한국어</option>
+              </select>
+            </label>
+            <button id="generateButton" class="generate-button" type="submit">
+              <span id="buttonText">开始生成</span>
+              <span class="button-arrow" aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </section>
+      </form>
+
+      <section id="progressCard" class="result-card progress-card" hidden aria-live="polite">
+        <div class="progress-header">
+          <div class="progress-visual" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="progress-copy">
+            <span class="result-kicker">LONG-FORM GENERATION</span>
+            <strong id="progressTitle">正在准备</strong>
+            <p id="progressText">正在建立生成任务。</p>
+          </div>
+          <button id="cancelButton" class="quiet-button" type="button">停止任务</button>
+        </div>
+        <div id="progressTrack" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span id="progressFill"></span>
+        </div>
+        <div class="progress-meta">
+          <strong id="progressPercent">0%</strong>
+          <span id="progressSegments">等待分段</span>
+        </div>
+        <p id="currentSegmentText" class="current-segment"></p>
+      </section>
+
+      <section id="resultCard" class="result-card" hidden>
+        <div class="result-heading">
+          <div>
+            <span class="result-kicker">GENERATED LOCALLY</span>
+            <h2>长文本生成完成</h2>
+          </div>
+          <a id="downloadLink" class="download-link" href="#" download>下载 WAV</a>
+        </div>
+        <audio id="audioPlayer" controls preload="metadata"></audio>
+        <dl class="metrics metrics-four">
+          <div><dt>音频长度</dt><dd id="durationMetric">-</dd></div>
+          <div><dt>分段数量</dt><dd id="segmentMetric">-</dd></div>
+          <div><dt>生成耗时</dt><dd id="timeMetric">-</dd></div>
+          <div><dt>峰值内存</dt><dd id="memoryMetric">-</dd></div>
+        </dl>
+      </section>
+
+      <section id="errorCard" class="error-card" hidden role="alert">
+        <strong>任务没有完成</strong>
+        <p id="errorText"></p>
+      </section>
+
+      <footer>
+        <p>Qwen3-TTS 0.6B · TEMP 1.0 · 1,024 TOKENS / SEGMENT · LOCALHOST ONLY</p>
+        <p>请只克隆本人或已获得明确授权的声音。</p>
+      </footer>
+    </main>
+    <script src="/static/app.js?v=2" defer></script>
+  </body>
+</html>

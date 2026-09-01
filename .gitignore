@@ -1,0 +1,16 @@
+.DS_Store
+.pytest_cache/
+.venv/
+artifacts/
+output/
+__pycache__/
+*.pyc
+data/uploads/
+data/jobs/
+data/voices/
+data/smoke/
+data/outputs/*.wav
+!data/README.md
+!data/outputs/.gitkeep
+models/*
+!models/README.md
