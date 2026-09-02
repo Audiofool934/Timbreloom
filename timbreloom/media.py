@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -132,6 +133,76 @@ def extract_voice_clip(
     if result.returncode != 0:
         detail = result.stderr.strip() or "无法截取音色片段。"
         raise ValueError(f"音色片段提取失败：{detail}")
+
+
+def tempo_fit_wav(
+    source: Path,
+    destination: Path,
+    *,
+    target_duration_seconds: float,
+    min_speed: float = 0.8,
+    max_speed: float = 1.25,
+) -> dict[str, object]:
+    """Fit speech toward a timeline slot without truncating audio.
+
+    FFmpeg's atempo filter preserves pitch. The requested speed is clamped to a
+    deliberately conservative range so timing correction does not turn into an
+    inaudible quality failure. The caller can surface ``limited`` to the user.
+    """
+    if not source.is_file():
+        raise FileNotFoundError("需要适配时长的配音片段不存在。")
+    if target_duration_seconds <= 0:
+        raise ValueError("目标时间槽长度必须大于 0。")
+    if min_speed <= 0 or max_speed < min_speed:
+        raise ValueError("安全语速范围无效。")
+
+    info = probe_media(source)
+    if not info.has_audio or info.duration_seconds <= 0:
+        raise ValueError("配音片段没有可用音频。")
+    requested_speed = info.duration_seconds / target_duration_seconds
+    applied_speed = min(max_speed, max(min_speed, requested_speed))
+    limited = not math.isclose(requested_speed, applied_speed, rel_tol=0.0, abs_tol=0.001)
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [
+            _tool("ffmpeg"),
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(source),
+            "-vn",
+            "-filter:a",
+            f"atempo={applied_speed:.6f}",
+            "-ac",
+            "1",
+            "-ar",
+            "24000",
+            "-c:a",
+            "pcm_s16le",
+            str(destination),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+    )
+    if result.returncode != 0:
+        destination.unlink(missing_ok=True)
+        detail = result.stderr.strip() or "无法安全适配配音时长。"
+        raise ValueError(f"配音时长适配失败：{detail}")
+    fitted = probe_media(destination)
+    return {
+        "source_duration_seconds": round(info.duration_seconds, 3),
+        "target_duration_seconds": round(target_duration_seconds, 3),
+        "output_duration_seconds": round(fitted.duration_seconds, 3),
+        "requested_speed": round(requested_speed, 4),
+        "applied_speed": round(applied_speed, 4),
+        "limited": limited,
+    }
 
 
 def mux_dubbed_video(

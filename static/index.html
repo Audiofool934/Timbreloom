@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light" />
     <title>Timbreloom</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/styles.css?v=6" />
+    <link rel="stylesheet" href="/static/styles.css?v=10" />
   </head>
   <body>
     <main class="shell">
@@ -421,7 +421,13 @@
                 <span class="result-kicker">LOCAL DUB ARCHIVE</span>
                 <h2>配音项目</h2>
               </div>
-              <button id="refreshDubProjects" class="icon-button" type="button" aria-label="刷新配音项目">↻</button>
+              <div class="library-actions">
+                <label class="icon-button" aria-label="导入 Timbreloom 项目" title="导入项目">
+                  <span>＋</span>
+                  <input id="dubBundleImport" type="file" accept=".timbreloom,application/zip" hidden />
+                </label>
+                <button id="refreshDubProjects" class="icon-button" type="button" aria-label="刷新配音项目">↻</button>
+              </div>
             </div>
             <div id="dubProjectList" class="transcript-list">
               <p class="empty-copy">还没有配音项目。</p>
@@ -453,6 +459,7 @@
             </div>
             <div class="dub-header-actions">
               <button id="dubSaveButton" class="quiet-button" type="button" disabled>保存修改</button>
+              <a id="dubBundleDownload" class="quiet-button button-link" href="#" download>项目包</a>
               <label id="dubOriginalAudioField" class="select-field dub-mix-field" hidden>
                 <span>原声音量</span>
                 <select id="dubOriginalAudioGain">
@@ -483,11 +490,38 @@
               </div>
               <span id="dubTimelineSummary">等待片段数据</span>
             </div>
-            <div id="dubTimelineTrack" class="dub-timeline-track" aria-label="配音片段时间线"></div>
+            <div id="dubWaveformShell" class="dub-waveform-shell">
+              <canvas id="dubWaveformCanvas" aria-hidden="true"></canvas>
+              <div id="dubTimelineTrack" class="dub-timeline-track" aria-label="配音片段时间线"></div>
+              <span id="dubPlayhead" class="dub-playhead" aria-hidden="true"></span>
+            </div>
             <div class="dub-timeline-legend" aria-hidden="true">
               <span><i class="legend-slot"></i>原时间槽</span>
               <span><i class="legend-ready"></i>生成语音</span>
               <span><i class="legend-overlap"></i>与下一段重叠</span>
+            </div>
+            <div class="dub-time-readout">
+              <span id="dubPlayheadTime">00:00.000</span>
+              <span>点击波形定位，选择单段后可在播放头拆分</span>
+            </div>
+          </section>
+
+          <section id="dubQuality" class="dub-quality" aria-live="polite">
+            <strong id="dubQualityTitle">项目检查</strong>
+            <p id="dubQualitySummary">等待项目数据</p>
+          </section>
+
+          <section class="dub-role-panel">
+            <div>
+              <span class="action-label">CAST &amp; VOICE ASSIGNMENT</span>
+              <strong>角色与批量音色</strong>
+            </div>
+            <div class="dub-role-controls">
+              <input id="dubRoleName" type="text" maxlength="160" placeholder="新角色名称" />
+              <select id="dubRoleVoice"><option value="">选择音色</option></select>
+              <button id="dubRoleSave" class="quiet-button" type="button">添加角色</button>
+              <select id="dubApplyRole"><option value="">选择角色</option></select>
+              <button id="dubApplyRoleButton" class="quiet-button" type="button" disabled>应用到所选</button>
             </div>
           </section>
 
@@ -497,6 +531,8 @@
               <span id="dubEditorStatus">编辑文字或音色后请先保存</span>
             </div>
             <div class="dub-generate-actions">
+              <button id="dubSplitButton" class="quiet-button" type="button" disabled>在播放头拆分</button>
+              <button id="dubMergeButton" class="quiet-button" type="button" disabled>合并所选</button>
               <button id="dubGenerateSelected" class="quiet-button" type="button" disabled>生成所选</button>
               <button id="dubRetryFailed" class="quiet-button" type="button" disabled>重试失败</button>
               <button id="dubGenerateAll" class="generate-button compact-generate" type="button">生成全部</button>
@@ -540,8 +576,16 @@
               <span class="action-label">GEMINI TRANSLATION · OPTIONAL CLOUD</span>
               <span id="dubGeminiStatus" class="provider-pill">检查中</span>
             </div>
-            <p>仅把当前选中的一段配音文字发送到 Gemini，不上传源音频或已生成音频。返回内容先进入编辑框，不会自动保存。</p>
+            <p>仅把当前选中的配音文字批量发送到 Gemini，不上传源音频或已生成音频。返回内容先进入编辑框，不会自动保存。</p>
             <div class="cloud-controls">
+              <label class="select-field mini-select">
+                <span>处理方式</span>
+                <select id="dubGeminiTask">
+                  <option value="translate">翻译</option>
+                  <option value="punctuation">补标点</option>
+                  <option value="cleanup">整理断句</option>
+                </select>
+              </label>
               <label class="select-field mini-select">
                 <span>目标语言</span>
                 <select id="dubGeminiTargetLanguage">
@@ -550,7 +594,7 @@
                   <option value="日本語">日本語</option>
                 </select>
               </label>
-              <button id="dubGeminiTranslate" class="quiet-button" type="button" disabled>翻译所选</button>
+              <button id="dubGeminiTranslate" class="quiet-button" type="button" disabled>批量处理所选</button>
             </div>
           </section>
 
@@ -568,10 +612,10 @@
       </section>
 
       <footer>
-        <p>Qwen3-TTS 0.6B · WHISPER LARGE V3 TURBO · GEMINI OPTIONAL · LOCALHOST ONLY</p>
+        <p>TIMBRELOOM 1.0 · QWEN3-TTS · WHISPER LARGE V3 TURBO · GEMINI OPTIONAL</p>
         <p>请只克隆本人或已获得明确授权的声音。</p>
       </footer>
     </main>
-    <script src="/static/app.js?v=5" defer></script>
+    <script src="/static/app.js?v=10" defer></script>
   </body>
 </html>

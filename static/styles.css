@@ -615,6 +615,19 @@ audio {
   opacity: 0.55;
 }
 
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+.library-actions {
+  display: flex;
+  gap: 7px;
+}
+
 .save-voice-button {
   min-width: 92px;
 }
@@ -1304,9 +1317,9 @@ audio {
   font-size: 9px;
 }
 
-.dub-timeline-track {
+.dub-waveform-shell {
   position: relative;
-  height: 44px;
+  height: 86px;
   margin: 12px 0 9px;
   overflow: hidden;
   border-right: 1px solid var(--line);
@@ -1318,6 +1331,22 @@ audio {
     white;
 }
 
+.dub-waveform-shell canvas,
+.dub-timeline-track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.dub-waveform-shell canvas {
+  opacity: 0.64;
+}
+
+.dub-timeline-track {
+  cursor: crosshair;
+}
+
 .dub-timeline-slot,
 .dub-timeline-render {
   position: absolute;
@@ -1325,12 +1354,12 @@ audio {
 }
 
 .dub-timeline-slot {
-  top: 7px;
-  height: 30px;
+  top: 8px;
+  height: 70px;
   min-width: 3px;
   padding: 0;
   border: 1px solid rgba(22, 24, 22, 0.32);
-  background: rgba(22, 24, 22, 0.05);
+  background: rgba(22, 24, 22, 0.025);
   cursor: pointer;
 }
 
@@ -1347,12 +1376,118 @@ audio {
 }
 
 .dub-timeline-render {
-  top: 18px;
+  bottom: 8px;
   z-index: 2;
   height: 8px;
   min-width: 3px;
   pointer-events: none;
   background: #999e99;
+}
+
+.dub-timeline-slot.is-selected {
+  z-index: 3;
+  border-color: #566316;
+  background: rgba(217, 255, 87, 0.22);
+}
+
+.dub-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 5;
+  width: 1px;
+  pointer-events: none;
+  background: var(--error);
+  transform: translateX(-0.5px);
+}
+
+.dub-playhead::before {
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 9px;
+  height: 7px;
+  background: var(--error);
+  content: "";
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.dub-time-readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+}
+
+.dub-quality {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-left: 3px solid #8ba329;
+  background: rgba(217, 255, 87, 0.1);
+}
+
+.dub-quality[data-state="warning"] {
+  border-left-color: #c18d18;
+  background: rgba(193, 141, 24, 0.08);
+}
+
+.dub-quality[data-state="error"] {
+  border-left-color: var(--error);
+  background: rgba(179, 38, 30, 0.06);
+}
+
+.dub-quality strong {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+.dub-quality p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.dub-role-panel {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.35fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: end;
+  margin-bottom: 14px;
+  padding: 15px;
+  border: 1px solid var(--soft-line);
+  background: #f7f8f4;
+}
+
+.dub-role-panel strong,
+.dub-role-panel .action-label {
+  display: block;
+}
+
+.dub-role-panel strong {
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+.dub-role-controls {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) auto minmax(130px, 1fr) auto;
+  gap: 8px;
+}
+
+.dub-role-controls input,
+.dub-role-controls select,
+.dub-role-controls .quiet-button {
+  min-width: 0;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 10px;
 }
 
 .dub-timeline-render.is-ready {
@@ -1497,6 +1632,38 @@ audio {
 .dub-segment-editor {
   display: grid;
   gap: 8px;
+}
+
+.dub-time-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.dub-time-fields label {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dub-time-fields input {
+  width: 100%;
+  height: 34px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  background: white;
+  padding: 0 7px;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+}
+
+.dub-editor-selects {
+  display: grid;
+  grid-template-columns: 1fr 0.72fr;
+  gap: 7px;
 }
 
 .dub-segment-editor textarea {
@@ -1653,6 +1820,15 @@ footer p {
     display: grid;
     grid-template-columns: 1fr;
     margin-top: 14px;
+  }
+
+  .dub-role-panel,
+  .dub-role-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .dub-role-controls .quiet-button {
+    width: 100%;
   }
 
   .dub-header-actions .quiet-button,

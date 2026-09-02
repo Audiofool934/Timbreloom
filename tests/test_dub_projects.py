@@ -3,19 +3,23 @@ import shutil
 import subprocess
 import time
 import wave
+import zipfile
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from timbreloom.dub_projects import (
+    DUB_PROJECT_SCHEMA_VERSION,
+    DubExportService,
     DubProjectStore,
     DubRenderService,
     content_fingerprint,
     mix_timeline_wav,
+    project_quality,
     render_project_srt,
 )
-from timbreloom.media import mux_dubbed_video, probe_media
+from timbreloom.media import mux_dubbed_video, probe_media, tempo_fit_wav
 
 
 VOICE_ID = "b" * 32
@@ -122,8 +126,10 @@ def test_video_source_is_project_owned_and_schema_one_is_upgraded(tmp_path: Path
     project_path.write_text(json.dumps(legacy), encoding="utf-8")
 
     upgraded = store.load(project["id"])
-    assert upgraded["schema_version"] == 2
+    assert upgraded["schema_version"] == DUB_PROJECT_SCHEMA_VERSION
     assert upgraded["source_has_video"] is False
+    assert upgraded["roles"]
+    assert upgraded["segments"][0]["fit_mode"] == "natural"
 
 
 def test_fingerprint_changes_for_text_voice_language_and_model(tmp_path: Path) -> None:
@@ -140,6 +146,115 @@ def test_fingerprint_changes_for_text_voice_language_and_model(tmp_path: Path) -
     assert content_fingerprint(changed_text, project, voice, "model-a", settings) != baseline
     assert content_fingerprint(segment, changed_language, voice, "model-a", settings) != baseline
     assert content_fingerprint(segment, project, voice, "model-b", settings) != baseline
+
+
+def test_roles_timing_split_merge_waveform_and_bundle_roundtrip(tmp_path: Path) -> None:
+    store = DubProjectStore(tmp_path / "projects")
+    project = _project(store, tmp_path)
+    original_source = "".join(item["source_text"] for item in project["segments"])
+    role = store.upsert_role(
+        project["id"],
+        name="旁白",
+        voice_id=VOICE_ID,
+    )["roles"][-1]
+    updated = store.update(
+        project["id"],
+        segment_updates=[
+            {
+                "id": "seg-00001",
+                "role_id": role["id"],
+                "start": 0.2,
+                "end": 1.1,
+                "fit_mode": "slot",
+            }
+        ],
+    )
+    assert updated["segments"][0]["role_id"] == role["id"]
+    assert updated["segments"][0]["start"] == 0.2
+    assert updated["segments"][0]["fit_mode"] == "slot"
+
+    split = store.split_segment(
+        project["id"],
+        "seg-00001",
+        split_at=0.65,
+    )
+    assert len(split["segments"]) == 3
+    assert split["segments"][0]["end"] == 0.65
+    merged = store.merge_segments(
+        project["id"],
+        [split["segments"][0]["id"], split["segments"][1]["id"]],
+    )
+    assert len(merged["segments"]) == 2
+    assert "".join(item["source_text"] for item in merged["segments"]) == original_source
+    assert merged["segments"][0]["source_segment_ids"] == ["seg-00001"]
+    assert merged["segments"][0]["render"]["status"] == "missing"
+
+    duplicated = json.loads(
+        (store.project_dir(project["id"]) / "project.json").read_text(encoding="utf-8")
+    )
+    duplicated["segments"][0]["source_segment_ids"] *= 2
+    (store.project_dir(project["id"]) / "project.json").write_text(
+        json.dumps(duplicated), encoding="utf-8"
+    )
+    assert store.load(project["id"])["segments"][0]["source_segment_ids"] == ["seg-00001"]
+
+    waveform = store.waveform(project["id"], points=240)
+    assert waveform["points"] <= 240
+    assert waveform["duration_seconds"] == pytest.approx(3.0, abs=0.01)
+    assert max(waveform["peaks"]) > 0
+
+    voice_dir = store.root.parent / "voices" / VOICE_ID
+    voice_dir.mkdir(parents=True)
+    (voice_dir / "profile.json").write_text(
+        json.dumps(
+            {
+                "id": VOICE_ID,
+                "name": "可迁移音色",
+                "reference_text": "准确参考文字。",
+                "duration_seconds": 3.0,
+                "created_at": "now",
+            }
+        ),
+        encoding="utf-8",
+    )
+    _write_wav(voice_dir / "reference.wav", duration=3.0)
+    bundle = store.create_bundle(project["id"])
+    imported_store = DubProjectStore(tmp_path / "imported-data" / "projects")
+    imported = imported_store.import_bundle(bundle)
+    assert imported["id"] != project["id"]
+    assert imported["title"].endswith("- 导入")
+    assert imported_store.source_audio(imported["id"]).read_bytes() == store.source_audio(project["id"]).read_bytes()
+    assert (imported_store.root.parent / "voices" / VOICE_ID / "reference.wav").is_file()
+    assert [item["source_text"] for item in imported["segments"]] == [
+        item["source_text"] for item in merged["segments"]
+    ]
+
+
+def test_project_quality_reports_blockers_and_safe_fit_limits(tmp_path: Path) -> None:
+    store = DubProjectStore(tmp_path / "projects")
+    project = _project(store, tmp_path)
+    project["segments"][0]["fit_mode"] = "slot"
+    project["segments"][0]["render"].update(
+        {"status": "ready", "duration_seconds": 2.0, "filename": "first.wav"}
+    )
+    project["segments"][1]["voice_id"] = None
+    quality = project_quality(project)
+    assert quality["export_ready"] is False
+    assert quality["counts"]["unassigned"] == 1
+    assert quality["counts"]["fit_limited"] == 1
+    assert quality["counts"]["overlap"] == 1
+
+
+def test_project_bundle_rejects_path_traversal(tmp_path: Path) -> None:
+    store = DubProjectStore(tmp_path / "projects")
+    bundle = tmp_path / "malicious.timbreloom"
+    with zipfile.ZipFile(bundle, "w") as archive:
+        archive.writestr("manifest.json", json.dumps({"format": "timbreloom-project", "version": 1}))
+        archive.writestr("../outside.txt", "must-not-escape")
+
+    with pytest.raises(ValueError, match="不安全"):
+        store.import_bundle(bundle)
+    assert not (tmp_path / "outside.txt").exists()
 
 
 def test_render_job_uses_cache_and_rerenders_only_changed_segment(tmp_path: Path) -> None:
@@ -411,6 +526,75 @@ def test_video_project_export_creates_mp4_record(tmp_path: Path) -> None:
     assert exported["original_audio_gain"] == 0.35
     assert exported["video_codec_mode"] == "copy"
     assert (store.project_dir(project["id"]) / "exports" / exported["mp4_filename"]).is_file()
+
+
+@pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="FFmpeg is required for safe time fitting",
+)
+def test_safe_tempo_fit_preserves_audio_and_reports_clamping(tmp_path: Path) -> None:
+    source = tmp_path / "source.wav"
+    fitted = tmp_path / "fitted.wav"
+    _write_wav(source, duration=2.0, value=1_500)
+
+    metrics = tempo_fit_wav(source, fitted, target_duration_seconds=0.5)
+
+    assert fitted.is_file()
+    assert metrics["requested_speed"] == pytest.approx(4.0, abs=0.05)
+    assert metrics["applied_speed"] == 1.25
+    assert metrics["limited"] is True
+    assert metrics["output_duration_seconds"] == pytest.approx(1.6, abs=0.05)
+
+
+def test_export_job_is_persistent_and_completes(tmp_path: Path) -> None:
+    store = DubProjectStore(tmp_path / "projects")
+    project = _project(store, tmp_path)
+    reference = tmp_path / "reference.wav"
+    _write_wav(reference, duration=3.0)
+
+    def load_voice(_: str) -> dict:
+        return {
+            "id": VOICE_ID,
+            "created_at": "voice-created",
+            "reference_text": "参考文字。",
+            "audio_path": reference,
+        }
+
+    def generate(
+        _reference_path: Path,
+        _reference_text: str,
+        _target_text: str,
+        _language: str,
+        output_path: Path,
+    ) -> dict[str, float]:
+        _write_wav(output_path, duration=0.2)
+        return {"duration_seconds": 0.2, "generation_seconds": 0.01, "peak_memory_gb": 0.1}
+
+    render_service = DubRenderService(
+        store,
+        load_voice=load_voice,
+        generate_segment=generate,
+        model_id="test-model",
+        settings={"temperature": 1.0},
+    )
+    render_job = render_service.create_job(project["id"], mode="all")
+    assert _wait_for_job(render_service, project["id"], render_job["job_id"])["status"] == "complete"
+
+    export_service = DubExportService(store, render_service)
+    export_job = export_service.create_job(project["id"])
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        completed = export_service.get_job(project["id"], export_job["job_id"])
+        if completed["status"] not in {"queued", "running"}:
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("导出任务没有按时结束。")
+
+    assert completed["status"] == "complete"
+    assert completed["progress"] == 1.0
+    assert completed["result"]["wav_filename"].endswith(".wav")
+    assert store.load(project["id"])["last_export_job_id"] == export_job["job_id"]
 
 
 @pytest.mark.skipif(

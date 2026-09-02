@@ -30,7 +30,7 @@ def test_health_does_not_load_model() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["privacy"] == "localhost-only"
-    assert payload["version"] == "0.5.0"
+    assert payload["version"] == "1.0.0"
     assert payload["model"] == app.MODEL_ID
     assert payload["sampling_temperature"] == 1.0
     provider_ids = {provider["id"] for provider in payload["providers"]}
@@ -388,3 +388,45 @@ def test_dub_project_api_creates_and_updates_persistent_project(
     )
     assert gemini_response.status_code == 400
     assert "明确确认" in gemini_response.json()["detail"]
+
+    class FakeGeminiProvider:
+        configured = True
+
+        def transform(self, text: str, task: str, target_language: str = "") -> dict:
+            assert task == "translate"
+            assert target_language == "English"
+            return {"text": f"translated:{text}"}
+
+    monkeypatch.setattr(app, "_gemini_provider", FakeGeminiProvider())
+    batch_response = client.post(
+        f"/api/dub/projects/{project_id}/gemini-batch",
+        json={
+            "segment_ids": ["seg-00001", "seg-00002"],
+            "task": "translate",
+            "target_language": "English",
+            "confirm_cloud": True,
+        },
+    )
+    assert batch_response.status_code == 200
+    batch = batch_response.json()
+    assert [item["segment_id"] for item in batch["results"]] == ["seg-00001", "seg-00002"]
+    assert all(item["text"].startswith("translated:") for item in batch["results"])
+
+    waveform_response = client.get(f"/api/dub/projects/{project_id}/waveform?points=240")
+    assert waveform_response.status_code == 200
+    assert waveform_response.json()["peaks"]
+
+    bundle_response = client.get(f"/api/dub/projects/{project_id}/bundle")
+    assert bundle_response.status_code == 200
+    imported_response = client.post(
+        "/api/dub/projects/import",
+        files={
+            "bundle": (
+                "project.timbreloom",
+                bundle_response.content,
+                "application/zip",
+            )
+        },
+    )
+    assert imported_response.status_code == 201
+    assert imported_response.json()["project"]["id"] != project_id

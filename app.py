@@ -23,7 +23,12 @@ from pydantic import BaseModel, Field
 
 from timbreloom.asr_service import ASRService
 from timbreloom.audio import stitch_wav_files, wav_duration
-from timbreloom.dub_projects import DubProjectStore, DubRenderService
+from timbreloom.dub_projects import (
+    DubExportService,
+    DubProjectStore,
+    DubRenderService,
+    project_quality,
+)
 from timbreloom.media import extract_voice_clip, probe_media
 from timbreloom.providers import (
     AcceleratorCoordinator,
@@ -181,7 +186,11 @@ class DubSegmentPatch(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     active_text: str | None = Field(default=None, max_length=200_000)
     voice_id: str | None = Field(default=None, max_length=64)
+    role_id: str | None = Field(default=None, max_length=64)
     gain: float | None = Field(default=None, ge=0.0, le=2.0)
+    start: float | None = Field(default=None, ge=0.0)
+    end: float | None = Field(default=None, ge=0.0)
+    fit_mode: str | None = Field(default=None, max_length=16)
 
 
 class DubProjectPatch(BaseModel):
@@ -197,6 +206,27 @@ class DubJobCreateRequest(BaseModel):
 
 class DubExportRequest(BaseModel):
     original_audio_gain: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class DubRoleRequest(BaseModel):
+    id: str | None = Field(default=None, max_length=64)
+    name: str = Field(min_length=1, max_length=160)
+    voice_id: str | None = Field(default=None, max_length=64)
+
+
+class DubSplitRequest(BaseModel):
+    split_at: float = Field(ge=0.0)
+
+
+class DubMergeRequest(BaseModel):
+    segment_ids: list[str] = Field(min_length=2, max_length=2_000)
+
+
+class GeminiBatchRequest(BaseModel):
+    segment_ids: list[str] = Field(min_length=1, max_length=50)
+    task: str = Field(min_length=1, max_length=32)
+    target_language: str = Field(default="", max_length=80)
+    confirm_cloud: bool = False
 
 
 _jobs: dict[str, GenerationJob] = {}
@@ -217,14 +247,15 @@ def _preload_safely() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     recovered_jobs = _dub_render_service.recover()
-    if os.getenv("TIMBRELOOM_PRELOAD", "1") == "1" and recovered_jobs == 0:
+    recovered_exports = _dub_export_service.recover()
+    if os.getenv("TIMBRELOOM_PRELOAD", "1") == "1" and recovered_jobs == 0 and recovered_exports == 0:
         threading.Thread(target=_preload_safely, daemon=True).start()
     yield
 
 
 app = FastAPI(
     title="Timbreloom",
-    version="0.5.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -337,6 +368,7 @@ async def _save_upload_stream(
     upload: UploadFile,
     destination: Path,
     max_bytes: int,
+    oversize_detail: str = "转录媒体不能超过 2 GB。",
 ) -> int:
     total = 0
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -350,7 +382,7 @@ async def _save_upload_stream(
                 if total > max_bytes:
                     raise HTTPException(
                         status_code=413,
-                        detail="转录媒体不能超过 2 GB。",
+                        detail=oversize_detail,
                     )
                 output.write(chunk)
     except Exception:
@@ -586,7 +618,9 @@ def delete_voice(voice_id: str) -> dict[str, Any]:
             project = _dub_store.load(project_summary["id"])
         except (FileNotFoundError, ValueError):
             continue
-        if any(segment.get("voice_id") == voice_id for segment in project["segments"]):
+        if any(segment.get("voice_id") == voice_id for segment in project["segments"]) or any(
+            role.get("voice_id") == voice_id for role in project.get("roles", [])
+        ):
             raise HTTPException(
                 status_code=409,
                 detail=f"该音色仍被配音项目「{project['title']}」使用。",
@@ -921,6 +955,7 @@ _dub_render_service = DubRenderService(
     },
     max_attempts=MAX_GENERATION_ATTEMPTS,
 )
+_dub_export_service = DubExportService(_dub_store, _dub_render_service)
 
 
 def _public_dub_project(project: dict[str, Any]) -> dict[str, Any]:
@@ -931,16 +966,30 @@ def _public_dub_project(project: dict[str, Any]) -> dict[str, Any]:
     for index, segment in enumerate(project["segments"]):
         render = segment["render"]
         slot_duration = max(0.0, float(segment["end"]) - float(segment["start"]))
-        overflow = max(0.0, float(render.get("duration_seconds", 0.0)) - slot_duration)
+        natural_duration = float(render.get("duration_seconds", 0.0))
+        requested_speed = natural_duration / slot_duration if slot_duration > 0 else 1.0
+        applied_speed = min(1.25, max(0.8, requested_speed))
+        fitted_duration = (
+            natural_duration / applied_speed
+            if segment.get("fit_mode") == "slot" and natural_duration > 0
+            else natural_duration
+        )
+        overflow = max(0.0, fitted_duration - slot_duration)
         next_start = (
             float(project["segments"][index + 1]["start"])
             if index + 1 < len(project["segments"])
             else None
         )
-        rendered_end = float(segment["start"]) + float(render.get("duration_seconds", 0.0))
+        rendered_end = float(segment["start"]) + fitted_duration
         overlap_next = max(0.0, rendered_end - next_start) if next_start is not None else 0.0
         render["slot_duration_seconds"] = round(slot_duration, 3)
         render["overflow_seconds"] = round(overflow, 3)
+        render["natural_overflow_seconds"] = round(max(0.0, natural_duration - slot_duration), 3)
+        render["fitted_duration_seconds"] = round(fitted_duration, 3)
+        render["fit_speed"] = round(applied_speed, 3) if segment.get("fit_mode") == "slot" else 1.0
+        render["fit_limited"] = bool(
+            segment.get("fit_mode") == "slot" and abs(requested_speed - applied_speed) > 0.001
+        )
         render["overlap_next_seconds"] = round(overlap_next, 3)
         if render.get("filename"):
             render["audio_url"] = (
@@ -967,6 +1016,17 @@ def _public_dub_project(project: dict[str, Any]) -> dict[str, Any]:
             project["last_job"] = None
     else:
         project["last_job"] = None
+    if project.get("last_export_job_id"):
+        try:
+            project["last_export_job"] = _dub_export_service.get_job(
+                project_id,
+                project["last_export_job_id"],
+            )
+        except (FileNotFoundError, ValueError):
+            project["last_export_job"] = None
+    else:
+        project["last_export_job"] = None
+    project["quality"] = project_quality(project)
     return project
 
 
@@ -1038,6 +1098,60 @@ def update_dub_project(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"ok": True, "project": _public_dub_project(project)}
+
+
+@app.post("/api/dub/projects/{project_id}/roles")
+def upsert_dub_role(project_id: str, request: DubRoleRequest) -> dict[str, Any]:
+    try:
+        if request.voice_id:
+            _load_voice_profile(request.voice_id)
+        project = _dub_store.upsert_role(
+            project_id,
+            role_id=request.id,
+            name=request.name,
+            voice_id=request.voice_id,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "project": _public_dub_project(project)}
+
+
+@app.post("/api/dub/projects/{project_id}/segments/{segment_id}/split")
+def split_dub_segment(
+    project_id: str,
+    segment_id: str,
+    request: DubSplitRequest,
+) -> dict[str, Any]:
+    try:
+        project = _dub_store.split_segment(project_id, segment_id, split_at=request.split_at)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "project": _public_dub_project(project)}
+
+
+@app.post("/api/dub/projects/{project_id}/segments/merge")
+def merge_dub_segments(project_id: str, request: DubMergeRequest) -> dict[str, Any]:
+    try:
+        project = _dub_store.merge_segments(project_id, request.segment_ids)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "project": _public_dub_project(project)}
+
+
+@app.get("/api/dub/projects/{project_id}/waveform")
+def get_dub_waveform(project_id: str, points: int = 1600) -> dict[str, Any]:
+    try:
+        return _dub_store.waveform(project_id, points=points)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/dub/projects/{project_id}/audio")
@@ -1139,6 +1253,71 @@ async def export_dub_project(
     return {"ok": True, "export": export}
 
 
+@app.post("/api/dub/projects/{project_id}/export-jobs", status_code=202)
+def create_dub_export_job(
+    project_id: str,
+    request: DubExportRequest | None = None,
+) -> dict[str, Any]:
+    try:
+        return _dub_export_service.create_job(
+            project_id,
+            original_audio_gain=request.original_audio_gain if request else 0.0,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/dub/projects/{project_id}/export-jobs/{job_id}")
+def get_dub_export_job(project_id: str, job_id: str) -> dict[str, Any]:
+    try:
+        job = _dub_export_service.get_job(project_id, job_id)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if job.get("result"):
+        result = job["result"]
+        result["wav_url"] = f"/api/dub/projects/{project_id}/exports/{result['wav_filename']}"
+        result["srt_url"] = f"/api/dub/projects/{project_id}/exports/{result['srt_filename']}"
+        if result.get("mp4_filename"):
+            result["mp4_url"] = f"/api/dub/projects/{project_id}/exports/{result['mp4_filename']}"
+    return job
+
+
+@app.get("/api/dub/projects/{project_id}/bundle")
+def download_dub_project_bundle(project_id: str) -> FileResponse:
+    try:
+        path = _dub_store.create_bundle(project_id)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(
+        path,
+        media_type="application/zip",
+        filename=path.name,
+    )
+
+
+@app.post("/api/dub/projects/import", status_code=201)
+async def import_dub_project_bundle(bundle: UploadFile = File(...)) -> dict[str, Any]:
+    upload_id = uuid.uuid4().hex
+    path = UPLOAD_DIR / f"dub-bundle-{upload_id}.timbreloom"
+    try:
+        await _save_upload_stream(
+            bundle,
+            path,
+            MAX_ASR_UPLOAD_BYTES,
+            "Timbreloom 项目包不能超过 2 GB。",
+        )
+        project = await asyncio.to_thread(_dub_store.import_bundle, path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        path.unlink(missing_ok=True)
+    return {"ok": True, "project": _public_dub_project(project)}
+
+
 @app.get("/api/dub/projects/{project_id}/exports/{filename}")
 def get_dub_export(project_id: str, filename: str) -> FileResponse:
     try:
@@ -1200,6 +1379,52 @@ async def transform_dub_segment_with_gemini(
     result["segment_id"] = request.segment_id
     result["cloud_request"] = True
     return result
+
+
+@app.post("/api/dub/projects/{project_id}/gemini-batch")
+async def transform_dub_segments_with_gemini(
+    project_id: str,
+    request: GeminiBatchRequest,
+) -> dict[str, Any]:
+    if not request.confirm_cloud:
+        raise HTTPException(status_code=400, detail="必须明确确认后才能把所选文字发送到 Gemini。")
+    if not _gemini_provider.configured:
+        raise HTTPException(status_code=503, detail="没有配置 GEMINI_API_KEY。")
+    try:
+        project = _dub_store.load(project_id)
+        by_id = {item["id"]: item for item in project["segments"]}
+        segment_ids = list(dict.fromkeys(request.segment_ids))
+        if not set(segment_ids).issubset(by_id):
+            raise ValueError("选择中包含不存在的配音片段。")
+        total_chars = sum(len(by_id[item]["active_text"]) for item in segment_ids)
+        if total_chars > 60_000:
+            raise ValueError("批量 Gemini 处理的文字总量不能超过 60,000 个字符。")
+
+        def run_batch() -> list[dict[str, Any]]:
+            results = []
+            for segment_id in segment_ids:
+                result = _gemini_provider.transform(
+                    by_id[segment_id]["active_text"],
+                    request.task,
+                    request.target_language,
+                )
+                results.append({"segment_id": segment_id, "text": result["text"]})
+            return results
+
+        results = await asyncio.to_thread(run_batch)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Gemini 批量处理失败：{exc}") from exc
+    return {
+        "ok": True,
+        "provider": "gemini-text",
+        "cloud_request": True,
+        "task": request.task,
+        "results": results,
+    }
 
 
 def _job_snapshot(job: GenerationJob) -> dict[str, Any]:
