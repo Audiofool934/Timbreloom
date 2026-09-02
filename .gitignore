@@ -10,6 +10,7 @@ data/jobs/
 data/voices/
 data/smoke/
 data/transcripts/
+data/projects/
 data/outputs/*.wav
 !data/README.md
 !data/outputs/.gitkeep

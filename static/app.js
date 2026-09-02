@@ -39,6 +39,7 @@ const modelStateText = document.querySelector("#modelStateText");
 const modeButtons = [...document.querySelectorAll(".mode-button")];
 const cloneView = document.querySelector("#cloneView");
 const asrView = document.querySelector("#asrView");
+const dubView = document.querySelector("#dubView");
 const asrForm = document.querySelector("#asrForm");
 const asrMedia = document.querySelector("#asrMedia");
 const asrDropzone = document.querySelector("#asrDropzone");
@@ -79,6 +80,44 @@ const geminiTargetLanguage = document.querySelector("#geminiTargetLanguage");
 const geminiActionStatus = document.querySelector("#geminiActionStatus");
 const selectAllSegments = document.querySelector("#selectAllSegments");
 const transcriptSegments = document.querySelector("#transcriptSegments");
+const createDubForm = document.querySelector("#createDubForm");
+const dubTranscriptSelect = document.querySelector("#dubTranscriptSelect");
+const dubTitleInput = document.querySelector("#dubTitleInput");
+const dubDefaultVoice = document.querySelector("#dubDefaultVoice");
+const dubTargetLanguage = document.querySelector("#dubTargetLanguage");
+const createDubButton = document.querySelector("#createDubButton");
+const refreshDubProjects = document.querySelector("#refreshDubProjects");
+const dubProjectList = document.querySelector("#dubProjectList");
+const dubEditor = document.querySelector("#dubEditor");
+const dubProjectTitleInput = document.querySelector("#dubProjectTitleInput");
+const dubProjectLanguage = document.querySelector("#dubProjectLanguage");
+const dubProjectMeta = document.querySelector("#dubProjectMeta");
+const dubSourceAudio = document.querySelector("#dubSourceAudio");
+const dubSaveButton = document.querySelector("#dubSaveButton");
+const dubExportButton = document.querySelector("#dubExportButton");
+const dubSelectionCount = document.querySelector("#dubSelectionCount");
+const dubEditorStatus = document.querySelector("#dubEditorStatus");
+const dubGenerateSelected = document.querySelector("#dubGenerateSelected");
+const dubRetryFailed = document.querySelector("#dubRetryFailed");
+const dubGenerateAll = document.querySelector("#dubGenerateAll");
+const dubProgressCard = document.querySelector("#dubProgressCard");
+const dubProgressTitle = document.querySelector("#dubProgressTitle");
+const dubProgressText = document.querySelector("#dubProgressText");
+const dubProgressTrack = document.querySelector("#dubProgressTrack");
+const dubProgressFill = document.querySelector("#dubProgressFill");
+const dubProgressPercent = document.querySelector("#dubProgressPercent");
+const dubProgressMeta = document.querySelector("#dubProgressMeta");
+const dubCurrentText = document.querySelector("#dubCurrentText");
+const dubCancelButton = document.querySelector("#dubCancelButton");
+const dubExportResult = document.querySelector("#dubExportResult");
+const dubExportSummary = document.querySelector("#dubExportSummary");
+const dubExportWav = document.querySelector("#dubExportWav");
+const dubExportSrt = document.querySelector("#dubExportSrt");
+const dubGeminiStatus = document.querySelector("#dubGeminiStatus");
+const dubGeminiTargetLanguage = document.querySelector("#dubGeminiTargetLanguage");
+const dubGeminiTranslate = document.querySelector("#dubGeminiTranslate");
+const dubSelectAll = document.querySelector("#dubSelectAll");
+const dubSegments = document.querySelector("#dubSegments");
 
 let voices = [];
 let statusTimer;
@@ -93,11 +132,20 @@ let geminiConfigured = false;
 const selectedTranscriptSegments = new Set();
 const dirtyTranscriptSegments = new Set();
 const segmentRows = new Map();
+let dubProjects = [];
+let currentDubProject = null;
+let currentDubJobId = null;
+let dubPollTimer;
+let dubProjectDirty = false;
+const selectedDubSegments = new Set();
+const dirtyDubSegments = new Set();
+const dubSegmentRows = new Map();
+const dubPreviewAudio = new Audio();
 
 function switchView(view) {
-  const isAsr = view === "asr";
-  cloneView.hidden = isAsr;
-  asrView.hidden = !isAsr;
+  cloneView.hidden = view !== "clone";
+  asrView.hidden = view !== "asr";
+  dubView.hidden = view !== "dub";
   for (const button of modeButtons) {
     const active = button.dataset.view === view;
     button.classList.toggle("is-active", active);
@@ -110,7 +158,8 @@ for (const button of modeButtons) {
   button.addEventListener("click", () => switchView(button.dataset.view));
 }
 
-switchView(window.localStorage.getItem("timbreloomView") === "asr" ? "asr" : "clone");
+const savedView = window.localStorage.getItem("timbreloomView");
+switchView(["clone", "asr", "dub"].includes(savedView) ? savedView : "clone");
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) return "";
@@ -206,6 +255,7 @@ async function loadVoices(preferredId = "") {
     voiceSelect.value = previous;
   }
   applyVoiceMode();
+  populateDubVoiceOptions();
 }
 
 voiceSelect.addEventListener("change", applyVoiceMode);
@@ -483,7 +533,10 @@ function updateProviders(providerList) {
   geminiConfigured = Boolean(gemini && gemini.configured);
   geminiStatus.textContent = geminiConfigured ? "已配置" : "未配置";
   geminiStatus.dataset.state = geminiConfigured ? "ready" : "missing";
+  dubGeminiStatus.textContent = geminiConfigured ? "已配置" : "未配置";
+  dubGeminiStatus.dataset.state = geminiConfigured ? "ready" : "missing";
   updateTranscriptSelection();
+  updateDubControls();
 }
 
 async function loadProviders() {
@@ -495,6 +548,8 @@ async function loadProviders() {
   } catch (error) {
     geminiStatus.textContent = "检查失败";
     geminiStatus.dataset.state = "error";
+    dubGeminiStatus.textContent = "检查失败";
+    dubGeminiStatus.dataset.state = "error";
   }
 }
 
@@ -723,6 +778,7 @@ async function loadTranscripts(preferredId = "") {
   const payload = await response.json();
   transcripts = payload.transcripts || [];
   renderTranscriptList(preferredId);
+  populateDubTranscriptOptions();
 }
 
 refreshTranscriptsButton.addEventListener("click", async () => {
@@ -980,6 +1036,531 @@ geminiPunctuation.addEventListener("click", () => runGemini("punctuation"));
 geminiCleanup.addEventListener("click", () => runGemini("cleanup"));
 geminiTranslate.addEventListener("click", () => runGemini("translate"));
 
+function populateDubVoiceOptions() {
+  const previous = dubDefaultVoice.value;
+  dubDefaultVoice.replaceChildren(new Option("选择已保存音色", ""));
+  for (const voice of voices) {
+    dubDefaultVoice.add(new Option(voice.name, voice.id));
+  }
+  if (previous && voices.some((voice) => voice.id === previous)) {
+    dubDefaultVoice.value = previous;
+  }
+}
+
+function populateDubTranscriptOptions() {
+  const previous = dubTranscriptSelect.value;
+  dubTranscriptSelect.replaceChildren(new Option("选择转录记录", ""));
+  for (const transcript of transcripts) {
+    dubTranscriptSelect.add(
+      new Option(
+        `${transcript.title || transcript.source_filename} · ${transcript.segment_count} 段`,
+        transcript.id,
+      ),
+    );
+  }
+  if (previous && transcripts.some((transcript) => transcript.id === previous)) {
+    dubTranscriptSelect.value = previous;
+  }
+}
+
+function renderDubProjectList(preferredId = "") {
+  dubProjectList.replaceChildren();
+  if (!dubProjects.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-copy";
+    empty.textContent = transcripts.length
+      ? "还没有配音项目。"
+      : "先在本地转录中建立一份带时间戳的转录。";
+    dubProjectList.append(empty);
+    return;
+  }
+
+  const activeId = preferredId || currentDubProject?.id || "";
+  for (const project of dubProjects) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "transcript-list-item";
+    button.classList.toggle("is-active", project.id === activeId);
+    const title = document.createElement("strong");
+    title.textContent = project.title;
+    const meta = document.createElement("span");
+    meta.textContent = `${project.ready_count} / ${project.segment_count} 段已生成`;
+    const state = document.createElement("small");
+    state.textContent = project.failed_count
+      ? `${project.failed_count} 段失败 · ${formatTranscriptDate(project.updated_at)}`
+      : formatTranscriptDate(project.updated_at);
+    button.append(title, meta, state);
+    button.addEventListener("click", () => loadDubProject(project.id, true));
+    dubProjectList.append(button);
+  }
+}
+
+async function loadDubProjects(preferredId = "") {
+  const response = await fetch("/api/dub/projects", { cache: "no-store" });
+  if (!response.ok) throw new Error(await readError(response));
+  const payload = await response.json();
+  dubProjects = payload.projects || [];
+  const storedId = window.localStorage.getItem("timbreloomDubProject") || "";
+  const candidate = preferredId || currentDubProject?.id || storedId;
+  const selectedId = dubProjects.some((project) => project.id === candidate)
+    ? candidate
+    : dubProjects[0]?.id || "";
+  renderDubProjectList(selectedId);
+  if (selectedId && currentDubProject?.id !== selectedId) {
+    await loadDubProject(selectedId);
+  } else if (!selectedId) {
+    currentDubProject = null;
+    dubEditor.hidden = true;
+  }
+}
+
+function dubStatusCopy(segment) {
+  const render = segment.render;
+  const labels = {
+    missing: "未生成",
+    stale: "需要更新",
+    rendering: "生成中",
+    ready: "可试听",
+    error: "生成失败",
+  };
+  let detail = labels[render.status] || render.status;
+  if (render.status === "ready") {
+    detail = render.overflow_seconds > 0.05
+      ? `超出原时长 ${render.overflow_seconds.toFixed(1)} 秒`
+      : `${render.duration_seconds.toFixed(1)} 秒 · 时间槽内`;
+  } else if (render.status === "error" && render.error) {
+    detail = render.error;
+  }
+  return { label: labels[render.status] || render.status, detail };
+}
+
+function markDubDirty(segmentId = "") {
+  if (segmentId) dirtyDubSegments.add(segmentId);
+  else dubProjectDirty = true;
+  updateDubControls();
+}
+
+function updateDubControls() {
+  const project = currentDubProject;
+  const active = Boolean(currentDubJobId);
+  const selectedCount = selectedDubSegments.size;
+  const dirtyCount = dirtyDubSegments.size + (dubProjectDirty ? 1 : 0);
+  const segments = project?.segments || [];
+  const failedCount = segments.filter((segment) => segment.render.status === "error").length;
+  const allReady = segments.length > 0
+    && segments.every((segment) => segment.render.status === "ready");
+
+  dubSelectionCount.textContent = selectedCount
+    ? `已选择 ${selectedCount} / ${segments.length} 段`
+    : "尚未选择片段";
+  if (active) {
+    dubEditorStatus.textContent = "配音生成正在运行，进度会持久保存";
+  } else if (dirtyCount) {
+    dubEditorStatus.textContent = `${dirtyCount} 处修改尚未保存`;
+  } else if (failedCount) {
+    dubEditorStatus.textContent = `${failedCount} 个失败片段可以独立重试`;
+  } else {
+    const readyCount = segments.filter((segment) => segment.render.status === "ready").length;
+    dubEditorStatus.textContent = `${readyCount} / ${segments.length} 段可以使用缓存`;
+  }
+
+  dubSaveButton.disabled = !project || !dirtyCount || active;
+  dubSaveButton.textContent = dirtyCount ? `保存 ${dirtyCount} 处修改` : "保存修改";
+  dubGenerateSelected.disabled = !project || !selectedCount || active;
+  dubGenerateAll.disabled = !project || active;
+  dubRetryFailed.disabled = !project || !failedCount || active;
+  dubExportButton.disabled = !project || !allReady || Boolean(dirtyCount) || active;
+  dubGeminiTranslate.disabled = !project || selectedCount !== 1 || !geminiConfigured || active;
+  dubSelectAll.checked = segments.length > 0 && selectedCount === segments.length;
+  dubSelectAll.indeterminate = selectedCount > 0 && selectedCount < segments.length;
+  for (const row of dubSegmentRows.values()) {
+    row.regenerate.disabled = active;
+  }
+}
+
+function startDubPolling(job) {
+  currentDubJobId = job.job_id;
+  window.localStorage.setItem(
+    "timbreloomCurrentDubJob",
+    JSON.stringify({ projectId: job.project_id, jobId: job.job_id }),
+  );
+  dubProgressCard.hidden = false;
+  renderDubJob(job);
+  window.clearTimeout(dubPollTimer);
+  dubPollTimer = window.setTimeout(pollDubJob, 500);
+  updateDubControls();
+}
+
+function renderDubProject(project) {
+  currentDubProject = project;
+  window.localStorage.setItem("timbreloomDubProject", project.id);
+  selectedDubSegments.clear();
+  dirtyDubSegments.clear();
+  dubProjectDirty = false;
+  dubSegmentRows.clear();
+  dubSegments.replaceChildren();
+  dubEditor.hidden = false;
+  dubProjectTitleInput.value = project.title;
+  dubProjectLanguage.value = project.target_language;
+  dubProjectMeta.textContent = `${formatDuration(project.duration_seconds)} · ${project.source_language.toUpperCase()} · ${project.segments.length} 段 · ${project.source_filename}`;
+  dubSourceAudio.src = `${project.source_audio_url}?v=${Date.now()}`;
+  dubExportResult.hidden = true;
+
+  const latestExport = project.exports?.at(-1);
+  if (latestExport) {
+    dubExportWav.href = latestExport.wav_url;
+    dubExportSrt.href = latestExport.srt_url;
+    dubExportSummary.textContent = latestExport.warning_count
+      ? `完整配音已导出，${latestExport.warning_count} 段超过原时间槽，未截断。`
+      : "完整配音已按原时间线导出。";
+    dubExportResult.hidden = false;
+  }
+
+  for (const segment of project.segments) {
+    const row = document.createElement("article");
+    row.className = "dub-segment";
+    row.dataset.status = segment.render.status;
+    row.dataset.segmentId = segment.id;
+
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.className = "segment-check";
+    check.setAttribute("aria-label", `选择 ${formatTimecode(segment.start)} 的配音片段`);
+    check.addEventListener("change", () => {
+      if (check.checked) selectedDubSegments.add(segment.id);
+      else selectedDubSegments.delete(segment.id);
+      row.classList.toggle("is-selected", check.checked);
+      updateDubControls();
+    });
+
+    const timeButton = document.createElement("button");
+    timeButton.type = "button";
+    timeButton.className = "segment-time";
+    timeButton.textContent = `${formatTimecode(segment.start)}\n${formatTimecode(segment.end)}`;
+    timeButton.addEventListener("click", () => {
+      dubSourceAudio.currentTime = segment.start;
+      dubSourceAudio.play().catch(() => {});
+    });
+
+    const source = document.createElement("div");
+    source.className = "dub-source-copy";
+    const sourceLabel = document.createElement("span");
+    sourceLabel.textContent = "原始 ASR";
+    const sourceText = document.createElement("p");
+    sourceText.textContent = segment.source_text;
+    source.append(sourceLabel, sourceText);
+
+    const editor = document.createElement("div");
+    editor.className = "dub-segment-editor";
+    const textarea = document.createElement("textarea");
+    textarea.rows = 3;
+    textarea.value = segment.active_text;
+    textarea.setAttribute("aria-label", `${formatTimecode(segment.start)} 的配音文字`);
+    textarea.addEventListener("input", () => {
+      segment.active_text = textarea.value;
+      markDubDirty(segment.id);
+    });
+    const voice = document.createElement("select");
+    voice.setAttribute("aria-label", `${formatTimecode(segment.start)} 的配音音色`);
+    voice.add(new Option("未分配音色", ""));
+    for (const item of voices) voice.add(new Option(item.name, item.id));
+    voice.value = segment.voice_id || "";
+    voice.addEventListener("change", () => {
+      segment.voice_id = voice.value || null;
+      markDubDirty(segment.id);
+    });
+    editor.append(textarea, voice);
+
+    const render = document.createElement("div");
+    render.className = "dub-render-cell";
+    const status = dubStatusCopy(segment);
+    const badge = document.createElement("strong");
+    badge.className = "dub-status-badge";
+    badge.textContent = status.label;
+    const detail = document.createElement("small");
+    detail.textContent = status.detail;
+    const actions = document.createElement("div");
+    actions.className = "dub-row-actions";
+    const play = document.createElement("button");
+    play.type = "button";
+    play.className = "micro-button";
+    play.textContent = "试听";
+    play.disabled = !segment.render.audio_url;
+    play.addEventListener("click", () => {
+      dubPreviewAudio.src = `${segment.render.audio_url}?v=${Date.now()}`;
+      dubPreviewAudio.play().catch((error) => showError(error.message));
+    });
+    const regenerate = document.createElement("button");
+    regenerate.type = "button";
+    regenerate.className = "micro-button";
+    regenerate.textContent = segment.render.status === "ready" ? "重新生成" : "生成此段";
+    regenerate.addEventListener("click", () => startDubJob("selected", [segment.id]));
+    actions.append(play, regenerate);
+    render.append(badge, detail, actions);
+
+    row.append(check, timeButton, source, editor, render);
+    dubSegments.append(row);
+    dubSegmentRows.set(segment.id, { row, check, textarea, voice, regenerate });
+  }
+
+  renderDubProjectList(project.id);
+  const lastJob = project.last_job;
+  if (lastJob && ["queued", "running"].includes(lastJob.status)) {
+    startDubPolling(lastJob);
+  } else {
+    currentDubJobId = null;
+    window.localStorage.removeItem("timbreloomCurrentDubJob");
+    dubProgressCard.hidden = true;
+  }
+  updateDubControls();
+}
+
+async function loadDubProject(projectId, shouldScroll = false) {
+  const response = await fetch(`/api/dub/projects/${projectId}`, { cache: "no-store" });
+  if (!response.ok) throw new Error(await readError(response));
+  renderDubProject(await response.json());
+  if (shouldScroll) dubEditor.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+createDubForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  createDubButton.disabled = true;
+  try {
+    const response = await fetch("/api/dub/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transcript_id: dubTranscriptSelect.value,
+        title: dubTitleInput.value,
+        target_language: dubTargetLanguage.value,
+        default_voice_id: dubDefaultVoice.value,
+      }),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    const payload = await response.json();
+    dubTitleInput.value = "";
+    await loadDubProjects(payload.project.id);
+    await loadDubProject(payload.project.id, true);
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    createDubButton.disabled = false;
+  }
+});
+
+refreshDubProjects.addEventListener("click", () => {
+  loadDubProjects(currentDubProject?.id || "").catch((error) => showError(error.message));
+});
+
+dubProjectTitleInput.addEventListener("input", () => {
+  if (!currentDubProject) return;
+  currentDubProject.title = dubProjectTitleInput.value;
+  markDubDirty();
+});
+
+dubProjectLanguage.addEventListener("change", () => {
+  if (!currentDubProject) return;
+  currentDubProject.target_language = dubProjectLanguage.value;
+  markDubDirty();
+});
+
+async function saveDubChanges() {
+  if (!currentDubProject) return false;
+  if (!dubProjectDirty && !dirtyDubSegments.size) return true;
+  const projectId = currentDubProject.id;
+  const updates = [...dirtyDubSegments].map((segmentId) => {
+    const segment = currentDubProject.segments.find((item) => item.id === segmentId);
+    return {
+      id: segmentId,
+      active_text: segment.active_text,
+      voice_id: segment.voice_id,
+    };
+  });
+  dubSaveButton.disabled = true;
+  dubSaveButton.textContent = "正在保存";
+  try {
+    const response = await fetch(`/api/dub/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: currentDubProject.title,
+        target_language: currentDubProject.target_language,
+        segments: updates,
+      }),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    const payload = await response.json();
+    renderDubProject(payload.project);
+    await loadDubProjects(projectId);
+    return true;
+  } catch (error) {
+    showError(error.message);
+    updateDubControls();
+    return false;
+  }
+}
+
+dubSaveButton.addEventListener("click", saveDubChanges);
+
+dubSelectAll.addEventListener("change", () => {
+  if (!currentDubProject) return;
+  selectedDubSegments.clear();
+  for (const segment of currentDubProject.segments) {
+    const row = dubSegmentRows.get(segment.id);
+    row.check.checked = dubSelectAll.checked;
+    row.row.classList.toggle("is-selected", dubSelectAll.checked);
+    if (dubSelectAll.checked) selectedDubSegments.add(segment.id);
+  }
+  updateDubControls();
+});
+
+function renderDubJob(job) {
+  const percent = Math.max(0, Math.min(100, Math.round(job.progress * 100)));
+  const titles = {
+    queued: "任务已保存",
+    rendering: "正在逐段生成",
+    complete: "所选片段已完成",
+    partial: "部分片段需要重试",
+    cancelled: "任务已停止",
+    error: "任务异常停止",
+  };
+  dubProgressTitle.textContent = titles[job.phase] || "正在生成配音";
+  dubProgressText.textContent = job.message;
+  dubProgressPercent.textContent = `${percent}%`;
+  dubProgressFill.style.width = `${percent}%`;
+  dubProgressTrack.setAttribute("aria-valuenow", percent.toString());
+  dubProgressMeta.textContent = `${job.processed} / ${job.total} 段 · 新生成 ${job.generated} · 缓存 ${job.cached} · 失败 ${job.failed}`;
+  dubCurrentText.textContent = job.current_text || "";
+}
+
+async function startDubJob(mode, segmentIds = []) {
+  if (!currentDubProject || currentDubJobId) return;
+  const projectId = currentDubProject.id;
+  const requestedIds = [...segmentIds];
+  if (!(await saveDubChanges())) return;
+  try {
+    const response = await fetch(`/api/dub/projects/${projectId}/jobs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode, segment_ids: requestedIds }),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    startDubPolling(await response.json());
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
+async function pollDubJob() {
+  if (!currentDubProject || !currentDubJobId) return;
+  const projectId = currentDubProject.id;
+  const jobId = currentDubJobId;
+  try {
+    const response = await fetch(`/api/dub/projects/${projectId}/jobs/${jobId}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    const job = await response.json();
+    renderDubJob(job);
+    if (["complete", "partial", "cancelled", "error"].includes(job.status)) {
+      currentDubJobId = null;
+      window.localStorage.removeItem("timbreloomCurrentDubJob");
+      dubProgressCard.hidden = true;
+      await loadDubProject(projectId);
+      await loadDubProjects(projectId);
+      if (job.status === "error") showError(job.error || job.message);
+      return;
+    }
+    dubPollTimer = window.setTimeout(pollDubJob, 800);
+  } catch (error) {
+    currentDubJobId = null;
+    dubProgressCard.hidden = true;
+    showError(error.message);
+    updateDubControls();
+  }
+}
+
+dubGenerateSelected.addEventListener("click", () => {
+  startDubJob("selected", [...selectedDubSegments]);
+});
+dubGenerateAll.addEventListener("click", () => startDubJob("all"));
+dubRetryFailed.addEventListener("click", () => startDubJob("failed"));
+
+dubCancelButton.addEventListener("click", async () => {
+  if (!currentDubProject || !currentDubJobId) return;
+  dubCancelButton.disabled = true;
+  try {
+    const response = await fetch(
+      `/api/dub/projects/${currentDubProject.id}/jobs/${currentDubJobId}/cancel`,
+      { method: "POST" },
+    );
+    if (!response.ok) throw new Error(await readError(response));
+    renderDubJob(await response.json());
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    dubCancelButton.disabled = false;
+  }
+});
+
+dubExportButton.addEventListener("click", async () => {
+  if (!currentDubProject) return;
+  if (!(await saveDubChanges())) return;
+  dubExportButton.disabled = true;
+  try {
+    const response = await fetch(`/api/dub/projects/${currentDubProject.id}/export`, {
+      method: "POST",
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    const result = (await response.json()).export;
+    dubExportWav.href = result.wav_url;
+    dubExportSrt.href = result.srt_url;
+    dubExportSummary.textContent = result.warning_count
+      ? `完整配音已导出，${result.warning_count} 段超过原时间槽，已保留完整音频。`
+      : "完整配音已按原时间线导出。";
+    dubExportResult.hidden = false;
+    await loadDubProject(currentDubProject.id);
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    updateDubControls();
+  }
+});
+
+dubGeminiTranslate.addEventListener("click", async () => {
+  if (!currentDubProject || selectedDubSegments.size !== 1) return;
+  const segmentId = [...selectedDubSegments][0];
+  const confirmed = window.confirm(
+    `将当前一段配音文字发送到 Gemini 翻译为${dubGeminiTargetLanguage.value}。不会上传音频，云端调用可能产生费用。是否继续？`,
+  );
+  if (!confirmed || !(await saveDubChanges())) return;
+  dubGeminiTranslate.disabled = true;
+  try {
+    const response = await fetch(`/api/dub/projects/${currentDubProject.id}/gemini`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        segment_id: segmentId,
+        task: "translate",
+        target_language: dubGeminiTargetLanguage.value,
+        confirm_cloud: true,
+      }),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    const result = await response.json();
+    const segment = currentDubProject.segments.find((item) => item.id === result.segment_id);
+    const row = dubSegmentRows.get(result.segment_id);
+    segment.active_text = result.text;
+    row.textarea.value = result.text;
+    markDubDirty(result.segment_id);
+    dubEditorStatus.textContent = "Gemini 翻译已放入配音文字，尚未保存";
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    updateDubControls();
+  }
+});
+
 Promise.all([
   refreshHealth(),
   loadProviders(),
@@ -987,7 +1568,7 @@ Promise.all([
   restoreJob(),
   loadTranscripts(),
   restoreAsrJob(),
-]).catch((error) => {
+]).then(() => loadDubProjects()).catch((error) => {
   showError(error.message);
 });
 statusTimer = window.setInterval(refreshHealth, 2500);

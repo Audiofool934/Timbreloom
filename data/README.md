@@ -5,6 +5,7 @@ This directory contains private runtime data and generated artifacts.
 - `voices/` stores normalized reference recordings and their exact transcripts.
 - `outputs/` stores generated WAV files.
 - `transcripts/` stores imported media, normalized ASR audio, editable transcripts, raw provider output, and QA summaries.
+- `projects/` stores persistent dubbing projects, segment renders, resumable jobs, and timeline exports.
 - `uploads/` stores temporary TTS uploads while a request is running.
 - `jobs/` stores resumable TTS generation state.
 - `smoke/` stores local smoke-test fixtures.

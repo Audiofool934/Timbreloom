@@ -1,13 +1,14 @@
 [project]
 name = "timbreloom"
-version = "0.3.0"
-description = "Local-first voice cloning and timestamped transcription for Apple Silicon"
+version = "0.4.0"
+description = "Local-first voice cloning, transcription, and persistent dubbing for Apple Silicon"
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.116,<1",
   "google-genai>=1,<2",
   "mlx-audio[tts] @ git+https://github.com/Blaizzy/mlx-audio.git@feb57c82ecd90bbb516f39d3cf0a33c77bf5ec4a",
   "mlx-whisper>=0.4,<1",
+  "numpy>=2,<3",
   "python-multipart>=0.0.22,<1",
   "uvicorn[standard]>=0.35,<1",
 ]

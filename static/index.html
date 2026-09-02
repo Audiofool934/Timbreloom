@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light" />
     <title>Timbreloom</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/styles.css?v=4" />
+    <link rel="stylesheet" href="/static/styles.css?v=5" />
   </head>
   <body>
     <main class="shell">
@@ -29,6 +29,10 @@
         <button class="mode-button" type="button" data-view="asr" aria-pressed="false">
           <span>02</span>
           本地转录
+        </button>
+        <button class="mode-button" type="button" data-view="dub" aria-pressed="false">
+          <span>03</span>
+          配音项目
         </button>
       </nav>
 
@@ -359,6 +363,175 @@
         </section>
       </section>
 
+      <section id="dubView" class="app-view" hidden>
+        <section class="asr-hero dub-hero">
+          <div>
+            <p class="eyebrow">片段 · 音色 · 原时间线</p>
+            <h1>把每句台词，<br />放回它的位置。</h1>
+          </div>
+          <p class="lede">从带时间戳的本地转录建立项目。原始 ASR 文字始终保留，配音文字和音色可以逐段编辑，只重新生成发生变化的片段，最后导出按原时间点对齐的 WAV 与 SRT。</p>
+        </section>
+
+        <div class="dub-intake-grid">
+          <form id="createDubForm" class="panel-card dub-create-card">
+            <div class="panel-heading compact-heading">
+              <span class="step">01</span>
+              <div>
+                <h2>新建配音项目</h2>
+                <p>选择一份本地转录，并为所有片段预设一个音色。</p>
+              </div>
+            </div>
+            <label class="select-field">
+              <span>来源转录</span>
+              <select id="dubTranscriptSelect" required>
+                <option value="">选择转录记录</option>
+              </select>
+            </label>
+            <label class="field compact-field">
+              <span>项目名称 <small>可选</small></span>
+              <input id="dubTitleInput" type="text" maxlength="160" placeholder="默认使用转录名称" />
+            </label>
+            <div class="dub-create-options">
+              <label class="select-field">
+                <span>默认音色</span>
+                <select id="dubDefaultVoice" required>
+                  <option value="">选择已保存音色</option>
+                </select>
+              </label>
+              <label class="select-field">
+                <span>生成语言</span>
+                <select id="dubTargetLanguage">
+                  <option value="auto">自动识别</option>
+                  <option value="chinese">中文</option>
+                  <option value="english">English</option>
+                  <option value="japanese">日本語</option>
+                  <option value="korean">한국어</option>
+                </select>
+              </label>
+            </div>
+            <button id="createDubButton" class="generate-button wide-button" type="submit">
+              <span>建立项目</span>
+              <span class="button-arrow" aria-hidden="true">↗</span>
+            </button>
+          </form>
+
+          <aside class="panel-card dub-library">
+            <div class="library-heading">
+              <div>
+                <span class="result-kicker">LOCAL DUB ARCHIVE</span>
+                <h2>配音项目</h2>
+              </div>
+              <button id="refreshDubProjects" class="icon-button" type="button" aria-label="刷新配音项目">↻</button>
+            </div>
+            <div id="dubProjectList" class="transcript-list">
+              <p class="empty-copy">还没有配音项目。</p>
+            </div>
+          </aside>
+        </div>
+
+        <section id="dubEditor" class="transcript-editor dub-editor" hidden>
+          <div class="dub-project-header">
+            <div>
+              <span class="result-kicker">PERSISTENT DUB PROJECT</span>
+              <div class="dub-title-row">
+                <label class="field dub-title-field">
+                  <span class="sr-only">项目名称</span>
+                  <input id="dubProjectTitleInput" type="text" maxlength="160" />
+                </label>
+                <label class="select-field dub-language-field">
+                  <span class="sr-only">生成语言</span>
+                  <select id="dubProjectLanguage">
+                    <option value="auto">自动识别</option>
+                    <option value="chinese">中文</option>
+                    <option value="english">English</option>
+                    <option value="japanese">日本語</option>
+                    <option value="korean">한국어</option>
+                  </select>
+                </label>
+              </div>
+              <p id="dubProjectMeta"></p>
+            </div>
+            <div class="dub-header-actions">
+              <button id="dubSaveButton" class="quiet-button" type="button" disabled>保存修改</button>
+              <button id="dubExportButton" class="generate-button compact-generate" type="button" disabled>
+                <span>导出 WAV + SRT</span>
+                <span class="button-arrow" aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </div>
+
+          <audio id="dubSourceAudio" controls preload="metadata"></audio>
+
+          <div class="dub-toolbar">
+            <div class="selection-summary">
+              <strong id="dubSelectionCount">尚未选择片段</strong>
+              <span id="dubEditorStatus">编辑文字或音色后请先保存</span>
+            </div>
+            <div class="dub-generate-actions">
+              <button id="dubGenerateSelected" class="quiet-button" type="button" disabled>生成所选</button>
+              <button id="dubRetryFailed" class="quiet-button" type="button" disabled>重试失败</button>
+              <button id="dubGenerateAll" class="generate-button compact-generate" type="button">生成全部</button>
+            </div>
+          </div>
+
+          <section id="dubProgressCard" class="dub-progress" hidden aria-live="polite">
+            <div class="progress-header">
+              <div class="progress-visual" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="progress-copy">
+                <span class="result-kicker">PERSISTENT SEGMENT RENDER</span>
+                <strong id="dubProgressTitle">正在准备</strong>
+                <p id="dubProgressText">正在建立配音任务。</p>
+              </div>
+              <button id="dubCancelButton" class="quiet-button" type="button">停止任务</button>
+            </div>
+            <div id="dubProgressTrack" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <span id="dubProgressFill"></span>
+            </div>
+            <div class="progress-meta">
+              <strong id="dubProgressPercent">0%</strong>
+              <span id="dubProgressMeta">等待片段</span>
+            </div>
+            <p id="dubCurrentText" class="current-segment"></p>
+          </section>
+
+          <section id="dubExportResult" class="dub-export-result" hidden>
+            <div>
+              <span class="action-label">TIMELINE EXPORT READY</span>
+              <strong id="dubExportSummary">完整配音已经导出。</strong>
+            </div>
+            <div class="export-actions">
+              <a id="dubExportWav" class="download-link secondary-link" href="#" download>WAV</a>
+              <a id="dubExportSrt" class="download-link secondary-link" href="#" download>SRT</a>
+            </div>
+          </section>
+
+          <section class="action-panel cloud-panel dub-cloud-panel">
+            <div class="cloud-title-row">
+              <span class="action-label">GEMINI TRANSLATION · OPTIONAL CLOUD</span>
+              <span id="dubGeminiStatus" class="provider-pill">检查中</span>
+            </div>
+            <p>仅把当前选中的一段配音文字发送到 Gemini，不上传源音频或已生成音频。返回内容先进入编辑框，不会自动保存。</p>
+            <div class="cloud-controls">
+              <label class="select-field mini-select">
+                <span>目标语言</span>
+                <select id="dubGeminiTargetLanguage">
+                  <option value="中文">中文</option>
+                  <option value="English">English</option>
+                  <option value="日本語">日本語</option>
+                </select>
+              </label>
+              <button id="dubGeminiTranslate" class="quiet-button" type="button" disabled>翻译所选</button>
+            </div>
+          </section>
+
+          <div class="segment-list-heading">
+            <label class="check-all"><input id="dubSelectAll" type="checkbox" /> 选择全部</label>
+            <span>源文字只读，配音文字和音色可以单独修改</span>
+          </div>
+          <div id="dubSegments" class="dub-segments"></div>
+        </section>
+      </section>
+
       <section id="errorCard" class="error-card" hidden role="alert">
         <strong>任务没有完成</strong>
         <p id="errorText"></p>
@@ -369,6 +542,6 @@
         <p>请只克隆本人或已获得明确授权的声音。</p>
       </footer>
     </main>
-    <script src="/static/app.js?v=3" defer></script>
+    <script src="/static/app.js?v=4" defer></script>
   </body>
 </html>

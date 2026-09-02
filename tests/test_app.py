@@ -9,6 +9,7 @@ os.environ["TIMBRELOOM_PRELOAD"] = "0"
 from fastapi.testclient import TestClient
 
 import app
+from timbreloom.dub_projects import DubProjectStore, DubRenderService
 from timbreloom.providers import TTSResult
 from timbreloom.segmentation import SEGMENT_ESTIMATED_TOKEN_LIMIT, segment_text
 
@@ -280,3 +281,103 @@ def test_background_job_stops_instead_of_skipping_suspicious_audio(
     assert job.segments_completed == 0
     assert "漏读" in (job.error or "")
     assert not list(output_dir.glob("*.wav"))
+
+
+def test_dub_project_api_creates_and_updates_persistent_project(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    transcript_root = tmp_path / "transcripts"
+    transcript_dir = transcript_root / ("a" * 32)
+    transcript_dir.mkdir(parents=True)
+    _write_wav(transcript_dir / "audio.wav", 3.0)
+    transcript = {
+        "id": "a" * 32,
+        "title": "API 配音测试",
+        "source_filename": "source.wav",
+        "duration_seconds": 3.0,
+        "language": "zh",
+        "segments": [
+            {"id": "seg-00001", "start": 0.0, "end": 1.2, "text": "原始第一句。"},
+            {"id": "seg-00002", "start": 1.4, "end": 2.7, "text": "原始第二句。"},
+        ],
+    }
+
+    class FakeASRService:
+        def get_transcript(self, transcript_id: str) -> dict:
+            if transcript_id != transcript["id"]:
+                raise FileNotFoundError("转录不存在。")
+            return transcript
+
+        def transcript_dir(self, transcript_id: str) -> Path:
+            if transcript_id != transcript["id"]:
+                raise FileNotFoundError("转录不存在。")
+            return transcript_dir
+
+    reference = tmp_path / "reference.wav"
+    _write_wav(reference, 3.0)
+    voice_id = "b" * 32
+
+    def fake_voice(requested_voice_id: str) -> dict:
+        if requested_voice_id != voice_id:
+            raise FileNotFoundError("音色不存在。")
+        return {
+            "id": voice_id,
+            "created_at": "voice-created",
+            "reference_text": "准确参考文字。",
+            "audio_path": reference,
+        }
+
+    store = DubProjectStore(tmp_path / "projects")
+    render_service = DubRenderService(
+        store,
+        load_voice=fake_voice,
+        generate_segment=lambda *_args: {},
+        model_id="test-model",
+        settings={"temperature": 1.0},
+    )
+    monkeypatch.setattr(app, "_asr_service", FakeASRService())
+    monkeypatch.setattr(app, "_load_voice_profile", fake_voice)
+    monkeypatch.setattr(app, "_dub_store", store)
+    monkeypatch.setattr(app, "_dub_render_service", render_service)
+
+    created_response = client.post(
+        "/api/dub/projects",
+        json={
+            "transcript_id": transcript["id"],
+            "title": "我的配音项目",
+            "target_language": "chinese",
+            "default_voice_id": voice_id,
+        },
+    )
+    assert created_response.status_code == 201
+    project = created_response.json()["project"]
+    project_id = project["id"]
+    assert project["segments"][0]["source_text"] == "原始第一句。"
+    assert project["source_audio_url"].endswith("/audio")
+
+    updated_response = client.patch(
+        f"/api/dub/projects/{project_id}",
+        json={
+            "segments": [
+                {"id": "seg-00001", "active_text": "用于配音的新文字。"}
+            ]
+        },
+    )
+    assert updated_response.status_code == 200
+    updated = updated_response.json()["project"]
+    assert updated["segments"][0]["source_text"] == "原始第一句。"
+    assert updated["segments"][0]["active_text"] == "用于配音的新文字。"
+    assert client.get(f"/api/dub/projects/{project_id}/audio").status_code == 200
+
+    gemini_response = client.post(
+        f"/api/dub/projects/{project_id}/gemini",
+        json={
+            "segment_id": "seg-00001",
+            "task": "translate",
+            "target_language": "English",
+            "confirm_cloud": False,
+        },
+    )
+    assert gemini_response.status_code == 400
+    assert "明确确认" in gemini_response.json()["detail"]
