@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import mimetypes
 import os
 import re
 import shutil
@@ -23,7 +24,7 @@ from pydantic import BaseModel, Field
 from timbreloom.asr_service import ASRService
 from timbreloom.audio import stitch_wav_files, wav_duration
 from timbreloom.dub_projects import DubProjectStore, DubRenderService
-from timbreloom.media import extract_voice_clip
+from timbreloom.media import extract_voice_clip, probe_media
 from timbreloom.providers import (
     AcceleratorCoordinator,
     GeminiTextProvider,
@@ -43,7 +44,9 @@ from timbreloom.transcripts import selected_segment_range
 
 APP_ROOT = Path(__file__).resolve().parent
 STATIC_DIR = APP_ROOT / "static"
-DATA_DIR = APP_ROOT / "data"
+DATA_DIR = Path(
+    os.getenv("TIMBRELOOM_DATA_DIR", str(APP_ROOT / "data"))
+).expanduser().resolve()
 UPLOAD_DIR = DATA_DIR / "uploads"
 OUTPUT_DIR = DATA_DIR / "outputs"
 VOICE_DIR = DATA_DIR / "voices"
@@ -192,6 +195,10 @@ class DubJobCreateRequest(BaseModel):
     segment_ids: list[str] = Field(default_factory=list, max_length=2_000)
 
 
+class DubExportRequest(BaseModel):
+    original_audio_gain: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
 _jobs: dict[str, GenerationJob] = {}
 
 
@@ -217,7 +224,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Timbreloom",
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -236,6 +243,7 @@ def health() -> dict[str, Any]:
     gemini_descriptor = _gemini_provider.descriptor
     return {
         "ok": _tts_provider.status != "error" and asr_descriptor.configured,
+        "version": app.version,
         "model": MODEL_ID,
         "model_source": "project-local" if Path(MODEL_SOURCE).is_dir() else MODEL_SOURCE,
         "model_status": _tts_provider.status,
@@ -265,6 +273,7 @@ def preload() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"模型加载失败：{exc}") from exc
     return {
         "ok": True,
+        "version": app.version,
         "model": MODEL_ID,
         "sample_rate": int(model.sample_rate),
     }
@@ -917,12 +926,22 @@ _dub_render_service = DubRenderService(
 def _public_dub_project(project: dict[str, Any]) -> dict[str, Any]:
     project_id = project["id"]
     project["source_audio_url"] = f"/api/dub/projects/{project_id}/audio"
-    for segment in project["segments"]:
+    if project.get("source_has_video"):
+        project["source_media_url"] = f"/api/dub/projects/{project_id}/media"
+    for index, segment in enumerate(project["segments"]):
         render = segment["render"]
         slot_duration = max(0.0, float(segment["end"]) - float(segment["start"]))
         overflow = max(0.0, float(render.get("duration_seconds", 0.0)) - slot_duration)
+        next_start = (
+            float(project["segments"][index + 1]["start"])
+            if index + 1 < len(project["segments"])
+            else None
+        )
+        rendered_end = float(segment["start"]) + float(render.get("duration_seconds", 0.0))
+        overlap_next = max(0.0, rendered_end - next_start) if next_start is not None else 0.0
         render["slot_duration_seconds"] = round(slot_duration, 3)
         render["overflow_seconds"] = round(overflow, 3)
+        render["overlap_next_seconds"] = round(overlap_next, 3)
         if render.get("filename"):
             render["audio_url"] = (
                 f"/api/dub/projects/{project_id}/segments/{segment['id']}/audio"
@@ -934,6 +953,10 @@ def _public_dub_project(project: dict[str, Any]) -> dict[str, Any]:
         export["srt_url"] = (
             f"/api/dub/projects/{project_id}/exports/{export['srt_filename']}"
         )
+        if export.get("mp4_filename"):
+            export["mp4_url"] = (
+                f"/api/dub/projects/{project_id}/exports/{export['mp4_filename']}"
+            )
     if project.get("last_job_id"):
         try:
             project["last_job"] = _dub_render_service.get_job(
@@ -958,12 +981,15 @@ async def create_dub_project(request: DubProjectCreateRequest) -> dict[str, Any]
         target_language = _validate_language(request.target_language)
         transcript = _asr_service.get_transcript(request.transcript_id)
         source_audio = _asr_service.transcript_dir(request.transcript_id) / "audio.wav"
+        source_media = _asr_service.source_media(request.transcript_id)
+        source_media_info = await asyncio.to_thread(probe_media, source_media)
         if request.default_voice_id:
             _load_voice_profile(request.default_voice_id)
         project = await asyncio.to_thread(
             _dub_store.create,
             transcript=transcript,
             source_audio=source_audio,
+            source_media=source_media if source_media_info.has_video else None,
             title=request.title,
             target_language=target_language,
             default_voice_id=request.default_voice_id,
@@ -1023,6 +1049,16 @@ def get_dub_source_audio(project_id: str) -> FileResponse:
     return FileResponse(path, media_type="audio/wav")
 
 
+@app.get("/api/dub/projects/{project_id}/media")
+def get_dub_source_media(project_id: str) -> FileResponse:
+    try:
+        path = _dub_store.source_media(project_id)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media_type)
+
+
 @app.get("/api/dub/projects/{project_id}/segments/{segment_id}/audio")
 def get_dub_segment_audio(project_id: str, segment_id: str) -> FileResponse:
     try:
@@ -1079,9 +1115,17 @@ def cancel_dub_job(project_id: str, job_id: str) -> dict[str, Any]:
 
 
 @app.post("/api/dub/projects/{project_id}/export")
-async def export_dub_project(project_id: str) -> dict[str, Any]:
+async def export_dub_project(
+    project_id: str,
+    request: DubExportRequest | None = None,
+) -> dict[str, Any]:
     try:
-        export = await asyncio.to_thread(_dub_render_service.export, project_id)
+        original_audio_gain = request.original_audio_gain if request else 0.0
+        export = await asyncio.to_thread(
+            _dub_render_service.export,
+            project_id,
+            original_audio_gain=original_audio_gain,
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -1090,6 +1134,8 @@ async def export_dub_project(project_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"导出配音项目失败：{exc}") from exc
     export["wav_url"] = f"/api/dub/projects/{project_id}/exports/{export['wav_filename']}"
     export["srt_url"] = f"/api/dub/projects/{project_id}/exports/{export['srt_filename']}"
+    if export.get("mp4_filename"):
+        export["mp4_url"] = f"/api/dub/projects/{project_id}/exports/{export['mp4_filename']}"
     return {"ok": True, "export": export}
 
 
@@ -1098,9 +1144,10 @@ def get_dub_export(project_id: str, filename: str) -> FileResponse:
     try:
         project = _dub_store.load(project_id)
         allowed = {
-            item[key]
+            value
             for item in project.get("exports", [])
-            for key in ("wav_filename", "srt_filename")
+            for key in ("wav_filename", "srt_filename", "mp4_filename")
+            if (value := item.get(key))
         }
         if filename not in allowed or Path(filename).name != filename:
             raise FileNotFoundError("配音导出文件不存在。")
@@ -1109,7 +1156,12 @@ def get_dub_export(project_id: str, filename: str) -> FileResponse:
             raise FileNotFoundError("配音导出文件不存在。")
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    media_type = "audio/wav" if path.suffix == ".wav" else "application/x-subrip; charset=utf-8"
+    media_types = {
+        ".wav": "audio/wav",
+        ".srt": "application/x-subrip; charset=utf-8",
+        ".mp4": "video/mp4",
+    }
+    media_type = media_types.get(path.suffix.lower(), "application/octet-stream")
     return FileResponse(path, media_type=media_type, filename=filename)
 
 

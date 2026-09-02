@@ -30,6 +30,7 @@ def test_health_does_not_load_model() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["privacy"] == "localhost-only"
+    assert payload["version"] == "0.5.0"
     assert payload["model"] == app.MODEL_ID
     assert payload["sampling_temperature"] == 1.0
     provider_ids = {provider["id"] for provider in payload["providers"]}
@@ -291,6 +292,7 @@ def test_dub_project_api_creates_and_updates_persistent_project(
     transcript_dir = transcript_root / ("a" * 32)
     transcript_dir.mkdir(parents=True)
     _write_wav(transcript_dir / "audio.wav", 3.0)
+    _write_wav(transcript_dir / "source.wav", 3.0)
     transcript = {
         "id": "a" * 32,
         "title": "API 配音测试",
@@ -313,6 +315,11 @@ def test_dub_project_api_creates_and_updates_persistent_project(
             if transcript_id != transcript["id"]:
                 raise FileNotFoundError("转录不存在。")
             return transcript_dir
+
+        def source_media(self, transcript_id: str) -> Path:
+            if transcript_id != transcript["id"]:
+                raise FileNotFoundError("转录不存在。")
+            return transcript_dir / "source.wav"
 
     reference = tmp_path / "reference.wav"
     _write_wav(reference, 3.0)

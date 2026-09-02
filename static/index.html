@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light" />
     <title>Timbreloom</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/styles.css?v=5" />
+    <link rel="stylesheet" href="/static/styles.css?v=6" />
   </head>
   <body>
     <main class="shell">
@@ -369,7 +369,7 @@
             <p class="eyebrow">片段 · 音色 · 原时间线</p>
             <h1>把每句台词，<br />放回它的位置。</h1>
           </div>
-          <p class="lede">从带时间戳的本地转录建立项目。原始 ASR 文字始终保留，配音文字和音色可以逐段编辑，只重新生成发生变化的片段，最后导出按原时间点对齐的 WAV 与 SRT。</p>
+          <p class="lede">从带时间戳的本地转录建立项目。原始 ASR 文字始终保留，配音文字和音色可以逐段编辑，只重新生成发生变化的片段。音频导出 WAV 与 SRT，视频来源同时封装为 MP4。</p>
         </section>
 
         <div class="dub-intake-grid">
@@ -453,14 +453,43 @@
             </div>
             <div class="dub-header-actions">
               <button id="dubSaveButton" class="quiet-button" type="button" disabled>保存修改</button>
+              <label id="dubOriginalAudioField" class="select-field dub-mix-field" hidden>
+                <span>原声音量</span>
+                <select id="dubOriginalAudioGain">
+                  <option value="0">静音原声</option>
+                  <option value="0.15">原声 15%</option>
+                  <option value="0.35">原声 35%</option>
+                  <option value="0.6">原声 60%</option>
+                  <option value="1">保留原声</option>
+                </select>
+              </label>
               <button id="dubExportButton" class="generate-button compact-generate" type="button" disabled>
-                <span>导出 WAV + SRT</span>
+                <span id="dubExportButtonText">导出 WAV + SRT</span>
                 <span class="button-arrow" aria-hidden="true">↗</span>
               </button>
             </div>
           </div>
 
-          <audio id="dubSourceAudio" controls preload="metadata"></audio>
+          <div class="dub-source-preview">
+            <video id="dubSourceVideo" controls preload="metadata" playsinline hidden></video>
+            <audio id="dubSourceAudio" controls preload="metadata"></audio>
+          </div>
+
+          <section class="dub-timeline" aria-labelledby="dubTimelineTitle">
+            <div class="dub-timeline-heading">
+              <div>
+                <span class="result-kicker">ORIGINAL TIMECODE MAP</span>
+                <strong id="dubTimelineTitle">片段时间线</strong>
+              </div>
+              <span id="dubTimelineSummary">等待片段数据</span>
+            </div>
+            <div id="dubTimelineTrack" class="dub-timeline-track" aria-label="配音片段时间线"></div>
+            <div class="dub-timeline-legend" aria-hidden="true">
+              <span><i class="legend-slot"></i>原时间槽</span>
+              <span><i class="legend-ready"></i>生成语音</span>
+              <span><i class="legend-overlap"></i>与下一段重叠</span>
+            </div>
+          </section>
 
           <div class="dub-toolbar">
             <div class="selection-summary">
@@ -500,6 +529,7 @@
               <strong id="dubExportSummary">完整配音已经导出。</strong>
             </div>
             <div class="export-actions">
+              <a id="dubExportMp4" class="download-link secondary-link" href="#" download hidden>MP4</a>
               <a id="dubExportWav" class="download-link secondary-link" href="#" download>WAV</a>
               <a id="dubExportSrt" class="download-link secondary-link" href="#" download>SRT</a>
             </div>
@@ -542,6 +572,6 @@
         <p>请只克隆本人或已获得明确授权的声音。</p>
       </footer>
     </main>
-    <script src="/static/app.js?v=4" defer></script>
+    <script src="/static/app.js?v=5" defer></script>
   </body>
 </html>

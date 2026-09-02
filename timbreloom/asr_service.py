@@ -241,6 +241,18 @@ class ASRService:
             raise FileNotFoundError("转录不存在。")
         return self.transcript_root / transcript_id
 
+    def source_media(self, transcript_id: str) -> Path:
+        transcript_dir = self.transcript_dir(transcript_id)
+        self.get_transcript(transcript_id)
+        candidates = sorted(
+            path
+            for path in transcript_dir.glob("source.*")
+            if path.is_file()
+        )
+        if len(candidates) != 1:
+            raise FileNotFoundError("转录的原始媒体不存在或不唯一。")
+        return candidates[0]
+
     def get_transcript(self, transcript_id: str) -> dict[str, Any]:
         return load_transcript(self.transcript_dir(transcript_id))
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import threading
@@ -15,10 +16,11 @@ from typing import Any, Callable, Iterable
 import numpy as np
 
 from .audio import stitch_wav_files, wav_duration
+from .media import mux_dubbed_video
 from .segmentation import AUDIO_TOKENS_PER_SECOND, segment_text
 
 
-DUB_PROJECT_SCHEMA_VERSION = 1
+DUB_PROJECT_SCHEMA_VERSION = 2
 DUB_JOB_SCHEMA_VERSION = 1
 PROJECT_ID_PATTERN = re.compile(r"[0-9a-f]{32}")
 RENDER_STATUSES = {"missing", "stale", "rendering", "ready", "error"}
@@ -80,6 +82,22 @@ def _blank_render() -> dict[str, Any]:
     }
 
 
+def _upgrade_project(project: dict[str, Any]) -> bool:
+    version = project.get("schema_version")
+    if version == DUB_PROJECT_SCHEMA_VERSION:
+        return False
+    if version == 1:
+        project["schema_version"] = DUB_PROJECT_SCHEMA_VERSION
+        project.setdefault("source_media_filename", "")
+        project.setdefault("source_has_video", False)
+        for export in project.get("exports", []):
+            export.setdefault("mp4_filename", "")
+            export.setdefault("original_audio_gain", 0.0)
+            export.setdefault("video_codec_mode", "")
+        return True
+    raise ValueError("不支持该配音项目数据版本。")
+
+
 def validate_project(project: dict[str, Any]) -> None:
     if project.get("schema_version") != DUB_PROJECT_SCHEMA_VERSION:
         raise ValueError("不支持该配音项目数据版本。")
@@ -87,6 +105,11 @@ def validate_project(project: dict[str, Any]) -> None:
     if not PROJECT_ID_PATTERN.fullmatch(project_id):
         raise ValueError("配音项目 ID 无效。")
     _safe_filename(str(project.get("source_audio_filename", "")))
+    source_media_filename = str(project.get("source_media_filename", ""))
+    if source_media_filename:
+        _safe_filename(source_media_filename)
+    if bool(project.get("source_has_video")) and not source_media_filename:
+        raise ValueError("视频配音项目缺少原始媒体文件。")
     segments = project.get("segments")
     if not isinstance(segments, list) or not segments:
         raise ValueError("配音项目没有有效片段。")
@@ -132,6 +155,7 @@ def project_summary(project: dict[str, Any]) -> dict[str, Any]:
         "title": project["title"],
         "source_filename": project.get("source_filename", ""),
         "source_transcript_id": project.get("source_transcript_id", ""),
+        "source_has_video": bool(project.get("source_has_video", False)),
         "duration_seconds": project.get("duration_seconds", 0.0),
         "source_language": project.get("source_language", "unknown"),
         "target_language": project.get("target_language", "auto"),
@@ -185,12 +209,15 @@ class DubProjectStore:
         *,
         transcript: dict[str, Any],
         source_audio: Path,
+        source_media: Path | None = None,
         title: str = "",
         target_language: str = "auto",
         default_voice_id: str | None = None,
     ) -> dict[str, Any]:
         if not source_audio.is_file():
             raise FileNotFoundError("转录源音频不存在。")
+        if source_media is not None and not source_media.is_file():
+            raise FileNotFoundError("转录原始媒体不存在。")
         transcript_segments = transcript.get("segments")
         if not isinstance(transcript_segments, list) or not transcript_segments:
             raise ValueError("转录没有可用片段。")
@@ -200,6 +227,7 @@ class DubProjectStore:
         project_id = uuid.uuid4().hex
         created_at = _utc_now()
         fallback_title = str(transcript.get("title", "")).strip() or "未命名配音项目"
+        source_media_filename = f"source-media{source_media.suffix.lower()}" if source_media else ""
         project = {
             "schema_version": DUB_PROJECT_SCHEMA_VERSION,
             "id": project_id,
@@ -207,6 +235,8 @@ class DubProjectStore:
             "source_transcript_id": str(transcript.get("id", "")),
             "source_filename": str(transcript.get("source_filename", "")),
             "source_audio_filename": "source.wav",
+            "source_media_filename": source_media_filename,
+            "source_has_video": bool(source_media),
             "duration_seconds": round(max(0.0, _number(transcript.get("duration_seconds"))), 3),
             "source_language": str(transcript.get("language", "unknown")),
             "target_language": target_language,
@@ -245,6 +275,12 @@ class DubProjectStore:
                 (project_dir / "jobs").mkdir()
                 (project_dir / "exports").mkdir()
                 shutil.copyfile(source_audio, project_dir / "source.wav")
+                if source_media is not None:
+                    media_destination = project_dir / source_media_filename
+                    try:
+                        os.link(source_media, media_destination)
+                    except OSError:
+                        shutil.copy2(source_media, media_destination)
                 _atomic_json(project_dir / "project.json", project)
             except Exception:
                 shutil.rmtree(project_dir, ignore_errors=True)
@@ -257,6 +293,9 @@ class DubProjectStore:
             if not path.is_file():
                 raise FileNotFoundError("配音项目不存在。")
             project = json.loads(path.read_text(encoding="utf-8"))
+            upgraded = _upgrade_project(project)
+            if upgraded:
+                _atomic_json(path, project)
         validate_project(project)
         return project
 
@@ -271,8 +310,7 @@ class DubProjectStore:
         projects: list[dict[str, Any]] = []
         for project_path in self.root.glob("*/project.json"):
             try:
-                project = json.loads(project_path.read_text(encoding="utf-8"))
-                validate_project(project)
+                project = self.load(project_path.parent.name)
                 projects.append(project_summary(project))
             except (OSError, ValueError, KeyError, json.JSONDecodeError):
                 continue
@@ -346,6 +384,16 @@ class DubProjectStore:
         path = self.project_dir(project_id) / project["source_audio_filename"]
         if not path.is_file():
             raise FileNotFoundError("配音项目源音频不存在。")
+        return path
+
+    def source_media(self, project_id: str) -> Path:
+        project = self.load(project_id)
+        filename = str(project.get("source_media_filename", ""))
+        if not filename or not project.get("source_has_video"):
+            raise FileNotFoundError("该配音项目没有原始视频。")
+        path = self.project_dir(project_id) / filename
+        if not path.is_file():
+            raise FileNotFoundError("配音项目原始视频不存在。")
         return path
 
     def render_path(self, project_id: str, filename: str) -> Path:
@@ -495,6 +543,7 @@ class DubRenderService:
         model_id: str,
         settings: dict[str, Any],
         max_attempts: int = 2,
+        mux_video: Callable[..., dict[str, object]] = mux_dubbed_video,
     ) -> None:
         self.store = store
         self.load_voice = load_voice
@@ -502,6 +551,7 @@ class DubRenderService:
         self.model_id = model_id
         self.settings = settings
         self.max_attempts = max_attempts
+        self.mux_video = mux_video
         self._lock = threading.RLock()
         self._cancel_events: dict[str, threading.Event] = {}
         self._running_jobs: set[str] = set()
@@ -844,7 +894,14 @@ class DubRenderService:
                 self._running_jobs.discard(job_id)
                 self._cancel_events.pop(job_id, None)
 
-    def export(self, project_id: str) -> dict[str, Any]:
+    def export(
+        self,
+        project_id: str,
+        *,
+        original_audio_gain: float = 0.0,
+    ) -> dict[str, Any]:
+        if not 0.0 <= original_audio_gain <= 1.0:
+            raise ValueError("原声音量必须在 0 到 1 之间。")
         project = self.store.load(project_id)
         timeline_segments: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
@@ -870,20 +927,47 @@ class DubRenderService:
         export_id = uuid.uuid4().hex[:8]
         wav_filename = f"timbreloom-dub-{stamp}-{export_id}.wav"
         srt_filename = f"timbreloom-dub-{stamp}-{export_id}.srt"
-        export_dir = self.store.project_dir(project_id) / "exports"
-        duration = mix_timeline_wav(
-            timeline_segments,
-            export_dir / wav_filename,
-            project_duration_seconds=project["duration_seconds"],
+        mp4_filename = (
+            f"timbreloom-dub-{stamp}-{export_id}.mp4"
+            if project.get("source_has_video")
+            else ""
         )
-        (export_dir / srt_filename).write_text(render_project_srt(project), encoding="utf-8")
+        export_dir = self.store.project_dir(project_id) / "exports"
+        wav_path = export_dir / wav_filename
+        srt_path = export_dir / srt_filename
+        mp4_path = export_dir / mp4_filename if mp4_filename else None
+        video_metrics: dict[str, object] = {}
+        try:
+            duration = mix_timeline_wav(
+                timeline_segments,
+                wav_path,
+                project_duration_seconds=project["duration_seconds"],
+            )
+            srt_path.write_text(render_project_srt(project), encoding="utf-8")
+            if mp4_path is not None:
+                video_metrics = self.mux_video(
+                    self.store.source_media(project_id),
+                    wav_path,
+                    mp4_path,
+                    original_audio_gain=original_audio_gain,
+                )
+        except Exception:
+            wav_path.unlink(missing_ok=True)
+            srt_path.unlink(missing_ok=True)
+            if mp4_path is not None:
+                mp4_path.unlink(missing_ok=True)
+            raise
         export_record = {
             "id": export_id,
             "wav_filename": wav_filename,
             "srt_filename": srt_filename,
+            "mp4_filename": mp4_filename,
             "duration_seconds": round(duration, 3),
             "warning_count": len(warnings),
             "warnings": warnings,
+            "original_audio_gain": round(original_audio_gain, 3) if mp4_filename else 0.0,
+            "video_codec_mode": str(video_metrics.get("video_codec_mode", "")),
+            "video_size_bytes": int(video_metrics.get("size_bytes", 0)),
             "created_at": _utc_now(),
         }
         project["exports"].append(export_record)

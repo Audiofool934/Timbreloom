@@ -132,3 +132,117 @@ def extract_voice_clip(
     if result.returncode != 0:
         detail = result.stderr.strip() or "无法截取音色片段。"
         raise ValueError(f"音色片段提取失败：{detail}")
+
+
+def mux_dubbed_video(
+    source_video: Path,
+    dubbed_audio: Path,
+    destination: Path,
+    *,
+    original_audio_gain: float = 0.0,
+) -> dict[str, object]:
+    if not source_video.is_file():
+        raise FileNotFoundError("配音项目的原始视频不存在。")
+    if not dubbed_audio.is_file():
+        raise FileNotFoundError("配音时间线音频不存在。")
+    if not 0.0 <= original_audio_gain <= 1.0:
+        raise ValueError("原声音量必须在 0 到 1 之间。")
+
+    media_info = probe_media(source_video)
+    if not media_info.has_video:
+        raise ValueError("配音项目的源媒体不包含视频轨。")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    audio_options: list[str]
+    if original_audio_gain > 0 and media_info.has_audio:
+        filter_graph = (
+            f"[0:a:0]asetpts=PTS-STARTPTS,volume={original_audio_gain:.6f}[original];"
+            "[1:a:0]asetpts=PTS-STARTPTS[dub];"
+            "[original][dub]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,"
+            "alimiter=limit=0.95[aout]"
+        )
+        audio_options = ["-filter_complex", filter_graph, "-map", "0:v:0", "-map", "[aout]"]
+    else:
+        audio_options = ["-map", "0:v:0", "-map", "1:a:0"]
+
+    common = [
+        _tool("ffmpeg"),
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        str(source_video),
+        "-i",
+        str(dubbed_audio),
+        *audio_options,
+        "-map_metadata",
+        "0",
+        "-map_chapters",
+        "0",
+        "-sn",
+        "-dn",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
+        "-metadata:s:a:0",
+        "title=Timbreloom Dub",
+        "-movflags",
+        "+faststart",
+        "-avoid_negative_ts",
+        "make_zero",
+    ]
+
+    attempts = [
+        ("copy", [*common, "-c:v", "copy", str(destination)]),
+        (
+            "h264",
+            [
+                *common,
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-crf",
+                "18",
+                "-pix_fmt",
+                "yuv420p",
+                str(destination),
+            ],
+        ),
+    ]
+    errors: list[str] = []
+    codec_mode = ""
+    for mode, command in attempts:
+        destination.unlink(missing_ok=True)
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=21_600,
+            check=False,
+        )
+        if result.returncode == 0 and destination.is_file():
+            codec_mode = mode
+            break
+        errors.append(result.stderr.strip() or f"{mode} 视频封装失败")
+    else:
+        detail = "；".join(errors)
+        raise ValueError(f"视频配音导出失败：{detail}")
+
+    output_info = probe_media(destination)
+    if not output_info.has_video or not output_info.has_audio:
+        destination.unlink(missing_ok=True)
+        raise ValueError("视频配音导出缺少视频轨或音频轨。")
+    return {
+        "duration_seconds": round(output_info.duration_seconds, 3),
+        "original_audio_gain": round(original_audio_gain, 3),
+        "video_codec_mode": codec_mode,
+        "size_bytes": destination.stat().st_size,
+    }

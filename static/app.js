@@ -92,9 +92,15 @@ const dubEditor = document.querySelector("#dubEditor");
 const dubProjectTitleInput = document.querySelector("#dubProjectTitleInput");
 const dubProjectLanguage = document.querySelector("#dubProjectLanguage");
 const dubProjectMeta = document.querySelector("#dubProjectMeta");
+const dubSourceVideo = document.querySelector("#dubSourceVideo");
 const dubSourceAudio = document.querySelector("#dubSourceAudio");
 const dubSaveButton = document.querySelector("#dubSaveButton");
 const dubExportButton = document.querySelector("#dubExportButton");
+const dubExportButtonText = document.querySelector("#dubExportButtonText");
+const dubOriginalAudioField = document.querySelector("#dubOriginalAudioField");
+const dubOriginalAudioGain = document.querySelector("#dubOriginalAudioGain");
+const dubTimelineTrack = document.querySelector("#dubTimelineTrack");
+const dubTimelineSummary = document.querySelector("#dubTimelineSummary");
 const dubSelectionCount = document.querySelector("#dubSelectionCount");
 const dubEditorStatus = document.querySelector("#dubEditorStatus");
 const dubGenerateSelected = document.querySelector("#dubGenerateSelected");
@@ -111,6 +117,7 @@ const dubCurrentText = document.querySelector("#dubCurrentText");
 const dubCancelButton = document.querySelector("#dubCancelButton");
 const dubExportResult = document.querySelector("#dubExportResult");
 const dubExportSummary = document.querySelector("#dubExportSummary");
+const dubExportMp4 = document.querySelector("#dubExportMp4");
 const dubExportWav = document.querySelector("#dubExportWav");
 const dubExportSrt = document.querySelector("#dubExportSrt");
 const dubGeminiStatus = document.querySelector("#dubGeminiStatus");
@@ -1084,7 +1091,7 @@ function renderDubProjectList(preferredId = "") {
     const title = document.createElement("strong");
     title.textContent = project.title;
     const meta = document.createElement("span");
-    meta.textContent = `${project.ready_count} / ${project.segment_count} 段已生成`;
+    meta.textContent = `${project.source_has_video ? "视频" : "音频"} · ${project.ready_count} / ${project.segment_count} 段已生成`;
     const state = document.createElement("small");
     state.textContent = project.failed_count
       ? `${project.failed_count} 段失败 · ${formatTranscriptDate(project.updated_at)}`
@@ -1170,12 +1177,82 @@ function updateDubControls() {
   dubGenerateAll.disabled = !project || active;
   dubRetryFailed.disabled = !project || !failedCount || active;
   dubExportButton.disabled = !project || !allReady || Boolean(dirtyCount) || active;
+  dubOriginalAudioGain.disabled = active;
   dubGeminiTranslate.disabled = !project || selectedCount !== 1 || !geminiConfigured || active;
   dubSelectAll.checked = segments.length > 0 && selectedCount === segments.length;
   dubSelectAll.indeterminate = selectedCount > 0 && selectedCount < segments.length;
   for (const row of dubSegmentRows.values()) {
     row.regenerate.disabled = active;
   }
+}
+
+function activeDubSourcePlayer() {
+  return currentDubProject?.source_has_video && !dubSourceVideo.hidden
+    ? dubSourceVideo
+    : dubSourceAudio;
+}
+
+function seekDubSource(seconds) {
+  const player = activeDubSourcePlayer();
+  player.currentTime = seconds;
+  player.play().catch(() => {});
+}
+
+function renderDubTimeline(project) {
+  dubTimelineTrack.replaceChildren();
+  const duration = Math.max(0.001, Number(project.duration_seconds) || 0);
+  const readyCount = project.segments.filter((segment) => segment.render.status === "ready").length;
+  const overlapCount = project.segments.filter(
+    (segment) => segment.render.overlap_next_seconds > 0.05,
+  ).length;
+  dubTimelineSummary.textContent = overlapCount
+    ? `${readyCount} / ${project.segments.length} 已生成 · ${overlapCount} 处重叠`
+    : `${readyCount} / ${project.segments.length} 已生成 · ${formatDuration(duration)}`;
+
+  for (const segment of project.segments) {
+    const left = Math.min(100, Math.max(0, (segment.start / duration) * 100));
+    const slotDuration = Math.max(0, segment.end - segment.start);
+    const slotWidth = Math.max(0.35, Math.min(100 - left, (slotDuration / duration) * 100));
+    const slot = document.createElement("button");
+    slot.type = "button";
+    slot.className = "dub-timeline-slot";
+    slot.style.left = `${left}%`;
+    slot.style.width = `${slotWidth}%`;
+    slot.dataset.status = segment.render.status;
+    slot.setAttribute(
+      "aria-label",
+      `${formatTimecode(segment.start)} 到 ${formatTimecode(segment.end)}，${dubStatusCopy(segment).detail}`,
+    );
+    slot.title = `${formatTimecode(segment.start)} · ${dubStatusCopy(segment).detail}`;
+    slot.addEventListener("click", () => seekDubSource(segment.start));
+    dubTimelineTrack.append(slot);
+
+    if (segment.render.duration_seconds > 0) {
+      const renderWidth = Math.max(
+        0.35,
+        Math.min(100 - left, (segment.render.duration_seconds / duration) * 100),
+      );
+      const rendered = document.createElement("span");
+      rendered.className = `dub-timeline-render is-${segment.render.status}`;
+      if (segment.render.overlap_next_seconds > 0.05) rendered.classList.add("has-overlap");
+      rendered.style.left = `${left}%`;
+      rendered.style.width = `${renderWidth}%`;
+      dubTimelineTrack.append(rendered);
+    }
+  }
+}
+
+function dubExportSummaryCopy(result) {
+  const output = result.mp4_url ? "MP4、WAV 和 SRT" : "WAV 和 SRT";
+  const warnings = result.warning_count
+    ? `，${result.warning_count} 段超过原时间槽，完整语音未截断`
+    : "";
+  if (result.mp4_url) {
+    const gain = Math.round((result.original_audio_gain || 0) * 100);
+    const mix = gain ? `，原声保留 ${gain}%` : "，原声已静音";
+    return `${output} 已导出${mix}${warnings}。`;
+  }
+  return `${output} 已按原时间线导出${warnings}。`;
 }
 
 function startDubPolling(job) {
@@ -1202,17 +1279,39 @@ function renderDubProject(project) {
   dubEditor.hidden = false;
   dubProjectTitleInput.value = project.title;
   dubProjectLanguage.value = project.target_language;
-  dubProjectMeta.textContent = `${formatDuration(project.duration_seconds)} · ${project.source_language.toUpperCase()} · ${project.segments.length} 段 · ${project.source_filename}`;
-  dubSourceAudio.src = `${project.source_audio_url}?v=${Date.now()}`;
+  const mediaKind = project.source_has_video ? "VIDEO" : "AUDIO";
+  dubProjectMeta.textContent = `${mediaKind} · ${formatDuration(project.duration_seconds)} · ${project.source_language.toUpperCase()} · ${project.segments.length} 段 · ${project.source_filename}`;
+  dubOriginalAudioField.hidden = !project.source_has_video;
+  dubExportButtonText.textContent = project.source_has_video
+    ? "导出 MP4 + WAV + SRT"
+    : "导出 WAV + SRT";
+  if (project.source_has_video) {
+    dubSourceAudio.pause();
+    dubSourceAudio.src = `${project.source_audio_url}?v=${Date.now()}`;
+    dubSourceAudio.hidden = true;
+    dubSourceVideo.hidden = false;
+    dubSourceVideo.src = `${project.source_media_url}?v=${Date.now()}`;
+  } else {
+    dubSourceVideo.pause();
+    dubSourceVideo.removeAttribute("src");
+    dubSourceVideo.hidden = true;
+    dubSourceAudio.hidden = false;
+    dubSourceAudio.src = `${project.source_audio_url}?v=${Date.now()}`;
+  }
   dubExportResult.hidden = true;
+  dubExportMp4.hidden = true;
+  renderDubTimeline(project);
 
   const latestExport = project.exports?.at(-1);
   if (latestExport) {
     dubExportWav.href = latestExport.wav_url;
     dubExportSrt.href = latestExport.srt_url;
-    dubExportSummary.textContent = latestExport.warning_count
-      ? `完整配音已导出，${latestExport.warning_count} 段超过原时间槽，未截断。`
-      : "完整配音已按原时间线导出。";
+    if (latestExport.mp4_url) {
+      dubExportMp4.href = latestExport.mp4_url;
+      dubExportMp4.hidden = false;
+      dubOriginalAudioGain.value = String(latestExport.original_audio_gain || 0);
+    }
+    dubExportSummary.textContent = dubExportSummaryCopy(latestExport);
     dubExportResult.hidden = false;
   }
 
@@ -1237,10 +1336,7 @@ function renderDubProject(project) {
     timeButton.type = "button";
     timeButton.className = "segment-time";
     timeButton.textContent = `${formatTimecode(segment.start)}\n${formatTimecode(segment.end)}`;
-    timeButton.addEventListener("click", () => {
-      dubSourceAudio.currentTime = segment.start;
-      dubSourceAudio.play().catch(() => {});
-    });
+    timeButton.addEventListener("click", () => seekDubSource(segment.start));
 
     const source = document.createElement("div");
     source.className = "dub-source-copy";
@@ -1486,6 +1582,13 @@ dubGenerateSelected.addEventListener("click", () => {
 dubGenerateAll.addEventListener("click", () => startDubJob("all"));
 dubRetryFailed.addEventListener("click", () => startDubJob("failed"));
 
+dubSourceVideo.addEventListener("error", () => {
+  if (!currentDubProject?.source_has_video) return;
+  dubSourceVideo.hidden = true;
+  dubSourceAudio.hidden = false;
+  dubEditorStatus.textContent = "浏览器无法预览该视频编码，已切换为源音频预览";
+});
+
 dubCancelButton.addEventListener("click", async () => {
   if (!currentDubProject || !currentDubJobId) return;
   dubCancelButton.disabled = true;
@@ -1507,22 +1610,41 @@ dubExportButton.addEventListener("click", async () => {
   if (!currentDubProject) return;
   if (!(await saveDubChanges())) return;
   dubExportButton.disabled = true;
+  dubExportButtonText.textContent = currentDubProject.source_has_video
+    ? "正在封装视频..."
+    : "正在导出...";
+  dubEditorStatus.textContent = currentDubProject.source_has_video
+    ? "正在混合音轨并封装 MP4"
+    : "正在写入时间线音频和字幕";
   try {
     const response = await fetch(`/api/dub/projects/${currentDubProject.id}/export`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        original_audio_gain: currentDubProject.source_has_video
+          ? Number(dubOriginalAudioGain.value)
+          : 0,
+      }),
     });
     if (!response.ok) throw new Error(await readError(response));
     const result = (await response.json()).export;
     dubExportWav.href = result.wav_url;
     dubExportSrt.href = result.srt_url;
-    dubExportSummary.textContent = result.warning_count
-      ? `完整配音已导出，${result.warning_count} 段超过原时间槽，已保留完整音频。`
-      : "完整配音已按原时间线导出。";
+    if (result.mp4_url) {
+      dubExportMp4.href = result.mp4_url;
+      dubExportMp4.hidden = false;
+    } else {
+      dubExportMp4.hidden = true;
+    }
+    dubExportSummary.textContent = dubExportSummaryCopy(result);
     dubExportResult.hidden = false;
     await loadDubProject(currentDubProject.id);
   } catch (error) {
     showError(error.message);
   } finally {
+    dubExportButtonText.textContent = currentDubProject?.source_has_video
+      ? "导出 MP4 + WAV + SRT"
+      : "导出 WAV + SRT";
     updateDubControls();
   }
 });
