@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en-US">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -14,43 +14,43 @@
   <body>
     <main class="shell">
       <header class="masthead">
-        <a class="brand" href="/" aria-label="Timbreloom 首页">
+        <a class="brand" href="/" aria-label="Timbreloom home">
           <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
           <span>TIMBRELOOM</span>
         </a>
         <div class="model-management-entry">
-        <button id="manageModelsButton" type="button" class="quiet-button">模型管理</button>
+        <button id="manageModelsButton" type="button" class="quiet-button">Models</button>
         <div class="model-state" id="modelState" data-state="loading">
           <span class="state-dot"></span>
-          <span id="modelStateText">正在检查模型</span>
+          <span id="modelStateText">Checking models</span>
         </div>
         </div>
       </header>
 
-      <nav class="mode-switch" aria-label="工作模式">
+      <nav class="mode-switch" aria-label="Workspaces">
         <button class="mode-button is-active" type="button" data-view="clone" aria-pressed="true">
           <span>01</span>
-          声音克隆
+          Voice cloning
         </button>
         <button class="mode-button" type="button" data-view="vc" aria-pressed="false">
           <span>02</span>
-          原声换色
+          Voice conversion
         </button>
         <button class="mode-button" type="button" data-view="asr" aria-pressed="false">
           <span>03</span>
-          本地转录
+          Transcription
         </button>
         <button class="mode-button" type="button" data-view="dub" aria-pressed="false">
           <span>04</span>
-          配音项目
+          Dubbing studio
         </button>
       </nav>
 
       <section id="cloneView" class="app-view">
       <section class="hero">
-        <p class="eyebrow">私密 · 本机 · 长文本</p>
-        <h1>一句声音，<br />持续说下去。</h1>
-        <p class="lede">把一种声音，织进每句话。参考录音仅在这台 Mac 上处理。保存一次音色，之后可以持续生成长文本。系统按语义组合多句，每段最多 1,024 个音频 token，再在本机拼接为一个完整 WAV。</p>
+        <p class="eyebrow">Private · Local · Long-form</p>
+        <h1>One voice.<br />So much to say.</h1>
+        <p class="lede">Bring a familiar voice to every line. Save a short reference recording, then turn your writing into natural, continuous speech. Everything is generated and joined on this Mac.</p>
       </section>
 
       <form id="cloneForm" class="workspace">
@@ -58,19 +58,19 @@
           <div class="panel-heading">
             <span class="step">01</span>
             <div>
-              <h2>参考声音</h2>
-              <p>使用已保存音色，或上传 5 至 15 秒清晰人声。</p>
+              <h2>Reference voice</h2>
+              <p>Choose a saved voice or upload 5 to 15 seconds of clear speech.</p>
             </div>
           </div>
 
           <div class="voice-library">
             <label class="select-field">
-              <span>音色来源</span>
-              <select id="voiceSelect" aria-label="音色来源">
-                <option value="">本次上传新录音</option>
+              <span>Voice source</span>
+              <select id="voiceSelect" aria-label="Voice source">
+                <option value="">Upload a new recording</option>
               </select>
             </label>
-            <button id="deleteVoiceButton" class="quiet-button danger-button" type="button" hidden>删除音色</button>
+            <button id="deleteVoiceButton" class="quiet-button danger-button" type="button" hidden>Delete voice</button>
           </div>
 
           <section id="savedVoiceCard" class="saved-voice-card" hidden>
@@ -89,44 +89,44 @@
                 required
               />
               <span class="upload-icon" aria-hidden="true">＋</span>
-              <strong id="fileTitle">拖入录音，或点击选择</strong>
-              <span id="fileMeta">WAV、M4A、MP3、FLAC · 最大 40 MB</span>
+              <strong id="fileTitle">Drop a recording or choose a file</strong>
+              <span id="fileMeta">WAV, M4A, MP3, FLAC · Up to 40 MB</span>
             </label>
 
-            <section class="recorder-panel" id="cloneRecorder" aria-label="参考声音录音">
+            <section class="recorder-panel" id="cloneRecorder" aria-label="Record a reference voice">
               <div class="recorder-copy">
                 <span class="record-dot" aria-hidden="true"></span>
                 <div>
-                  <strong>直接录音</strong>
-                  <p id="cloneRecordStatus" role="status" aria-live="polite">最长 30 秒 · 录音只会留在本机</p>
+                  <strong>Record here</strong>
+                  <p id="cloneRecordStatus" role="status" aria-live="polite">Up to 30 seconds · Recorded on this Mac</p>
                 </div>
               </div>
               <div class="recorder-actions">
                 <span id="cloneRecordTimer" class="recorder-timer" aria-live="off">00:00</span>
-                <button id="cloneRecordStart" class="quiet-button record-start" type="button">开始录音</button>
-                <button id="cloneRecordStop" class="quiet-button record-stop" type="button" hidden>停止并使用</button>
-                <button id="cloneRecordCancel" class="quiet-button record-cancel" type="button" hidden>取消</button>
+                <button id="cloneRecordStart" class="quiet-button record-start" type="button">Record</button>
+                <button id="cloneRecordStop" class="quiet-button record-stop" type="button" hidden>Stop and use</button>
+                <button id="cloneRecordCancel" class="quiet-button record-cancel" type="button" hidden>Cancel</button>
               </div>
               <audio id="cloneRecordPreview" class="record-preview" controls preload="metadata" hidden></audio>
             </section>
 
             <label class="field">
-              <span>录音对应文字</span>
+              <span>Reference transcript</span>
               <textarea
                 id="referenceText"
                 rows="4"
                 maxlength="2000"
-                placeholder="逐字填写参考录音里说的内容，标点也尽量准确。"
+                placeholder="Enter the exact words from the recording, including punctuation."
                 required
               ></textarea>
             </label>
 
             <div class="save-voice-row">
               <label class="field compact-field">
-                <span>保存这个音色</span>
-                <input id="voiceName" type="text" maxlength="80" placeholder="例如：我的普通话" />
+                <span>Save this voice</span>
+                <input id="voiceName" type="text" maxlength="80" placeholder="For example: My narration voice" />
               </label>
-              <button id="saveVoiceButton" class="quiet-button save-voice-button" type="button">保存音色</button>
+              <button id="saveVoiceButton" class="quiet-button save-voice-button" type="button">Save voice</button>
             </div>
             <p id="voiceSaveStatus" class="inline-status" aria-live="polite"></p>
           </div>
@@ -136,52 +136,52 @@
           <div class="panel-heading">
             <span class="step">02</span>
             <div>
-              <h2>长文本</h2>
-              <p>多句组合分段，不设置日常使用中的短段落上限。</p>
+              <h2>Long-form speech</h2>
+              <p>Generate complete scripts with natural sentence breaks.</p>
             </div>
           </div>
 
           <label class="field target-field">
-            <span>希望它说什么</span>
+            <span>What would you like it to say?</span>
             <textarea
               id="targetText"
               rows="12"
-              placeholder="粘贴一段、一个章节，或者更长的内容。标点和段落会用于寻找自然分段位置。"
+              placeholder="Paste a paragraph, a chapter, or a longer script. Punctuation and paragraphs guide natural breaks."
               required
             ></textarea>
-            <small><b id="targetCount">0</b> 字 · <span id="segmentEstimate">等待输入</span></small>
+            <small><b id="targetCount">0</b> characters · <span id="segmentEstimate">Waiting for text</span></small>
           </label>
 
           <details class="prosody-guide">
             <summary>
-              <span>语气写法</span>
+              <span>Writing for expression</span>
               <strong>TEMPERATURE 1.0</strong>
             </summary>
             <div class="prosody-guide-body">
-              <p>当前 Base 克隆模型没有隐藏的情绪标签。请使用正常文字和标点引导语气，不要加入 <code>[开心]</code>、<code>[laugh]</code> 或 <code>&lt;prosody&gt;</code>，它们可能会被直接念出来。</p>
+              <p>Use ordinary words and punctuation to guide expression. The Base cloning model has no hidden emotion tags. Tags such as <code>[happy]</code>, <code>[laugh]</code>, or <code>&lt;prosody&gt;</code> may be spoken aloud.</p>
               <dl>
-                <div><dt>犹豫、稍作延长</dt><dd>啊……我还没想好。</dd></div>
-                <div><dt>惊讶、强调</dt><dd>啊？！真的成功了！</dd></div>
-                <div><dt>疑问、上扬</dt><dd>啊？你刚才说什么？</dd></div>
-                <div><dt>笑声、叹气</dt><dd>哈哈……原来是这样。／唉……算了。</dd></div>
+                <div><dt>Hesitation</dt><dd>Well… I am still thinking.</dd></div>
+                <div><dt>Surprise and emphasis</dt><dd>Wait, it worked! It really worked!</dd></div>
+                <div><dt>Questions</dt><dd>Oh? What did you say?</dd></div>
+                <div><dt>Laughter and sighs</dt><dd>Ha, now I see. / Ah… never mind.</dd></div>
               </dl>
-              <p class="prosody-note"><code>～</code> 和省略号只能提供语义提示，不能保证某个字精确持续 1 至 2 秒。</p>
+              <p class="prosody-note">Punctuation suggests phrasing. It cannot guarantee an exact pause or word duration.</p>
             </div>
           </details>
 
           <div class="controls">
             <label class="select-field">
-              <span>语言</span>
+              <span>Language</span>
               <select id="language">
-                <option value="auto">自动识别</option>
-                <option value="chinese">中文</option>
+                <option value="auto">Auto-detect</option>
+                <option value="chinese">Chinese</option>
                 <option value="english">English</option>
-                <option value="japanese">日本語</option>
-                <option value="korean">한국어</option>
+                <option value="japanese">Japanese</option>
+                <option value="korean">Korean</option>
               </select>
             </label>
             <button id="generateButton" class="generate-button" type="submit">
-              <span id="buttonText">开始生成</span>
+              <span id="buttonText">Generate speech</span>
               <span class="button-arrow" aria-hidden="true">↗</span>
             </button>
           </div>
@@ -193,17 +193,17 @@
           <div class="progress-visual" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
           <div class="progress-copy">
             <span class="result-kicker">LONG-FORM GENERATION</span>
-            <strong id="progressTitle">正在准备</strong>
-            <p id="progressText">正在建立生成任务。</p>
+            <strong id="progressTitle">Preparing</strong>
+            <p id="progressText">Creating a speech generation job.</p>
           </div>
-          <button id="cancelButton" class="quiet-button" type="button">停止任务</button>
+          <button id="cancelButton" class="quiet-button" type="button">Stop job</button>
         </div>
         <div id="progressTrack" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <span id="progressFill"></span>
         </div>
         <div class="progress-meta">
           <strong id="progressPercent">0%</strong>
-          <span id="progressSegments">等待分段</span>
+          <span id="progressSegments">Waiting for segments</span>
         </div>
         <p id="currentSegmentText" class="current-segment"></p>
       </section>
@@ -212,10 +212,10 @@
         <div class="stream-card-heading">
           <div>
             <span class="stream-kicker"><i aria-hidden="true"></i> LIVE PLAYBACK</span>
-            <strong>边生成边听</strong>
-            <p id="cloneStreamStatus">首段完成后即可开始，后续片段会自动续播。</p>
+            <strong>Listen as it generates</strong>
+            <p id="cloneStreamStatus">Start listening after the first segment. Later segments play automatically.</p>
           </div>
-          <button id="cloneStreamToggle" class="quiet-button" type="button" disabled>等待首段</button>
+          <button id="cloneStreamToggle" class="quiet-button" type="button" disabled>Waiting for first segment</button>
         </div>
         <audio id="cloneStreamAudio" controls preload="metadata"></audio>
       </section>
@@ -224,16 +224,16 @@
         <div class="result-heading">
           <div>
             <span class="result-kicker">GENERATED LOCALLY</span>
-            <h2>长文本生成完成</h2>
+            <h2>Your speech is ready</h2>
           </div>
-          <a id="downloadLink" class="download-link" href="#" download>下载 WAV</a>
+          <a id="downloadLink" class="download-link" href="#" download>Download WAV</a>
         </div>
         <audio id="audioPlayer" controls preload="metadata"></audio>
         <dl class="metrics metrics-four">
-          <div><dt>音频长度</dt><dd id="durationMetric">-</dd></div>
-          <div><dt>分段数量</dt><dd id="segmentMetric">-</dd></div>
-          <div><dt>生成耗时</dt><dd id="timeMetric">-</dd></div>
-          <div><dt>峰值内存</dt><dd id="memoryMetric">-</dd></div>
+          <div><dt>Audio duration</dt><dd id="durationMetric">-</dd></div>
+          <div><dt>Segments</dt><dd id="segmentMetric">-</dd></div>
+          <div><dt>Generation time</dt><dd id="timeMetric">-</dd></div>
+          <div><dt>Peak memory</dt><dd id="memoryMetric">-</dd></div>
         </dl>
       </section>
       </section>
@@ -241,10 +241,10 @@
       <section id="vcView" class="app-view" hidden>
         <section class="asr-hero vc-hero">
           <div>
-            <p class="eyebrow">原表演 · 新音色 · 本地处理</p>
-            <h1>说法不变，<br />换一种声音。</h1>
+            <p class="eyebrow">Original performance · New voice · Local processing</p>
+            <h1>Same performance.<br />A different voice.</h1>
           </div>
-          <p class="lede">直接把原录音的节奏、停顿和情绪迁移到已保存音色，不经过 ASR，也不重新朗读文字。音频和视频都在本机由 Seed-VC 处理。</p>
+          <p class="lede">Carry the rhythm, pauses, and expression of a recording into a saved voice. Seed-VC converts audio and video directly on this Mac, preserving the original performance.</p>
         </section>
 
         <div class="vc-workspace">
@@ -252,8 +252,8 @@
             <div class="panel-heading compact-heading">
               <span class="step">01</span>
               <div>
-                <h2>导入原表演</h2>
-                <p>支持有声书等长音频，最长 8 小时，自动按自然停顿分段。</p>
+                <h2>Import a performance</h2>
+                <p>Process up to 8 hours of audio, including audiobooks, with automatic splits at natural pauses.</p>
               </div>
             </div>
 
@@ -265,56 +265,56 @@
                 required
               />
               <span class="upload-icon" aria-hidden="true">＋</span>
-              <strong id="vcFileTitle">拖入带表演的音频或视频</strong>
-              <span id="vcFileMeta">含 TS、M2TS、MTS · 原节奏、停顿和情绪会被保留</span>
+              <strong id="vcFileTitle">Drop an audio or video performance</strong>
+              <span id="vcFileMeta">Includes TS, M2TS, MTS · Keeps timing, pauses, and expression</span>
             </label>
 
-            <section class="recorder-panel" id="vcRecorder" aria-label="原表演录音">
+            <section class="recorder-panel" id="vcRecorder" aria-label="Record a performance">
               <div class="recorder-copy">
                 <span class="record-dot" aria-hidden="true"></span>
                 <div>
-                  <strong>直接录音</strong>
-                  <p id="vcRecordStatus" role="status" aria-live="polite">最长 30 分钟 · 停止后可先试听</p>
+                  <strong>Record here</strong>
+                  <p id="vcRecordStatus" role="status" aria-live="polite">Up to 30 minutes · Preview after recording</p>
                 </div>
               </div>
               <div class="recorder-actions">
                 <span id="vcRecordTimer" class="recorder-timer" aria-live="off">00:00</span>
-                <button id="vcRecordStart" class="quiet-button record-start" type="button">开始录音</button>
-                <button id="vcRecordStop" class="quiet-button record-stop" type="button" hidden>停止并使用</button>
-                <button id="vcRecordCancel" class="quiet-button record-cancel" type="button" hidden>取消</button>
+                <button id="vcRecordStart" class="quiet-button record-start" type="button">Record</button>
+                <button id="vcRecordStop" class="quiet-button record-stop" type="button" hidden>Stop and use</button>
+                <button id="vcRecordCancel" class="quiet-button record-cancel" type="button" hidden>Cancel</button>
               </div>
               <audio id="vcRecordPreview" class="record-preview" controls preload="metadata" hidden></audio>
             </section>
 
             <label class="select-field">
-              <span>目标音色</span>
+              <span>Target voice</span>
               <select id="vcVoiceSelect" required>
-                <option value="">选择已保存音色</option>
+                <option value="">Choose a saved voice</option>
               </select>
             </label>
 
             <fieldset class="vc-preset-field">
-              <legend>转换质量</legend>
-              <label><input type="radio" name="vcPreset" value="fast" /><span><strong>快速</strong><small>4 步 · 预览</small></span></label>
-              <label><input type="radio" name="vcPreset" value="balanced" checked /><span><strong>均衡</strong><small>8 步 · 推荐</small></span></label>
-              <label><input type="radio" name="vcPreset" value="quality" /><span><strong>高质量</strong><small>12 步 · 更慢</small></span></label>
+              <legend>Conversion quality</legend>
+              <label><input type="radio" name="vcPreset" value="fast" /><span><strong>Fast</strong><small>4 steps · Preview</small></span></label>
+              <label><input type="radio" name="vcPreset" value="balanced" checked /><span><strong>Balanced</strong><small>8 steps · Recommended</small></span></label>
+              <label><input type="radio" name="vcPreset" value="quality" /><span><strong>High quality</strong><small>12 steps · Slower</small></span></label>
             </fieldset>
 
             <label class="rights-check">
               <input id="vcRights" type="checkbox" required />
-              <span>我有权使用这段原始媒体和目标音色，并会在对外内容中如实标注 AI 处理。</span>
+              <span>I have permission to use this media and target voice, and will disclose AI processing when sharing the result.</span>
             </label>
 
             <div class="local-engine-note">
               <span class="state-dot"></span>
               <div>
                 <strong>Seed-VC 1.0</strong>
-                <p id="vcEngineState">项目内隔离运行 · 离线转换</p>
+                <p id="vcEngineState">Isolated runtime · Offline conversion</p>
               </div>
             </div>
 
             <button id="vcStartButton" class="generate-button wide-button" type="submit">
-              <span id="vcButtonText">开始原声换色</span>
+              <span id="vcButtonText">Convert voice</span>
               <span class="button-arrow" aria-hidden="true">↗</span>
             </button>
           </form>
@@ -323,12 +323,12 @@
             <div class="library-heading">
               <div>
                 <span class="result-kicker">LOCAL CONVERSION ARCHIVE</span>
-                <h2>换色记录</h2>
+                <h2>Conversion history</h2>
               </div>
-              <button id="refreshVcJobs" class="icon-button" type="button" aria-label="刷新换色记录">↻</button>
+              <button id="refreshVcJobs" class="icon-button" type="button" aria-label="Refresh conversion history">↻</button>
             </div>
             <div id="vcJobList" class="transcript-list">
-              <p class="empty-copy">还没有原声换色记录。</p>
+              <p class="empty-copy">No voice conversions yet.</p>
             </div>
           </aside>
         </div>
@@ -338,18 +338,18 @@
             <div class="progress-visual" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
             <div class="progress-copy">
               <span class="result-kicker">NATIVE SPEECH-TO-SPEECH</span>
-              <strong id="vcProgressTitle">正在准备</strong>
-              <p id="vcProgressText">正在建立本地换声任务。</p>
+              <strong id="vcProgressTitle">Preparing</strong>
+              <p id="vcProgressText">Creating a local voice conversion job.</p>
             </div>
-            <button id="vcCancelButton" class="quiet-button" type="button">停止任务</button>
-            <button id="vcRetryButton" class="quiet-button" type="button" hidden>重试</button>
+            <button id="vcCancelButton" class="quiet-button" type="button">Stop job</button>
+            <button id="vcRetryButton" class="quiet-button" type="button" hidden>Retry</button>
           </div>
           <div id="vcProgressTrack" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <span id="vcProgressFill"></span>
           </div>
           <div class="progress-meta">
             <strong id="vcProgressPercent">0%</strong>
-            <span id="vcProgressMeta">等待媒体检查</span>
+            <span id="vcProgressMeta">Waiting for media check</span>
           </div>
         </section>
 
@@ -357,10 +357,10 @@
           <div class="stream-card-heading">
             <div>
               <span class="stream-kicker"><i aria-hidden="true"></i> LIVE PLAYBACK</span>
-              <strong>边换色边听</strong>
-              <p id="vcStreamStatus">第一段完成后即可开始，后续片段会自动续播。</p>
+              <strong>Listen as it converts</strong>
+              <p id="vcStreamStatus">Start after the first segment. Later segments play automatically.</p>
             </div>
-            <button id="vcStreamToggle" class="quiet-button" type="button" disabled>等待第一段</button>
+            <button id="vcStreamToggle" class="quiet-button" type="button" disabled>Waiting for first segment</button>
           </div>
           <audio id="vcStreamAudio" controls preload="metadata"></audio>
         </section>
@@ -369,31 +369,31 @@
           <div class="result-heading">
             <div>
               <span class="result-kicker">PERFORMANCE PRESERVED</span>
-              <h2>原声换色完成</h2>
+              <h2>Voice conversion complete</h2>
             </div>
             <div class="export-actions">
-              <a id="vcDownloadVideo" class="download-link secondary-link" href="#" download hidden>下载 MP4</a>
-              <a id="vcDownloadAudio" class="download-link" href="#" download>下载 WAV</a>
+              <a id="vcDownloadVideo" class="download-link secondary-link" href="#" download hidden>Download MP4</a>
+              <a id="vcDownloadAudio" class="download-link" href="#" download>Download WAV</a>
             </div>
           </div>
           <div class="vc-compare">
             <article>
-              <span class="action-label">A · 原表演</span>
-              <strong id="vcSourceLabel">原始媒体</strong>
+              <span class="action-label">A · Original performance</span>
+              <strong id="vcSourceLabel">Source media</strong>
               <audio id="vcSourceAudio" controls preload="metadata"></audio>
               <video id="vcSourceVideo" controls preload="metadata" playsinline hidden></video>
             </article>
             <article>
-              <span class="action-label">B · 新音色</span>
-              <strong id="vcOutputLabel">转换结果</strong>
+              <span class="action-label">B · New voice</span>
+              <strong id="vcOutputLabel">Conversion result</strong>
               <audio id="vcOutputAudio" controls preload="metadata"></audio>
             </article>
           </div>
           <dl class="metrics metrics-four">
-            <div><dt>音频长度</dt><dd id="vcDurationMetric">-</dd></div>
-            <div><dt>目标音色</dt><dd id="vcVoiceMetric">-</dd></div>
-            <div><dt>转换耗时</dt><dd id="vcTimeMetric">-</dd></div>
-            <div><dt>实时系数</dt><dd id="vcRtfMetric">-</dd></div>
+            <div><dt>Audio duration</dt><dd id="vcDurationMetric">-</dd></div>
+            <div><dt>Target voice</dt><dd id="vcVoiceMetric">-</dd></div>
+            <div><dt>Conversion time</dt><dd id="vcTimeMetric">-</dd></div>
+            <div><dt>Real-time factor</dt><dd id="vcRtfMetric">-</dd></div>
           </dl>
         </section>
       </section>
@@ -401,10 +401,10 @@
       <section id="asrView" class="app-view" hidden>
         <section class="asr-hero">
           <div>
-            <p class="eyebrow">离线 · 时间戳 · 可编辑</p>
-            <h1>听见每一句，<br />留下它的位置。</h1>
+            <p class="eyebrow">Offline · Timestamped · Editable</p>
+            <h1>Every word.<br />In its place.</h1>
           </div>
-          <p class="lede">音频和视频在这台 Mac 上由 Whisper 转录。原始结果、分句时间戳和人工修改分别保存，可以导出字幕，也可以直接把一段清晰人声保存成音色。</p>
+          <p class="lede">Transcribe audio and video with Whisper on this Mac. Edit the words, keep the original timestamps, export subtitles, or save a clear passage as a reusable voice.</p>
         </section>
 
         <div class="asr-workspace">
@@ -412,8 +412,8 @@
             <div class="panel-heading compact-heading">
               <span class="step">01</span>
               <div>
-                <h2>导入媒体</h2>
-                <p>支持常见音频与视频，最长 8 小时，最大 2 GB。</p>
+                <h2>Import Media</h2>
+                <p>Common audio and video formats · Up to 8 hours and 2 GB.</p>
               </div>
             </div>
 
@@ -425,44 +425,44 @@
                 required
               />
               <span class="upload-icon" aria-hidden="true">＋</span>
-              <strong id="asrFileTitle">拖入音频或视频</strong>
-              <span id="asrFileMeta">本地处理 · 不上传云端</span>
+              <strong id="asrFileTitle">Drop audio or video here</strong>
+              <span id="asrFileMeta">Processed locally · No cloud upload</span>
             </label>
 
-            <section class="recorder-panel" id="asrRecorder" aria-label="转录内容录音">
+            <section class="recorder-panel" id="asrRecorder" aria-label="Record audio to transcribe">
               <div class="recorder-copy">
                 <span class="record-dot" aria-hidden="true"></span>
                 <div>
-                  <strong>直接录音</strong>
-                  <p id="asrRecordStatus" role="status" aria-live="polite">最长 8 小时 · 停止后直接进入本地转录</p>
+                  <strong>Record here</strong>
+                  <p id="asrRecordStatus" role="status" aria-live="polite">Up to 8 hours · Transcribe after recording</p>
                 </div>
               </div>
               <div class="recorder-actions">
                 <span id="asrRecordTimer" class="recorder-timer" aria-live="off">00:00</span>
-                <button id="asrRecordStart" class="quiet-button record-start" type="button">开始录音</button>
-                <button id="asrRecordStop" class="quiet-button record-stop" type="button" hidden>停止并使用</button>
-                <button id="asrRecordCancel" class="quiet-button record-cancel" type="button" hidden>取消</button>
+                <button id="asrRecordStart" class="quiet-button record-start" type="button">Record</button>
+                <button id="asrRecordStop" class="quiet-button record-stop" type="button" hidden>Stop and use</button>
+                <button id="asrRecordCancel" class="quiet-button record-cancel" type="button" hidden>Cancel</button>
               </div>
               <audio id="asrRecordPreview" class="record-preview" controls preload="metadata" hidden></audio>
             </section>
 
             <div class="asr-options">
               <label class="select-field">
-                <span>识别语言</span>
+                <span>Spoken language</span>
                 <select id="asrLanguage">
-                  <option value="auto">自动识别</option>
-                  <option value="zh">中文</option>
+                  <option value="auto">Auto-detect</option>
+                  <option value="zh">Chinese</option>
                   <option value="en">English</option>
-                  <option value="ja">日本語</option>
-                  <option value="ko">한국어</option>
-                  <option value="de">Deutsch</option>
-                  <option value="fr">Français</option>
-                  <option value="es">Español</option>
+                  <option value="ja">Japanese</option>
+                  <option value="ko">Korean</option>
+                  <option value="de">German</option>
+                  <option value="fr">French</option>
+                  <option value="es">Spanish</option>
                 </select>
               </label>
               <label class="field">
-                <span>词汇提示 <small>可选</small></span>
-                <input id="asrPrompt" type="text" maxlength="1000" placeholder="人名、术语、项目名" />
+                <span>Vocabulary hints <small>Optional</small></span>
+                <input id="asrPrompt" type="text" maxlength="1000" placeholder="Names, technical terms, project names" />
               </label>
             </div>
 
@@ -470,12 +470,12 @@
               <span class="state-dot"></span>
               <div>
                 <strong>Whisper Large v3 Turbo Q4</strong>
-                <p>项目内权重 · 词级时间戳 · 离线运行</p>
+                <p>Local models · Word timestamps · Offline processing</p>
               </div>
             </div>
 
             <button id="asrStartButton" class="generate-button wide-button" type="submit">
-              <span id="asrButtonText">开始本地转录</span>
+              <span id="asrButtonText">Transcribe</span>
               <span class="button-arrow" aria-hidden="true">↗</span>
             </button>
           </form>
@@ -484,12 +484,12 @@
             <div class="library-heading">
               <div>
                 <span class="result-kicker">LOCAL ARCHIVE</span>
-                <h2>转录记录</h2>
+                <h2>Transcripts</h2>
               </div>
-              <button id="refreshTranscripts" class="icon-button" type="button" aria-label="刷新转录记录">↻</button>
+              <button id="refreshTranscripts" class="icon-button" type="button" aria-label="Refresh transcripts">↻</button>
             </div>
             <div id="transcriptList" class="transcript-list">
-              <p class="empty-copy">还没有转录记录。</p>
+              <p class="empty-copy">No transcripts yet.</p>
             </div>
           </aside>
         </div>
@@ -499,17 +499,17 @@
             <div class="progress-visual" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
             <div class="progress-copy">
               <span class="result-kicker">LOCAL TRANSCRIPTION</span>
-              <strong id="asrProgressTitle">正在准备</strong>
-              <p id="asrProgressText">正在建立本地转录任务。</p>
+              <strong id="asrProgressTitle">Preparing</strong>
+              <p id="asrProgressText">Creating a local transcription job.</p>
             </div>
-            <button id="asrCancelButton" class="quiet-button" type="button">停止任务</button>
+            <button id="asrCancelButton" class="quiet-button" type="button">Stop job</button>
           </div>
           <div id="asrProgressTrack" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <span id="asrProgressFill"></span>
           </div>
           <div class="progress-meta">
             <strong id="asrProgressPercent">0%</strong>
-            <span id="asrProgressMeta">等待媒体检查</span>
+            <span id="asrProgressMeta">Waiting for media check</span>
           </div>
         </section>
 
@@ -517,10 +517,10 @@
           <div class="stream-card-heading">
             <div>
               <span class="stream-kicker"><i aria-hidden="true"></i> LIVE PLAYBACK</span>
-              <strong>边转录边听原声</strong>
-              <p id="asrStreamStatus">标准化音轨准备完成后即可播放，不必等待转录结束。</p>
+              <strong>Listen while transcribing</strong>
+              <p id="asrStreamStatus">Play the prepared audio without waiting for transcription to finish.</p>
             </div>
-            <button id="asrStreamToggle" class="quiet-button" type="button" disabled>正在准备音轨</button>
+            <button id="asrStreamToggle" class="quiet-button" type="button" disabled>Preparing audio track</button>
           </div>
           <audio id="asrStreamAudio" controls preload="metadata"></audio>
         </section>
@@ -529,7 +529,7 @@
           <div class="transcript-header">
             <div>
               <span class="result-kicker">EDITABLE TRANSCRIPT</span>
-              <h2 id="transcriptTitle">转录</h2>
+              <h2 id="transcriptTitle">Transcript</h2>
               <p id="transcriptMeta"></p>
             </div>
             <div class="export-actions">
@@ -543,49 +543,49 @@
 
           <div class="transcript-toolbar">
             <div class="selection-summary">
-              <strong id="selectionCount">尚未选择片段</strong>
-              <span id="selectionDuration">选择连续的 2 至 30 秒可保存为音色</span>
+              <strong id="selectionCount">No segments selected</strong>
+              <span id="selectionDuration">Select 2 to 30 consecutive seconds to save a voice</span>
             </div>
-            <button id="saveTranscriptButton" class="quiet-button" type="button" disabled>保存文字修改</button>
+            <button id="saveTranscriptButton" class="quiet-button" type="button" disabled>Save text changes</button>
           </div>
 
           <div class="transcript-actions-grid">
             <section class="action-panel">
               <span class="action-label">CREATE VOICE</span>
               <label class="field compact-field">
-                <span>新音色名称</span>
-                <input id="transcriptVoiceName" type="text" maxlength="80" placeholder="例如：访谈片段 01" />
+                <span>New voice name</span>
+                <input id="transcriptVoiceName" type="text" maxlength="80" placeholder="For example: Interview voice 01" />
               </label>
-              <button id="createVoiceFromTranscript" class="quiet-button save-voice-button" type="button" disabled>从所选片段保存音色</button>
+              <button id="createVoiceFromTranscript" class="quiet-button save-voice-button" type="button" disabled>Save selection as voice</button>
               <p id="transcriptVoiceStatus" class="inline-status" aria-live="polite"></p>
             </section>
 
             <section class="action-panel cloud-panel">
               <div class="cloud-title-row">
                 <span class="action-label">GEMINI · OPTIONAL CLOUD</span>
-                <span id="geminiStatus" class="provider-pill">检查中</span>
+                <span id="geminiStatus" class="provider-pill">Checking</span>
               </div>
-              <p>仅把当前选中的一段文字发送到 Gemini，不上传音频。返回结果先留在编辑框中，由你确认后保存。</p>
+              <p>Send only the selected text to Gemini. Audio stays local. Review the result in the editor before saving.</p>
               <div class="cloud-controls">
-                <button id="geminiPunctuation" class="quiet-button" type="button" disabled>补标点</button>
-                <button id="geminiCleanup" class="quiet-button" type="button" disabled>整理断句</button>
+                <button id="geminiPunctuation" class="quiet-button" type="button" disabled>Add punctuation</button>
+                <button id="geminiCleanup" class="quiet-button" type="button" disabled>Clean up text</button>
                 <label class="select-field mini-select">
-                  <span>翻译</span>
+                  <span>Translate</span>
                   <select id="geminiTargetLanguage">
-                    <option value="中文">中文</option>
-                    <option value="English">English</option>
-                    <option value="日本語">日本語</option>
+                    <option value="Chinese">Chinese</option>
+                    <option value="English" selected>English</option>
+                    <option value="Japanese">Japanese</option>
                   </select>
                 </label>
-                <button id="geminiTranslate" class="quiet-button" type="button" disabled>翻译所选</button>
+                <button id="geminiTranslate" class="quiet-button" type="button" disabled>Translate selection</button>
               </div>
               <p id="geminiActionStatus" class="inline-status" aria-live="polite"></p>
             </section>
           </div>
 
           <div class="segment-list-heading">
-            <label class="check-all"><input id="selectAllSegments" type="checkbox" /> 选择全部</label>
-            <span>点击时间可跳到对应音频位置</span>
+            <label class="check-all"><input id="selectAllSegments" type="checkbox" /> Select all</label>
+            <span>Select a timestamp to jump to that point in the audio</span>
           </div>
           <div id="transcriptSegments" class="transcript-segments"></div>
         </section>
@@ -594,10 +594,10 @@
       <section id="dubView" class="app-view" hidden>
         <section class="asr-hero dub-hero">
           <div>
-            <p class="eyebrow">片段 · 音色 · 原时间线</p>
-            <h1>把每句台词，<br />放回它的位置。</h1>
+            <p class="eyebrow">Segments · Voices · Original timing</p>
+            <h1>Give every line<br />a place to belong.</h1>
           </div>
-          <p class="lede">从带时间戳的本地转录建立项目。原始 ASR 文字始终保留，配音文字和音色可以逐段编辑，只重新生成发生变化的片段。音频导出 WAV 与 SRT，视频来源同时封装为 MP4。</p>
+          <p class="lede">Build a project from a timestamped transcript. Refine each line and voice, reuse unchanged audio, and export the finished timeline as WAV and SRT, plus MP4 for video sources.</p>
         </section>
 
         <div class="dub-intake-grid">
@@ -605,40 +605,40 @@
             <div class="panel-heading compact-heading">
               <span class="step">01</span>
               <div>
-                <h2>新建配音项目</h2>
-                <p>选择一份本地转录，并为所有片段预设一个音色。</p>
+                <h2>New dubbing project</h2>
+                <p>Choose a transcript and an initial voice for all segments.</p>
               </div>
             </div>
             <label class="select-field">
-              <span>来源转录</span>
+              <span>Source transcript</span>
               <select id="dubTranscriptSelect" required>
-                <option value="">选择转录记录</option>
+                <option value="">Choose a transcript</option>
               </select>
             </label>
             <label class="field compact-field">
-              <span>项目名称 <small>可选</small></span>
-              <input id="dubTitleInput" type="text" maxlength="160" placeholder="默认使用转录名称" />
+              <span>Project name <small>Optional</small></span>
+              <input id="dubTitleInput" type="text" maxlength="160" placeholder="Uses the transcript title by default" />
             </label>
             <div class="dub-create-options">
               <label class="select-field">
-                <span>默认音色</span>
+                <span>Default voice</span>
                 <select id="dubDefaultVoice" required>
-                  <option value="">选择已保存音色</option>
+                  <option value="">Choose a saved voice</option>
                 </select>
               </label>
               <label class="select-field">
-                <span>生成语言</span>
+                <span>Speech language</span>
                 <select id="dubTargetLanguage">
-                  <option value="auto">自动识别</option>
-                  <option value="chinese">中文</option>
+                  <option value="auto">Auto-detect</option>
+                  <option value="chinese">Chinese</option>
                   <option value="english">English</option>
-                  <option value="japanese">日本語</option>
-                  <option value="korean">한국어</option>
+                  <option value="japanese">Japanese</option>
+                  <option value="korean">Korean</option>
                 </select>
               </label>
             </div>
             <button id="createDubButton" class="generate-button wide-button" type="submit">
-              <span>建立项目</span>
+              <span>Create project</span>
               <span class="button-arrow" aria-hidden="true">↗</span>
             </button>
           </form>
@@ -647,18 +647,18 @@
             <div class="library-heading">
               <div>
                 <span class="result-kicker">LOCAL DUB ARCHIVE</span>
-                <h2>配音项目</h2>
+                <h2>Projects</h2>
               </div>
               <div class="library-actions">
-                <label class="icon-button" aria-label="导入 Timbreloom 项目" title="导入项目">
+                <label class="icon-button" aria-label="Import Timbreloom project" title="Import project">
                   <span>＋</span>
                   <input id="dubBundleImport" type="file" accept=".timbreloom,application/zip" hidden />
                 </label>
-                <button id="refreshDubProjects" class="icon-button" type="button" aria-label="刷新配音项目">↻</button>
+                <button id="refreshDubProjects" class="icon-button" type="button" aria-label="Refresh dubbing projects">↻</button>
               </div>
             </div>
             <div id="dubProjectList" class="transcript-list">
-              <p class="empty-copy">还没有配音项目。</p>
+              <p class="empty-copy">No dubbing projects yet.</p>
             </div>
           </aside>
         </div>
@@ -669,37 +669,37 @@
               <span class="result-kicker">PERSISTENT DUB PROJECT</span>
               <div class="dub-title-row">
                 <label class="field dub-title-field">
-                  <span class="sr-only">项目名称</span>
+                  <span class="sr-only">Project name</span>
                   <input id="dubProjectTitleInput" type="text" maxlength="160" />
                 </label>
                 <label class="select-field dub-language-field">
-                  <span class="sr-only">生成语言</span>
+                  <span class="sr-only">Speech language</span>
                   <select id="dubProjectLanguage">
-                    <option value="auto">自动识别</option>
-                    <option value="chinese">中文</option>
+                    <option value="auto">Auto-detect</option>
+                    <option value="chinese">Chinese</option>
                     <option value="english">English</option>
-                    <option value="japanese">日本語</option>
-                    <option value="korean">한국어</option>
+                    <option value="japanese">Japanese</option>
+                    <option value="korean">Korean</option>
                   </select>
                 </label>
               </div>
               <p id="dubProjectMeta"></p>
             </div>
             <div class="dub-header-actions">
-              <button id="dubSaveButton" class="quiet-button" type="button" disabled>保存修改</button>
-              <a id="dubBundleDownload" class="quiet-button button-link" href="#" download>项目包</a>
+              <button id="dubSaveButton" class="quiet-button" type="button" disabled>Save Changes</button>
+              <a id="dubBundleDownload" class="quiet-button button-link" href="#" download>Project bundle</a>
               <label id="dubOriginalAudioField" class="select-field dub-mix-field" hidden>
-                <span>原声音量</span>
+                <span>Original audio volume</span>
                 <select id="dubOriginalAudioGain">
-                  <option value="0">静音原声</option>
-                  <option value="0.15">原声 15%</option>
-                  <option value="0.35">原声 35%</option>
-                  <option value="0.6">原声 60%</option>
-                  <option value="1">保留原声</option>
+                  <option value="0">Mute original</option>
+                  <option value="0.15">Original at 15%</option>
+                  <option value="0.35">Original at 35%</option>
+                  <option value="0.6">Original at 60%</option>
+                  <option value="1">Keep original</option>
                 </select>
               </label>
               <button id="dubExportButton" class="generate-button compact-generate" type="button" disabled>
-                <span id="dubExportButtonText">导出 WAV + SRT</span>
+                <span id="dubExportButtonText">Export WAV + SRT</span>
                 <span class="button-arrow" aria-hidden="true">↗</span>
               </button>
             </div>
@@ -714,56 +714,56 @@
             <div class="dub-timeline-heading">
               <div>
                 <span class="result-kicker">ORIGINAL TIMECODE MAP</span>
-                <strong id="dubTimelineTitle">片段时间线</strong>
+                <strong id="dubTimelineTitle">Segment timeline</strong>
               </div>
-              <span id="dubTimelineSummary">等待片段数据</span>
+              <span id="dubTimelineSummary">Waiting for segment data</span>
             </div>
             <div id="dubWaveformShell" class="dub-waveform-shell">
               <canvas id="dubWaveformCanvas" aria-hidden="true"></canvas>
-              <div id="dubTimelineTrack" class="dub-timeline-track" aria-label="配音片段时间线"></div>
+              <div id="dubTimelineTrack" class="dub-timeline-track" aria-label="Dubbing segment timeline"></div>
               <span id="dubPlayhead" class="dub-playhead" aria-hidden="true"></span>
             </div>
             <div class="dub-timeline-legend" aria-hidden="true">
-              <span><i class="legend-slot"></i>原时间槽</span>
-              <span><i class="legend-ready"></i>生成语音</span>
-              <span><i class="legend-overlap"></i>与下一段重叠</span>
+              <span><i class="legend-slot"></i>Original slot</span>
+              <span><i class="legend-ready"></i>Generated speech</span>
+              <span><i class="legend-overlap"></i>Overlaps next segment</span>
             </div>
             <div class="dub-time-readout">
               <span id="dubPlayheadTime">00:00.000</span>
-              <span>点击波形定位，选择单段后可在播放头拆分</span>
+              <span>Select the waveform to seek. Select one segment to split at the playhead.</span>
             </div>
           </section>
 
           <section id="dubQuality" class="dub-quality" aria-live="polite">
-            <strong id="dubQualityTitle">项目检查</strong>
-            <p id="dubQualitySummary">等待项目数据</p>
+            <strong id="dubQualityTitle">Project checks</strong>
+            <p id="dubQualitySummary">Waiting for project data</p>
           </section>
 
           <section class="dub-role-panel">
             <div>
               <span class="action-label">CAST &amp; VOICE ASSIGNMENT</span>
-              <strong>角色与批量音色</strong>
+              <strong>Roles and voices</strong>
             </div>
             <div class="dub-role-controls">
-              <input id="dubRoleName" type="text" maxlength="160" placeholder="新角色名称" />
-              <select id="dubRoleVoice"><option value="">选择音色</option></select>
-              <button id="dubRoleSave" class="quiet-button" type="button">添加角色</button>
-              <select id="dubApplyRole"><option value="">选择角色</option></select>
-              <button id="dubApplyRoleButton" class="quiet-button" type="button" disabled>应用到所选</button>
+              <input id="dubRoleName" type="text" maxlength="160" placeholder="New role name" />
+              <select id="dubRoleVoice"><option value="">Choose a voice</option></select>
+              <button id="dubRoleSave" class="quiet-button" type="button">Add role</button>
+              <select id="dubApplyRole"><option value="">Choose a role</option></select>
+              <button id="dubApplyRoleButton" class="quiet-button" type="button" disabled>Apply to selection</button>
             </div>
           </section>
 
           <div class="dub-toolbar">
             <div class="selection-summary">
-              <strong id="dubSelectionCount">尚未选择片段</strong>
-              <span id="dubEditorStatus">编辑文字或音色后请先保存</span>
+              <strong id="dubSelectionCount">No segments selected</strong>
+              <span id="dubEditorStatus">Save after editing text or voices</span>
             </div>
             <div class="dub-generate-actions">
-              <button id="dubSplitButton" class="quiet-button" type="button" disabled>在播放头拆分</button>
-              <button id="dubMergeButton" class="quiet-button" type="button" disabled>合并所选</button>
-              <button id="dubGenerateSelected" class="quiet-button" type="button" disabled>生成所选</button>
-              <button id="dubRetryFailed" class="quiet-button" type="button" disabled>重试失败</button>
-              <button id="dubGenerateAll" class="generate-button compact-generate" type="button">生成全部</button>
+              <button id="dubSplitButton" class="quiet-button" type="button" disabled>Split at playhead</button>
+              <button id="dubMergeButton" class="quiet-button" type="button" disabled>Merge selected</button>
+              <button id="dubGenerateSelected" class="quiet-button" type="button" disabled>Generate selected</button>
+              <button id="dubRetryFailed" class="quiet-button" type="button" disabled>Retry failed</button>
+              <button id="dubGenerateAll" class="generate-button compact-generate" type="button">Generate all</button>
             </div>
           </div>
 
@@ -772,17 +772,17 @@
               <div class="progress-visual" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
               <div class="progress-copy">
                 <span class="result-kicker">PERSISTENT SEGMENT RENDER</span>
-                <strong id="dubProgressTitle">正在准备</strong>
-                <p id="dubProgressText">正在建立配音任务。</p>
+                <strong id="dubProgressTitle">Preparing</strong>
+                <p id="dubProgressText">Creating a dubbing job.</p>
               </div>
-              <button id="dubCancelButton" class="quiet-button" type="button">停止任务</button>
+              <button id="dubCancelButton" class="quiet-button" type="button">Stop job</button>
             </div>
             <div id="dubProgressTrack" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
               <span id="dubProgressFill"></span>
             </div>
             <div class="progress-meta">
               <strong id="dubProgressPercent">0%</strong>
-              <span id="dubProgressMeta">等待片段</span>
+              <span id="dubProgressMeta">Waiting for segments</span>
             </div>
             <p id="dubCurrentText" class="current-segment"></p>
           </section>
@@ -791,10 +791,10 @@
             <div class="stream-card-heading">
               <div>
                 <span class="stream-kicker"><i aria-hidden="true"></i> LIVE PLAYBACK</span>
-                <strong>边生成边听配音</strong>
-                <p id="dubStreamStatus">首个片段完成后即可开始，生成到哪里就听到哪里。</p>
+                <strong>Listen as dubbing generates</strong>
+                <p id="dubStreamStatus">Start listening after the first segment and follow along as more audio is generated.</p>
               </div>
-              <button id="dubStreamToggle" class="quiet-button" type="button" disabled>等待首段</button>
+              <button id="dubStreamToggle" class="quiet-button" type="button" disabled>Waiting for first segment</button>
             </div>
             <audio id="dubStreamAudio" controls preload="metadata"></audio>
           </section>
@@ -802,7 +802,7 @@
           <section id="dubExportResult" class="dub-export-result" hidden>
             <div>
               <span class="action-label">TIMELINE EXPORT READY</span>
-              <strong id="dubExportSummary">完整配音已经导出。</strong>
+              <strong id="dubExportSummary">The full dubbing timeline has been exported.</strong>
             </div>
             <div class="export-actions">
               <a id="dubExportMp4" class="download-link secondary-link" href="#" download hidden>MP4</a>
@@ -814,63 +814,63 @@
           <section class="action-panel cloud-panel dub-cloud-panel">
             <div class="cloud-title-row">
               <span class="action-label">GEMINI TRANSLATION · OPTIONAL CLOUD</span>
-              <span id="dubGeminiStatus" class="provider-pill">检查中</span>
+              <span id="dubGeminiStatus" class="provider-pill">Checking</span>
             </div>
-            <p>仅把当前选中的配音文字批量发送到 Gemini，不上传源音频或已生成音频。返回内容先进入编辑框，不会自动保存。</p>
+            <p>Send only selected dialogue to Gemini in a batch. Source and generated audio stay local. Review the returned text before saving.</p>
             <div class="cloud-controls">
               <label class="select-field mini-select">
-                <span>处理方式</span>
+                <span>Action</span>
                 <select id="dubGeminiTask">
-                  <option value="translate">翻译</option>
-                  <option value="punctuation">补标点</option>
-                  <option value="cleanup">整理断句</option>
+                  <option value="translate">Translate</option>
+                  <option value="punctuation">Add punctuation</option>
+                  <option value="cleanup">Clean up text</option>
                 </select>
               </label>
               <label class="select-field mini-select">
-                <span>目标语言</span>
+                <span>Target language</span>
                 <select id="dubGeminiTargetLanguage">
-                  <option value="中文">中文</option>
-                  <option value="English">English</option>
-                  <option value="日本語">日本語</option>
+                  <option value="Chinese">Chinese</option>
+                  <option value="English" selected>English</option>
+                  <option value="Japanese">Japanese</option>
                 </select>
               </label>
-              <button id="dubGeminiTranslate" class="quiet-button" type="button" disabled>批量处理所选</button>
+              <button id="dubGeminiTranslate" class="quiet-button" type="button" disabled>Process selected</button>
             </div>
           </section>
 
           <div class="segment-list-heading">
-            <label class="check-all"><input id="dubSelectAll" type="checkbox" /> 选择全部</label>
-            <span>源文字只读，配音文字和音色可以单独修改</span>
+            <label class="check-all"><input id="dubSelectAll" type="checkbox" /> Select all</label>
+            <span>Original text is preserved. Edit dialogue and voices independently.</span>
           </div>
           <div id="dubSegments" class="dub-segments"></div>
         </section>
       </section>
 
       <section id="errorCard" class="error-card" hidden role="alert">
-        <strong>任务没有完成</strong>
+        <strong>Job did not complete</strong>
         <p id="errorText"></p>
       </section>
 
       <footer>
         <p>TIMBRELOOM 1.1 · QWEN3-TTS · SEED-VC · WHISPER LARGE V3 TURBO · GEMINI OPTIONAL</p>
-        <p>请只克隆本人或已获得明确授权的声音。</p>
+        <p>Clone only your own voice or a voice you have explicit permission to use.</p>
       </footer>
     </main>
     <dialog id="modelManager" aria-labelledby="modelManagerTitle">
       <div class="model-manager-heading">
-        <span>本地模型</span>
-        <button id="closeModelManager" class="quiet-button" type="button" autofocus>完成</button>
+        <span>Local models</span>
+        <button id="closeModelManager" class="quiet-button" type="button" autofocus>Done</button>
       </div>
-      <h2 id="modelManagerTitle">需要什么，再下载什么。</h2>
-      <p class="model-manager-intro">模型与 App 分开保存。选择你需要的功能，再从 Hugging Face 下载对应模型；下载完成后，声音处理都在本机完成。</p>
+      <h2 id="modelManagerTitle">Choose what you need.</h2>
+      <p class="model-manager-intro">Models are stored separately from the app. Download the ones you need from Hugging Face, then process audio entirely on this Mac.</p>
       <p id="modelDownloadError" role="alert" hidden></p>
       <div id="modelCatalog"></div>
       <div class="model-manager-storage">
-        <span>保存在这台 Mac</span>
+        <span>Saved on this Mac</span>
         <code id="modelDirectory"></code>
-        <span>关闭此面板会继续下载。退出 App 会暂停并保留进度，下次可以继续下载。</span>
+        <span>Downloads continue when this panel closes. Quitting the app pauses them and saves progress for later.</span>
       </div>
     </dialog>
-    <script type="module" src="/static/app.js?v=21" defer></script>
+    <script type="module" src="/static/app.js?v=22" defer></script>
   </body>
 </html>

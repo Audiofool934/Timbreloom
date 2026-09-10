@@ -1,51 +1,52 @@
-# Timbreloom 项目格式
+# Timbreloom project format
 
-Timbreloom 1.0 把每个配音项目保存在 `data/projects/<project-id>/`。
-项目目录是日常工作的权威副本，网页只是该数据的本地编辑界面。
+Each dubbing project lives in `data/projects/<project-id>/` under the active library directory.
+This directory is the authoritative working copy; the browser and Mac workspaces edit the same local data.
 
-## 目录结构
+## Directory structure
 
 ```text
 <project-id>/
 ├── project.json
 ├── source.wav
-├── source-media.<ext>       可选的视频源文件
-├── waveform-<points>.json   可重建的波形缓存
-├── renders/                 内容指纹命名的片段 WAV
-├── jobs/                    生成和导出任务快照
-├── exports/                 WAV、SRT 和可选 MP4
-└── bundles/                 最近生成的 .timbreloom 项目包
+├── source-media.<ext>       Optional original video
+├── waveform-<points>.json   Rebuildable waveform cache
+├── renders/                 Segment WAV files named by content fingerprint
+├── jobs/                    Generation and export job snapshots
+├── exports/                 WAV, SRT, and optional MP4
+└── bundles/                 Recently generated .timbreloom bundles
 ```
 
-`project.json` 当前使用 schema version 4。
-服务读取旧 schema 1、2 或 3 项目时会在原目录中执行向前迁移，并保留源媒体、片段文字、缓存和已有导出记录。
+`project.json` currently uses schema version 4.
+Older schema 1, 2, and 3 projects migrate forward in place when read, preserving source media, segment text, cached audio, and exports.
 
-## 片段不变量
+## Segment invariants
 
-每个片段同时保存只读 `source_text` 和可编辑 `active_text`。
-拆分和合并操作会更新 `source_segment_ids`，因此仍然可以追溯到原始 ASR 片段。
-片段按 `order` 和非递减 `start` 排序，且 `end` 不能早于 `start`。
+Each segment stores read-only `source_text` and editable `active_text`.
+Split and merge operations update `source_segment_ids` to preserve links to the original ASR segments.
+Segments are ordered by `order` and nondecreasing `start`; `end` cannot precede `start`.
 
-渲染内容指纹包含配音文字、实际音色、目标语言、模型 ID 和生成设置。
-修改时间戳、音量或时长适配方式不会重新生成语音，因为这些字段只影响最终时间线。
-修改文字或实际音色只会把受影响片段标记为过期。
+A render fingerprint includes dialogue, effective voice, target language, model ID, and generation settings.
+Changing timestamps, gain, or duration fit does not regenerate speech because those fields affect the final timeline only.
+Text or voice changes mark only the affected renders as stale.
 
-## 角色和音色
+## Roles and voices
 
-角色是项目级对象，包含名称、显示颜色和可选音色 ID。
-片段保存 `role_id` 与解析后的 `voice_id`，所以导出不依赖运行时猜测。
-修改角色绑定的音色会只使引用该角色的片段缓存过期。
+Roles belong to a project and include a name, display color, and optional voice ID.
+Segments store both `role_id` and the resolved `voice_id`, so export does not need to infer a voice at runtime.
+Changing a role's voice invalidates only the segments assigned to that role.
 
-## 安全时长适配
+## Safe duration fitting
 
-`fit_mode` 为 `natural` 时，生成语音按自然时长放回原起点。
-`fit_mode` 为 `slot` 时，导出任务使用保音高变速向片段时间槽靠拢。
-速度限制固定为 0.8x 到 1.25x，任何超出范围的内容都不会被截断。
+With `fit_mode: natural`, generated speech starts at the original segment position and plays at its natural duration.
+With `fit_mode: slot`, export adjusts playback speed while preserving pitch to approach the available slot length.
+Speed is limited to 0.8x through 1.25x, and content beyond that range is never cut.
 
-## 项目包
+## Project bundles
 
-`.timbreloom` 是 ZIP 容器，当前 bundle version 为 2，包含版本化 `manifest.json`、`project.json`、项目使用的参考音色、源媒体、片段渲染和已有导出。
-导入音色时，同 ID 且内容一致的档案会复用；同 ID 但内容不同的档案会使整个导入失败，不会静默覆盖本地音色。
-任务快照、波形缓存和嵌套项目包不进入项目包，因为它们不是迁移后的运行前提。
-导入器拒绝绝对路径、父目录穿越、过多条目和超过安全上限的解压数据。
-导入始终生成新的项目 ID 并重置未完成任务引用，不覆盖本地现有项目。
+A `.timbreloom` file is a ZIP container using bundle version 2.
+It contains a versioned `manifest.json`, `project.json`, referenced voices, source media, renders, and existing exports.
+Identical voice profiles with matching IDs are reused during import; conflicting content with the same ID fails the entire import instead of overwriting a local voice.
+Job snapshots, waveform caches, and nested bundles are excluded because they are not prerequisites for the migrated project.
+The importer rejects absolute paths, parent-directory traversal, excessive entries, and extracted data beyond its safety limits.
+Import always assigns a new project ID and resets unfinished job references, preserving existing local projects.

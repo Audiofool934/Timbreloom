@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     private let started = ProcessInfo.processInfo.systemUptime
     private var mode = "clone"
     private let toolbarTitle = NSTextField(labelWithString: "")
-    private let importButton = NSButton(title: "导入文件", target: nil, action: nil)
+    private let importButton = NSButton(title: "Import File", target: nil, action: nil)
     private var workspaceMenu: NSMenu?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         ])
         window.contentViewController = content
         window.title = "Timbreloom"
-        window.subtitle = "本机声音工作台"
+        window.subtitle = "Your local voice studio"
         window.titleVisibility = .hidden
         window.toolbarStyle = .unified
         window.minSize = NSSize(width: 920, height: 640)
@@ -102,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
             NSLog("Timbreloom workspace ready in %.3f s", ProcessInfo.processInfo.systemUptime - self.started)
         }
         backend.onReady = { [weak self] in
-            self?.sidebar.setStatus("本地引擎已连接", state: "idle")
+            self?.sidebar.setStatus("Local engine connected", state: "idle")
             self?.workspace.loadWorkspace()
         }
         backend.onError = { [weak self] message in
@@ -130,8 +130,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         guard let selection = WorkspaceMode.all.first(where: { $0.id == mode }) else { return }
         toolbarTitle.stringValue = selection.title
         window.title = "\(selection.title) · Timbreloom"
-        let names = ["clone": "导入录音", "vc": "导入媒体", "asr": "导入媒体", "dub": "导入项目"]
-        importButton.title = names[mode] ?? "导入文件"
+        let names = ["clone": "Import Audio", "vc": "Import Media", "asr": "Import Media", "dub": "Import Project"]
+        importButton.title = names[mode] ?? "Import File"
         importButton.toolTip = "\(importButton.title) · ⌘O"
         importButton.setAccessibilityLabel(importButton.title)
         importButton.sizeToFit()
@@ -163,8 +163,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     }
     @objc func about() {
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "Timbreloom", .applicationVersion: "1.1.0", .version: "Mac 本机版",
-            .credits: NSAttributedString(string: "在这台 Mac 上，编织声音。\n声音克隆 · 原声换色 · 本地转录 · 配音项目"),
+            .applicationName: "Timbreloom", .applicationVersion: "1.1.0", .version: "Native Mac app",
+            .credits: NSAttributedString(string: "Shape your sound on this Mac.\nVoice cloning · Voice conversion · Transcription · Dubbing studio"),
         ])
     }
 
@@ -183,18 +183,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
             if dirty || busy || workspace.downloading {
                 showWindow()
                 let alert = NSAlert()
-                alert.messageText = state == nil ? "确认退出工作台？" : busy ? "仍有任务在运行" : workspace.downloading ? "文件仍在导出" : "结束这次工作？"
+                alert.messageText = state == nil ? "Quit the studio?" : busy ? "A job is still running" : workspace.downloading ? "A file is still being exported" : "Finish this session?"
                 var reasons = [String]()
                 if busy {
                     reasons.append(backend.process == nil
-                        ? "终端启动的服务会继续运行。"
-                        : "退出会中断当前处理；下次打开会恢复可恢复的任务，换色任务可在记录中重试。模型下载会保留进度，可手动继续。关闭窗口则会继续在后台运行。")
+                        ? "The service started in Terminal will keep running."
+                        : "Quitting interrupts processing. Supported jobs resume on the next launch; voice conversion jobs can be retried from history. Model downloads keep their progress and can be resumed manually. Closing the window keeps the app running in the background.")
                 }
-                if dirty { reasons.append("文字草稿已保留；尚未保存的项目修改、录音和本次选取的文件可能需要重新准备。") }
-                if workspace.downloading { reasons.append("尚未完成的文件导出将中断。") }
+                if dirty { reasons.append("Text drafts are saved. Unsaved project edits, recordings, and selected files may need to be prepared again.") }
+                if workspace.downloading { reasons.append("Any unfinished file export will be interrupted.") }
                 alert.informativeText = reasons.joined(separator: "\n\n")
-                alert.addButton(withTitle: "继续工作")
-                alert.addButton(withTitle: "退出 Timbreloom")
+                alert.addButton(withTitle: "Keep Working")
+                alert.addButton(withTitle: "Quit Timbreloom")
                 alert.beginSheetModal(for: window) { [weak self] response in
                     let quit = response == .alertSecondButtonReturn
                     if quit { self?.backend.stop() } else { self?.terminating = false }
@@ -222,9 +222,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         }
         if id.rawValue == "sidebar" {
             let item = NSToolbarItem(itemIdentifier: id)
-            item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "显示或隐藏侧栏")
-            item.label = "侧栏"
-            item.toolTip = "显示或隐藏侧栏 · ⌃⌘S"
+            item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "Show or Hide Sidebar")
+            item.label = "Sidebar"
+            item.toolTip = "Show or Hide Sidebar · ⌃⌘S"
             item.target = self
             item.action = #selector(toggleSidebar)
             return item
@@ -236,8 +236,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
             item.view = toolbarTitle
         } else {
             let open = id.rawValue == "open"
-            item.label = open ? "导入文件" : "打开资料库"
-            item.toolTip = open ? "导入文件 (⌘O)" : "在 Finder 中打开资料库"
+            item.label = open ? "Import File" : "Open Library"
+            item.toolTip = open ? "Import File (⌘O)" : "Show Library in Finder"
             item.image = NSImage(systemSymbolName: open ? "square.and.arrow.down" : "folder", accessibilityDescription: item.label)
             if open {
                 importButton.image = item.image
@@ -271,46 +271,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
             return item
         }
         let app = menu("Timbreloom")
-        item(app, "关于 Timbreloom", #selector(about), target: self)
-        item(app, "模型管理…", #selector(showModels), ",", target: self)
+        item(app, "About Timbreloom", #selector(about), target: self)
+        item(app, "Models…", #selector(showModels), ",", target: self)
         app.addItem(.separator())
-        item(app, "隐藏 Timbreloom", #selector(NSApplication.hide(_:)), "h")
-        item(app, "显示全部", #selector(NSApplication.unhideAllApplications(_:)))
+        item(app, "Hide Timbreloom", #selector(NSApplication.hide(_:)), "h")
+        item(app, "Show All", #selector(NSApplication.unhideAllApplications(_:)))
         app.addItem(.separator())
-        item(app, "退出 Timbreloom", #selector(NSApplication.terminate(_:)), "q")
-        let file = menu("文件")
-        item(file, "导入文件…", #selector(openFile), "o", target: self)
-        item(file, "保存修改", #selector(save), "s", target: self)
-        item(file, "开始生成 / 转录", #selector(generate), "\r", target: self)
+        item(app, "Quit Timbreloom", #selector(NSApplication.terminate(_:)), "q")
+        let file = menu("File")
+        item(file, "Import File…", #selector(openFile), "o", target: self)
+        item(file, "Save Changes", #selector(save), "s", target: self)
+        item(file, "Start Processing", #selector(generate), "\r", target: self)
         file.addItem(.separator())
-        item(file, "在 Finder 中打开资料库", #selector(showLibrary), target: self)
-        item(file, "关闭窗口", #selector(NSWindow.performClose(_:)), "w")
-        let edit = menu("编辑")
-        item(edit, "撤销", Selector(("undo:")), "z")
-        let redo = item(edit, "重做", Selector(("redo:")), "z")
+        item(file, "Show Library in Finder", #selector(showLibrary), target: self)
+        item(file, "Close Window", #selector(NSWindow.performClose(_:)), "w")
+        let edit = menu("Edit")
+        item(edit, "Undo", Selector(("undo:")), "z")
+        let redo = item(edit, "Redo", Selector(("redo:")), "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         edit.addItem(.separator())
-        item(edit, "剪切", #selector(NSText.cut(_:)), "x")
-        item(edit, "复制", #selector(NSText.copy(_:)), "c")
-        item(edit, "粘贴", #selector(NSText.paste(_:)), "v")
-        item(edit, "全选", #selector(NSText.selectAll(_:)), "a")
-        let view = menu("工作空间")
+        item(edit, "Cut", #selector(NSText.cut(_:)), "x")
+        item(edit, "Copy", #selector(NSText.copy(_:)), "c")
+        item(edit, "Paste", #selector(NSText.paste(_:)), "v")
+        item(edit, "Select All", #selector(NSText.selectAll(_:)), "a")
+        let view = menu("Workspace")
         workspaceMenu = view
         for (index, mode) in WorkspaceMode.all.enumerated() {
             item(view, mode.title, #selector(selectMenu(_:)), String(index + 1), target: self).tag = index
         }
         view.addItem(.separator())
-        let toggle = item(view, "显示 / 隐藏侧栏", #selector(toggleSidebar), "s", target: self)
+        let toggle = item(view, "Show or Hide Sidebar", #selector(toggleSidebar), "s", target: self)
         toggle.keyEquivalentModifierMask = [.command, .control]
-        let windows = menu("窗口")
-        item(windows, "显示工作台", #selector(showWindow), "0", target: self)
-        item(windows, "最小化", #selector(NSWindow.performMiniaturize(_:)), "m")
-        item(windows, "缩放", #selector(NSWindow.performZoom(_:)))
+        let windows = menu("Window")
+        item(windows, "Show Studio", #selector(showWindow), "0", target: self)
+        item(windows, "Minimize", #selector(NSWindow.performMiniaturize(_:)), "m")
+        item(windows, "Zoom", #selector(NSWindow.performZoom(_:)))
         NSApp.windowsMenu = windows
-        let help = menu("帮助")
-        item(help, "Timbreloom 使用说明", #selector(showHelp), target: self)
-        if backend.embedded { item(help, "第三方许可", #selector(showLicenses), target: self) }
-        item(help, "打开运行日志", #selector(showLog), target: self)
+        let help = menu("Help")
+        item(help, "Timbreloom Help", #selector(showHelp), target: self)
+        if backend.embedded { item(help, "Third-Party Licenses", #selector(showLicenses), target: self) }
+        item(help, "Open Runtime Log", #selector(showLog), target: self)
         NSApp.helpMenu = help
         NSApp.mainMenu = main
     }

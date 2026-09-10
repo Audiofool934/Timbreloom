@@ -23,10 +23,10 @@ def atomic_json(path: Path, payload: dict[str, Any]) -> None:
 
 def local_file(directory: Path, name: str) -> Path:
     if not name or Path(name).name != name:
-        raise ValueError("任务文件必须位于任务目录内。")
+        raise ValueError("Job files must be inside the jobs folder.")
     path = directory / name
     if path.resolve().parent != directory.resolve():
-        raise ValueError("任务文件不能指向其他目录。")
+        raise ValueError("Job files cannot point to another folder.")
     return path
 
 

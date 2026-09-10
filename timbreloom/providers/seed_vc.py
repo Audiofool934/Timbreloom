@@ -101,13 +101,13 @@ class LocalSeedVCProvider(VCProvider):
         progress_callback: Callable[[float, str], None] | None = None,
     ) -> VCResult:
         if not self.descriptor.configured:
-            raise RuntimeError("请先在“模型管理”中下载 Seed-VC，再开始换色。")
+            raise RuntimeError("Download Seed-VC from Models before starting voice conversion.")
         if not 1 <= request.diffusion_steps <= 30:
-            raise ValueError("Seed-VC 扩散步数必须在 1 到 30 之间。")
+            raise ValueError("Seed-VC diffusion steps must be between 1 and 30.")
         if not 0.0 <= request.inference_cfg_rate <= 1.0:
-            raise ValueError("Seed-VC CFG 必须在 0 到 1 之间。")
+            raise ValueError("Seed-VC CFG must be between 0 and 1.")
         if not 0.5 <= request.length_adjust <= 2.0:
-            raise ValueError("Seed-VC 时长倍率必须在 0.5 到 2.0 之间。")
+            raise ValueError("Seed-VC duration ratio must be between 0.5 and 2.0.")
 
         request.work_dir.mkdir(parents=True, exist_ok=True)
         engine_output = request.work_dir / "engine-output"
@@ -156,7 +156,7 @@ class LocalSeedVCProvider(VCProvider):
 
         self._set_status("running")
         if progress_callback is not None:
-            progress_callback(0.04, "正在释放 TTS 显存并准备 Seed-VC")
+            progress_callback(0.04, "Releasing TTS memory and preparing Seed-VC")
         try:
             with self.coordinator.session("voice-conversion"):
                 if self.before_load is not None:
@@ -179,11 +179,11 @@ class LocalSeedVCProvider(VCProvider):
                                 except subprocess.TimeoutExpired:
                                     process.kill()
                                     process.wait(timeout=5)
-                                raise InterruptedError("原声换色已取消。")
+                                raise InterruptedError("Voice conversion canceled.")
                             if progress_callback is not None:
                                 elapsed = time.perf_counter() - started
                                 progress = min(0.92, 0.08 + (elapsed / expected_seconds) * 0.78)
-                                progress_callback(progress, "Seed-VC 正在保留原表演并迁移音色")
+                                progress_callback(progress, "Seed-VC is converting the voice while preserving the performance")
                             time.sleep(0.35)
                     finally:
                         if process.poll() is None:
@@ -191,13 +191,13 @@ class LocalSeedVCProvider(VCProvider):
 
             if process.returncode != 0:
                 detail = log_path.read_text(encoding="utf-8", errors="replace")[-4_000:].strip()
-                raise RuntimeError(detail or "Seed-VC 换声失败。")
+                raise RuntimeError(detail or "Seed-VC voice conversion failed.")
 
             candidates = sorted(engine_output.glob("vc_*.wav"))
             if len(candidates) != 1:
-                raise RuntimeError("Seed-VC 没有产生唯一的音频结果。")
+                raise RuntimeError("Seed-VC did not produce a unique audio result.")
             if progress_callback is not None:
-                progress_callback(0.94, "正在标准化换声结果")
+                progress_callback(0.94, "Normalizing converted audio")
             normalize_vc_audio(candidates[0], request.output_path)
             output_info = probe_media(request.output_path)
             log_text = log_path.read_text(encoding="utf-8", errors="replace")

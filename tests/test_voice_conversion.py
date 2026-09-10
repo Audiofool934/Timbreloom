@@ -30,7 +30,7 @@ class FakeVCProvider:
 
     def convert(self, request, cancel_event=None, progress_callback=None) -> VCResult:
         if progress_callback:
-            progress_callback(0.5, "正在测试换声")
+            progress_callback(0.5, "Testing voice conversion")
         shutil.copyfile(request.source_audio, request.output_path)
         return VCResult(
             duration_seconds=2.0,
@@ -129,7 +129,7 @@ def test_long_conversion_reuses_completed_chunks_after_retry(
         source_filename="audiobook.ts",
         source_bytes=source.stat().st_size,
         voice_id="f" * 32,
-        voice_name="有声书音色",
+        voice_name="Audiobook voice",
         preset="balanced",
     )
 
@@ -199,7 +199,7 @@ def test_conversion_job_is_persistent_and_completes(monkeypatch, tmp_path: Path)
         source_filename="source.wav",
         source_bytes=source.stat().st_size,
         voice_id="b" * 32,
-        voice_name="测试音色",
+        voice_name="Test voice",
         preset="balanced",
     )
     service.launch(job)
@@ -217,7 +217,7 @@ def test_conversion_job_is_persistent_and_completes(monkeypatch, tmp_path: Path)
     assert (job_dir / "conversion.json").is_file()
     manifest = json.loads((job_dir / "vc-chunks.json").read_text(encoding="utf-8"))
     assert manifest["chunks"][0]["status"] == "complete"
-    assert service.list()[0]["voice_name"] == "测试音色"
+    assert service.list()[0]["voice_name"] == "Test voice"
 
 
 def test_recovery_marks_interrupted_jobs_retryable(tmp_path: Path) -> None:
@@ -239,7 +239,7 @@ def test_recovery_marks_interrupted_jobs_retryable(tmp_path: Path) -> None:
         source_filename="source.wav",
         source_bytes=source.stat().st_size,
         voice_id="d" * 32,
-        voice_name="测试音色",
+        voice_name="Test voice",
         preset="fast",
     )
     service._update(job, status="running", phase="converting")
@@ -252,4 +252,4 @@ def test_recovery_marks_interrupted_jobs_retryable(tmp_path: Path) -> None:
     assert restarted.recover() == 1
     recovered = restarted.get_job(job.job_id)
     assert recovered.status == "error"
-    assert "可安全重试" in recovered.message
+    assert "It is safe to retry" in recovered.message

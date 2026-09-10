@@ -1,317 +1,147 @@
+<div align="center">
+
+<img src="docs/assets/app-icon.png" width="112" alt="Timbreloom app icon" />
+
 # Timbreloom
 
-Timbreloom 是一个只监听 `127.0.0.1` 的本地语音工作台。
-它在 Apple Silicon Mac 上完成声音克隆、原生语音换色、长文本生成、带时间戳的本地转录、持久化配音项目和视频配音导出，并把云端模型限制为需要用户明确触发的可选文本工具。
+### A local voice studio for your Mac.
 
-## 功能
+Clone a voice. Keep a performance. Turn speech into text. Bring dialogue to picture.
 
-- 使用 Qwen3-TTS 0.6B Base 和 Apple MLX 从短参考录音克隆基本音色。
-- 保存本地音色，并在后续生成中重复使用。
-- 在声音克隆、原声换色和本地转录三个媒体入口直接使用浏览器麦克风录音，支持计时、取消和本地试听。
-- 使用 Seed-VC 把音频或视频中的原始节奏、停顿和情绪迁移到已保存音色，不经过 ASR 或重新朗读文字。
-- 原声换色接受 TS、M2TS 和 MTS，并支持最长 8 小时的有声书等长音频。
-- 长音频优先在自然停顿附近切成约 4 分钟的小段，逐段落盘、失败后复用已完成分段，再无额外停顿拼接。
-- 声音克隆、原声换色和配音任务会把已完成片段立即加入连续播放队列，不必等整条音频生成完。
-- 本地转录会在标准化音轨准备完成后开放原声播放，让长文件可以边听边转录。
-- 为原声换色提供 4、8、12 步质量档、持久化记录、取消、失败重试、进度显示和原声/结果 A/B 试听。
-- 视频换色完成后保留画面，并把转换后的音轨重新封装为 MP4。
-- 按语义边界组合多句话，每段最多生成 1,024 个音频 token。
-- 对长文本执行逐字符完整性校验、失败重试、顺序拼接和生成进度显示。
-- 使用本地 Whisper Large v3 Turbo Q4 转录音频或视频。
-- 保存原始 ASR JSON、词级时间戳、可编辑片段和 QA 摘要。
-- 导出 TXT、SRT 和 VTT。
-- 从连续的转录片段截取参考音频并保存为新音色。
-- 从现有转录建立持久化配音项目，同时保留只读原始 ASR 文字和可编辑配音文字。
-- 为每个时间戳片段分配音色、试听、单独生成或重试，并使用内容指纹避免重复生成未修改片段。
-- 在页面刷新或服务重启后恢复项目、片段缓存和未完成任务。
-- 按原始时间线导出完整 WAV 与 SRT，不截断超过原时间槽的语音，并明确报告重叠警告。
-- 为视频来源保留项目内原始媒体，显示时间槽、生成语音长度和相邻片段重叠。
-- 把生成语音重新封装为 MP4，并允许静音原声或按 15%、35%、60%、100% 混入原声音轨。
-- 在服务端提取并缓存源音频波形，让音频、视频、片段表和时间线共享同一个播放头。
-- 建立项目级角色，为角色绑定音色，并把角色和音色批量应用到所选片段。
-- 直接编辑片段起止时间，在播放头拆分单段，或无损合并时间线上连续的片段。
-- 选择自然时长或安全适配时间槽，使用 0.8x 到 1.25x 的保音高变速，超过安全范围时保留完整台词并给出警告。
-- 在导出前汇总未分配、未生成、过期、失败、溢出和重叠问题。
-- 把 WAV、SRT 和 MP4 导出作为持久化后台任务，刷新页面或重启服务后可恢复。
-- 导出和导入 `.timbreloom` 项目包，携带所用音色、源媒体、片段缓存、字幕和已有导出结果。
-- 通过统一的 TTS、ASR 和文本模型 Provider 接口报告能力与状态。
-- 在明确确认后，把最多 50 个所选片段的文字批量发送给 Gemini 做补标点、断句整理或翻译。
+[![Platform](https://img.shields.io/badge/macOS-26.2%2B-20251f?style=flat-square)](docs/macos-app.md)
+[![Apple Silicon](https://img.shields.io/badge/Apple_Silicon-MLX_%2B_MPS-6e854a?style=flat-square)](docs/provider-architecture.md)
+[![License](https://img.shields.io/badge/License-MIT-6e854a?style=flat-square)](LICENSE)
 
-## 启动
+[Get started](#get-started) · [User guide](docs/user-guide.md) · [Mac app](docs/macos-app.md) · [Architecture](docs/provider-architecture.md)
 
-### Mac App
+</div>
 
-Mac App 提供原生窗口、侧栏、菜单、快捷键和系统文件面板，并自动管理本地服务。
-独立安装包包含运行时，模型权重单独保存，由用户在模型管理中按需下载。
-Mac App 要求 Apple Silicon 和 macOS 26.2 或更新版本。
-声音克隆与配音使用 Qwen（约 2.52 GB），本地转录使用 Whisper（约 464 MB），原声换色使用 Seed-VC 及依赖（约 1.88 GB）。
-启动、查看资料和打开模型管理不会下载权重；下载并校验完成后，对应功能可离线使用。
-以下命令构建依赖当前项目的开发外壳；完整包构建和发布验收见下方文档。
+![Timbreloom dubbing studio with a generated English project and a shared waveform timeline](docs/assets/dubbing-studio.png)
+
+Timbreloom brings four audio workflows into a native Mac app, with a shared local library and an English interface.
+Audio processing runs on your Mac using Qwen3-TTS, Whisper, and Seed-VC.
+Download the models you need once, then work offline.
+
+## Four ways to work with a voice
+
+| Workspace | What you can do |
+| --- | --- |
+| **Voice cloning** | Save a short reference recording and generate a sentence, a chapter, or a full script in that voice. |
+| **Voice conversion** | Give an existing audio or video performance a new voice while preserving its rhythm, pauses, and expression. |
+| **Transcription** | Turn audio or video into editable, timestamped text; export TXT, SRT, or VTT. |
+| **Dubbing studio** | Assign roles and voices, edit lines on a shared timeline, regenerate individual segments, and export WAV, SRT, and MP4. |
+
+| From a reference to a new script | From a recording to editable words |
+| --- | --- |
+| ![Voice cloning workspace with a saved sample voice and English script](docs/assets/voice-cloning.png) | ![Transcription workspace with timestamped English segments](docs/assets/transcription.png) |
+
+The screenshots show the actual Mac app using a separate demonstration library.
+
+- **Listen while it works.** Finished speech segments join a continuous playback queue as generation progresses.
+- **Keep your work.** Voices, transcripts, projects, and job progress are saved locally; supported jobs resume after a restart.
+- **Edit without starting over.** Dubbing caches unchanged segments and lets you retry individual lines.
+- **Preserve every line.** Safe duration fitting adjusts playback within 0.8x to 1.25x and reports remaining overlaps without cutting dialogue.
+- **Take projects with you.** A `.timbreloom` bundle carries the project, referenced voices, media, and generated audio.
+
+## Get started
+
+Timbreloom is built for **Apple Silicon Macs**.
+The current standalone app requires **macOS 26.2 or later**.
+This repository provides the source and build tools; the current local binary candidate is development-signed and has not been notarized for public distribution.
+See [release validation](docs/release-readiness.md) for the exact status and testing limits.
+
+### Run from source
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and FFmpeg, then clone this repository.
+The main environment uses Python 3.12; Seed-VC uses an isolated Python 3.10 environment.
+
+```bash
+brew install uv ffmpeg
+git clone https://github.com/Audiofool934/Timbreloom.git
+cd Timbreloom
+./setup.sh
+./start.sh
+```
+
+Open [localhost:7865](http://127.0.0.1:7865).
+The developer setup downloads all three model groups and prepares the environments, so allow several gigabytes of disk space.
+Models and your library are excluded from Git.
+
+### Build the Mac app
+
+After setting up the project:
 
 ```bash
 .venv/bin/python scripts/build_macos_app.py --install
 open ~/Applications/Timbreloom.app
 ```
 
-详见 [Mac App 使用、构建与验证说明](docs/macos-app.md)。
-当前签名、真实模型、冷启动和麦克风验证状态见 [发布验收记录](docs/release-readiness.md)。
+This builds a development app connected to your checkout.
+For a standalone app with bundled runtimes, see the [Mac build guide](docs/macos-app.md#build).
 
-### 网页
+## Models, on your terms
 
-在终端进入克隆后的项目目录。
-源码开发需要 uv、Python 3.12 和 FFmpeg；Seed-VC 使用独立 Python 3.10 环境。
-模型和处理资料保存在本机，并从 Git 中排除。
+The standalone app includes the runtime and downloads **no model weights at launch**.
+Open **Models** or press **⌘,** to download, pause, or resume each model separately.
+Existing library items remain available to view and edit while a model is missing.
 
-开发环境的完整初始化会下载三组模型，需预留数 GB 空间。
-首次安装或模型缺失时运行：
+| Model | Enables | Download size |
+| --- | --- | ---: |
+| Qwen3-TTS 0.6B Base, BF16 | Voice cloning and dubbing | About 2.52 GB |
+| Whisper Large v3 Turbo, Q4 | Transcription | About 464 MB |
+| Seed-VC and supporting models | Voice conversion | About 1.88 GB |
 
-```bash
-./setup.sh
-```
+<details>
+<summary>See the model manager and storage locations</summary>
 
-启动网页：
+![Model manager with separate Qwen, Whisper, and Seed-VC downloads](docs/assets/models.png)
 
-```bash
-./start.sh
-```
+The Mac app keeps models in `~/Library/Application Support/Timbreloom/models` and your library in `~/Library/Application Support/Timbreloom/data`.
+Replacing the app preserves both.
+Source runs use the repository's `models/` and `data/` folders by default.
+Set `TIMBRELOOM_MODELS_DIR` or `TIMBRELOOM_DATA_DIR` to use a different location.
 
-然后打开 `http://127.0.0.1:7865`。
+Downloads use pinned revisions and verify every file with SHA-256 before enabling a model.
+Partial downloads are retained across pauses, connection failures, and app restarts.
 
-可选 Gemini 文字工具使用启动进程中的 `GEMINI_API_KEY` 环境变量。
-请通过本机凭据管理方式提供密钥，不要写入源码或提交到 Git。
+</details>
 
-没有 `GEMINI_API_KEY` 时，本地声音克隆和本地 ASR 仍然完整可用。
+## Local by default
 
-自动化验收或隔离实验可以通过 `TIMBRELOOM_DATA_DIR` 指向单独的数据目录，避免接触日常音色、转录和项目数据。
+The service listens only on `127.0.0.1`.
+Local voice cloning, conversion, transcription, and dubbing do not upload your recordings or generated audio.
+Microphone access is requested only when you start recording.
+The English interface supports multilingual speech and text.
 
-## 原声换色
+Gemini is an optional text tool for punctuation, cleanup, and translation.
+It requires `GEMINI_API_KEY` and explicit confirmation before sending selected text; audio stays local.
+Cloud usage may incur charges.
+Keep credentials out of source files and Git.
 
-1. 先在“声音克隆”保存一个目标音色。
-2. 切换到“原声换色”，上传已经包含语气和表演的音频或视频，包括 TS、M2TS 和 MTS。
-3. 选择目标音色和质量档，并确认拥有原始媒体及音色的使用权。
-4. 等待 Seed-VC 在本地完成音色迁移。
-5. 使用 A/B 播放器比较原表演与新音色，下载 WAV，视频来源还可以下载 MP4。
+Use your own voice or voices you have explicit permission to use, and disclose AI processing when sharing results.
 
-“均衡”档使用本机实测后选定的 8 个扩散步，默认兼顾音色相似度、韵律保持和速度。
-“快速”档适合预览，“高质量”档耗时更长，但不保证每段内容都明显优于均衡档。
-转换记录保存在 `data/conversions/<id>/`，其中包含原媒体、结果音频、可选结果视频、运行日志和任务元数据。
-长音频成功完成后会清理可重建的标准化原声和分段中间文件，避免让一本有声书在项目里重复占用大量空间。
-当前单次最长 8 小时，单个文件最大 2 GB。
-超过 6 分钟的媒体会优先在自然停顿附近分段，每段最长 6 分钟，拼接时不增加额外静音。
-分段结果逐段持久化，失败或应用重启后重试会复用仍然有效的已完成分段。
-第一段换色完成后，“边换色边听”播放器会出现；开始播放一次后，新完成片段会依次自动续播。
-任务刷新后仍可查看，应用重启中断的任务会安全标记为可重试。
+## Documentation and development
 
-## 本地转录
-
-1. 切换到“本地转录”。
-2. 上传音频或视频，并选择自动识别或指定语言。
-3. 等待媒体检查、音频预处理和本地识别进度完成。
-4. 在保留时间戳的前提下修改片段文字。
-5. 导出 TXT、SRT 或 VTT，或者选择连续片段保存为音色。
-
-转录记录保存在 `data/transcripts/<id>/`。
-每条记录保留源文件、用于识别的标准化音频、原始 Whisper 结果、规范化转录和 QA 摘要。
-标准化音轨一旦准备好就可以播放，此时 Whisper 会继续在后台转录。
-转录任务的请求和状态会原子写入 `job.json`，浏览器刷新后和服务重启后都可以继续跟踪同一个任务。
-恢复时会校验并复用已准备好的音轨；已经完整保存的 Whisper 结果也会复用，否则重新进行识别。
-已经取消的任务不会自动重新开始。
-
-## 配音项目
-
-1. 先在“本地转录”中生成一份带时间戳的转录。
-2. 切换到“配音项目”，选择来源转录、默认音色和生成语言。
-3. 在共享波形上定位播放头，按需要修改片段时间、拆分或合并片段。
-4. 建立角色并绑定音色，再把角色批量应用到所选片段，也可以逐段直接指定音色。
-5. 编辑配音文字，选择自然时长或安全适配时间槽。
-6. 生成全部、所选片段或仅重试失败片段。
-7. 根据项目检查处理阻塞项和时间警告，再启动可恢复的 WAV、SRT 或 MP4 导出任务。
-
-项目保存在 `data/projects/<id>/`。
-生成任务运行时，已经完成且校验有效的片段会立刻进入连续播放队列。
-每个项目包含独立源音频、`project.json`、波形缓存、片段渲染、持久化生成及导出任务和时间线导出。
-视频项目还通过硬链接保留原始媒体，在硬链接不可用时自动回退为复制，因此删除转录记录也不会破坏已经建立的配音项目。
-片段内容指纹包含配音文字、音色、语言、模型和生成设置，因此修改一段不会使其他段的缓存失效。
-如果生成语音长于原片段时间槽，系统保留完整音频并在导出结果中报告重叠，不会静默截断或漏读。
-`.timbreloom` 项目包使用可验证的版本化清单，包含项目引用且仍在本机的参考音色，并在导入时分配新的项目 ID，因此不会覆盖现有项目。
-项目数据格式和迁移规则见 [项目格式](docs/project-format.md)。
-
-## 视频配音导出
-
-从 MP4、MOV、MKV、AVI 或 M4V 建立转录后，配音项目会自动识别视频来源。
-编辑器使用原视频作为时间码预览，并在紧凑时间线上同时显示原时间槽和生成语音长度。
-红色片段表示生成语音已经与下一段发生时间重叠，需要调整文字、重新生成或接受混音结果。
-
-“安全适配时间槽”会在导出时使用 FFmpeg `atempo` 保持音高，只在 0.8x 到 1.25x 范围内调整速度。
-如果仍然无法放进时间槽，系统继续保留完整音频，并在质量检查和导出结果中标记受限片段。
-
-导出时可以完全静音原声，也可以按选定比例把原声与配音混合。
-系统优先无损复制原视频轨，只重新编码音频；当源视频编码不能放进 MP4 时，自动回退到 H.264 重编码。
-最终 MP4 不会为了适配画面长度而截断生成语音。
-
-## 保存音色
-
-1. 选择一段 5 至 15 秒的清晰录音。
-2. 填写与录音逐字一致的参考文字。
-3. 输入音色名称并点击“保存音色”。
-4. 之后可以从“音色来源”下拉框直接选择它。
-
-也可以在本地转录完成后选择连续片段创建音色。
-系统会按片段的准确起止时间截取参考音频，并把当前编辑后的文字作为参考文本。
-
-音色保存在 `data/voices/`。
-删除音色只会删除对应参考录音和文字，不会删除已经生成的 WAV。
-
-## Provider 与内存策略
-
-当前 Provider 如下：
-
-| 类型 | Provider | 默认行为 |
-| --- | --- | --- |
-| TTS | Local Qwen3-TTS | 本地运行，可在启动时预加载 |
-| ASR | Local Whisper MLX | 本地离线子进程，任务结束后释放 |
-| VC | Local Seed-VC | 独立 Python 3.10 子进程，保留原表演并迁移音色 |
-| Text | Gemini | 可选云端，只处理用户明确选择的文字 |
-
-TTS、ASR 和 VC 通过同一个本地加速器协调器串行运行。
-开始 ASR 前会释放 Qwen 模型，Whisper 在独立进程中完成转录后退出。
-开始 VC 前也会释放 Qwen 模型，Seed-VC 在隔离的 `runtime/seed-vc/.venv` 中运行并在任务完成后退出。
-下一次 TTS 任务会按需重新加载 Qwen，因此不会强制让两个模型同时常驻 16 GB 统一内存。
-
-架构说明见 [Provider 架构](docs/provider-architecture.md)。
-
-## 项目结构
-
-```text
-Timbreloom/
-├── app.py                  FastAPI 入口和 API
-├── timbreloom/
-│   ├── providers/          TTS、ASR、文本 Provider 与运行协调
-│   ├── api_models.py       API 请求模型
-│   ├── dubbing_api.py      配音 API 路由和显式服务依赖
-│   ├── tts_service.py      TTS 持久化任务、已完成片段校验和重启恢复
-│   ├── job_storage.py      任务文件原子写入和文件校验
-│   ├── asr_service.py      后台转录任务和持久化
-│   ├── voice_conversion.py 原声换色持久化任务、进度和结果
-│   ├── dub_projects.py     配音项目、内容缓存、任务恢复和时间线导出
-│   ├── transcripts.py      转录编辑、选择与字幕导出
-│   ├── media.py            FFmpeg 媒体检查、音频截取和视频配音封装
-│   └── segmentation.py     TTS 长文本无损分段
-├── static/                 原生 JavaScript 模块和本地网页样式
-│   ├── app.js              工作模式、克隆、转录和换色界面
-│   ├── dubbing.js          配音项目编辑器
-│   ├── audio-player.js     连续片段播放队列
-│   ├── audio-recorder.js   麦克风录音和录音生命周期
-│   └── job-client.js       任务查询和服务暂时断开时的错误分类
-├── models/                 项目独立的模型权重
-├── data/
-│   ├── voices/             已保存音色
-│   ├── outputs/            生成的 WAV
-│   ├── transcripts/        转录记录和原始 ASR 结果
-│   ├── projects/           配音项目、片段缓存、任务和时间线导出
-│   ├── conversions/        原声换色的源媒体、结果和任务元数据
-│   ├── uploads/            临时上传
-│   └── jobs/               TTS 任务状态
-├── docs/                   架构与产品研究
-├── scripts/                模型预加载和冒烟测试
-├── runtime/                隔离的 Seed-VC 源码和 Python 3.10 环境
-├── tests/                  自动化测试
-└── .venv/                  项目专用 Python 环境
-```
-
-默认 TTS 权重位于 `models/Qwen3-TTS-12Hz-0.6B-Base-bf16/`。
-默认 ASR 权重位于 `models/Whisper-large-v3-turbo-q4/`。
-Seed-VC 及其依赖权重位于 `models/Seed-VC/`。
-以上为源码运行时的默认目录，不依赖全局 Hugging Face 缓存。
-独立 Mac App 将权重保存在 `~/Library/Application Support/Timbreloom/models/`，更新 App 不需要重新下载已有模型。
-使用侧栏的“模型管理”或 `⌘,` 分别下载、暂停或继续各个模型，退出后的下载需要手动继续。
-`TIMBRELOOM_MODELS_DIR` 可以指定其他权重目录。
-
-## 长文本分段
-
-系统先按句号、问号、感叹号和段落寻找语义边界。
-它会尽量把多句话组合到同一段中，避免一句一段导致语气不连贯。
-如果单句话过长，才会继续在逗号、分号、冒号、空格或安全字符位置分开。
-每段的保守估算上限为 880 个音频 token，模型硬上限仍为 1,024 个音频 token。
-当前语速估算通常对应约 50 至 70 秒一段。
-
-持续生成通过逐段处理实现。
-第一段完成后即可开始连续播放，播放器会等待并自动接上后续新片段。
-TTS 任务把参考录音、完整分段计划和进度保存在 `data/jobs/<id>/`。
-服务重启后会校验已完成片段的 SHA-256，从第一个缺失或损坏的片段继续生成。
-生成配置发生变化时会停止恢复，避免将不同配置生成的片段混在一起。
-完成或失败后仍会保留任务记录和已完成片段，以便查询结果和继续试听。
-浏览器在本地服务暂时断开时保留任务 ID 并自动重连。
-这些恢复信息适用于本次更新之后建立的任务，旧任务中未保存的请求无法追溯恢复。
-实际总长度仍受运行时间、磁盘空间和 200,000 字符安全上限约束。
-
-## 开发验证
-
-基础验证使用独立临时数据目录，不会运行语音模型：
+- [User guide](docs/user-guide.md): the four workflows, long audio, exports, and recovery.
+- [Mac app](docs/macos-app.md): shortcuts, installation, builds, and validation.
+- [Provider architecture](docs/provider-architecture.md): model interfaces, job persistence, and accelerator lifecycle.
+- [Project format](docs/project-format.md): schema, segment caching, roles, and portable bundles.
+- [Mac design](docs/macos-design.md): visual system and interaction checks.
+- [Release validation](docs/release-readiness.md): tested builds, evidence, and remaining limits.
 
 ```bash
 TIMBRELOOM_DATA_DIR="$(mktemp -d -t timbreloom-tests)" TIMBRELOOM_PRELOAD=0 uv run pytest -q
 node --test tests/test_browser_helpers.mjs
+.venv/bin/python scripts/e2e_macos.py
+.venv/bin/python scripts/e2e_macos.py --models
 ```
 
-端到端脚本支持具有所需 API 的 Timbreloom 1.x 服务。
-只检查版本、接口和模型文件配置时使用以下命令，不会创建媒体或启动推理：
-
-```bash
-uv run python scripts/e2e_v1.py --check-only
-```
-
-完整验收使用 `--base-url` 指向以独立 `TIMBRELOOM_DATA_DIR` 启动的服务，再指定 `--output-dir`。
-它会运行真实的本地 TTS 和 ASR，创建音色和配音项目，并验证视频导出和项目包导入。
-
-## 语气写法
-
-当前 Base 声音克隆模型不支持 `instruct` 情绪指令，也没有 `[开心]`、`[laugh]` 或 SSML `<prosody>` 这类隐藏语气标签。
-这些标签如果直接写进目标文本，可能会被模型念出来。
-
-可以使用正常文字和自然标点给模型提供语义提示：
-
-- `啊……我还没想好。` 表示犹豫或轻微延长。
-- `啊？！真的成功了！` 表示惊讶和强调。
-- `啊？你刚才说什么？` 表示疑问和上扬。
-- `哈哈……原来是这样。` 或 `唉……算了。` 使用可直接朗读的拟声词。
-
-省略号、问号、感叹号和 `～` 只能引导模型，不保证具体音高、情绪或持续时长。
-如果需要让一个字精确持续 1 至 2 秒，需要另行实现局部音频拉伸和拼接，而不是添加文本标签。
-
-## 隐私与边界
-
-服务只绑定本机地址，不应改成公网监听地址。
-本地 TTS、VC、ASR 和配音项目不会上传参考录音、媒体、音色或生成结果。
-浏览器录音只在点击“开始录音”后请求麦克风权限，停止后作为本地媒体文件进入当前工作流。
-Gemini 功能默认不调用云端，只有用户选中一段文字并确认后才会发出请求。
-Gemini 请求不包含音频、API 密钥、其他片段或本地文件路径。
-批量 Gemini 操作最多处理 50 段且总计不超过 60,000 个字符，每次调用前都需要浏览器中的明确确认。
-API 密钥只从服务进程的环境变量读取，不写入项目文件、Git、日志或浏览器响应。
-请只克隆本人或已经获得明确授权的声音。
-对外发布生成内容时应标记为 AI 合成。
-
-## 1.1 范围
-
-Timbreloom 1.1 在 1.0 的本地声音克隆、ASR、角色化片段配音、安全时间线适配、可恢复导出和项目迁移基础上，加入原生 speech-to-speech 音色转换。
-自动说话人识别、背景人声分离、口型同步和独立情绪参考模型需要新增模型与质量评估，不属于 1.1 的隐式承诺。
-
-## 组件版本
-
-- Qwen3-TTS 0.6B Base 模型使用 Apache-2.0 许可证。
-- MLX-Audio 使用 MIT 许可证，并锁定到提交 `feb57c82ecd90bbb516f39d3cf0a33c77bf5ec4a`。
-- Whisper Large v3 Turbo Q4 使用项目内固定的 Hugging Face 修订版本。
-- MLX Whisper 使用 MIT 许可证。
-- Seed-VC 源码和模型使用 GPL-3.0，并锁定源码提交与模型修订版本。
-- Seed-VC 保持在不进入 Git 的隔离运行目录中，安装和固定版本信息见 [Seed-VC 集成说明](docs/seed-vc-integration.md)。
-- 模型权重位于本地 `models/` 目录，不进入 Git。
-- 私有音色、转录和生成结果位于 `data/` 目录，不进入 Git。
+The WebKit checks use an isolated sample library and synthetic ASR.
+Real model validation is a separate step described in the Mac build guide.
 
 ## License
 
-Copyright (C) 2026 Timbreloom contributors.
-The independently authored Timbreloom application and integration code is licensed under the MIT License; see [LICENSE](LICENSE).
-Third-party software and model weights retain their own licenses; see [THIRD_PARTY.md](THIRD_PARTY.md).
-In particular, the optional Seed-VC engine remains GPL-3.0; the MIT license does not relicense that engine or remove the obligations of distributing a combined work.
-This repository contains source code, tests, build scripts, and documentation.
-Model weights, personal audio, local libraries, credentials, Python environments, and built applications are excluded.
+The independently authored Timbreloom application and integration code is licensed under [MIT](LICENSE).
+Third-party software and model weights retain their own licenses, including GPL-3.0 for the optional Seed-VC engine.
+See [third-party notices](THIRD_PARTY.md) and [Seed-VC integration](docs/seed-vc-integration.md) for details.
+Model weights, personal audio, local libraries, credentials, Python environments, and built applications are not included in this repository.

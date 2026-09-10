@@ -17,7 +17,7 @@ from timbreloom.runtime_lock import DataDirectoryLock
 
 def test_library_lock_excludes_second_writer_and_releases(tmp_path):
     with DataDirectoryLock(tmp_path):
-        with pytest.raises(RuntimeError, match="已有 Timbreloom"):
+        with pytest.raises(RuntimeError, match="already using this library"):
             with DataDirectoryLock(tmp_path):
                 pytest.fail("A second writer must not start")
     with DataDirectoryLock(tmp_path):

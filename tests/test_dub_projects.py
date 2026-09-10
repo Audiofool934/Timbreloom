@@ -44,13 +44,13 @@ def _write_wav(
 def _transcript() -> dict:
     return {
         "id": "a" * 32,
-        "title": "访谈测试",
+        "title": "Interview test",
         "source_filename": "source.wav",
         "duration_seconds": 3.0,
-        "language": "zh",
+        "language": "en",
         "segments": [
-            {"id": "seg-00001", "start": 0.25, "end": 1.0, "text": "第一句。"},
-            {"id": "seg-00002", "start": 1.4, "end": 2.3, "text": "第二句。"},
+            {"id": "seg-00001", "start": 0.25, "end": 1.0, "text": "First sentence."},
+            {"id": "seg-00002", "start": 1.4, "end": 2.3, "text": "Second sentence."},
         ],
     }
 
@@ -61,7 +61,7 @@ def _project(store: DubProjectStore, tmp_path: Path) -> dict:
     return store.create(
         transcript=_transcript(),
         source_audio=source,
-        target_language="chinese",
+        target_language="english",
         default_voice_id=VOICE_ID,
     )
 
@@ -73,7 +73,7 @@ def _wait_for_job(service: DubRenderService, project_id: str, job_id: str) -> di
         if job["status"] not in {"queued", "running"}:
             return job
         time.sleep(0.01)
-    raise AssertionError("配音测试任务没有按时结束。")
+    raise AssertionError("The dubbing test job did not finish in time.")
 
 
 def test_waveform_never_reads_the_entire_recording_at_once(tmp_path: Path, monkeypatch) -> None:
@@ -110,11 +110,11 @@ def test_project_preserves_source_text_and_only_invalidates_edited_segment(
 
     updated = store.update(
         project["id"],
-        segment_updates=[{"id": "seg-00002", "active_text": "第二句，改过。"}],
+        segment_updates=[{"id": "seg-00002", "active_text": "Second sentence, edited."}],
     )
 
     assert updated["segments"][1]["source_text"] == original
-    assert updated["segments"][1]["active_text"] == "第二句，改过。"
+    assert updated["segments"][1]["active_text"] == "Second sentence, edited."
     assert updated["segments"][0]["render"]["status"] == "ready"
     assert updated["segments"][1]["render"]["status"] == "stale"
     assert store.source_audio(project["id"]).is_file()
@@ -154,12 +154,12 @@ def test_fingerprint_changes_for_text_voice_language_and_model(tmp_path: Path) -
     store = DubProjectStore(tmp_path / "projects")
     project = _project(store, tmp_path)
     segment = project["segments"][0]
-    voice = {"created_at": "now", "reference_text": "参考文字"}
+    voice = {"created_at": "now", "reference_text": "Reference text"}
     settings = {"temperature": 1.0, "max_tokens": 1024}
     baseline = content_fingerprint(segment, project, voice, "model-a", settings)
 
-    changed_text = dict(segment, active_text="另一句话。")
-    changed_language = dict(project, target_language="english")
+    changed_text = dict(segment, active_text="Another sentence.")
+    changed_language = dict(project, target_language="chinese")
 
     assert content_fingerprint(changed_text, project, voice, "model-a", settings) != baseline
     assert content_fingerprint(segment, changed_language, voice, "model-a", settings) != baseline
@@ -172,7 +172,7 @@ def test_roles_timing_split_merge_waveform_and_bundle_roundtrip(tmp_path: Path) 
     original_source = "".join(item["source_text"] for item in project["segments"])
     role = store.upsert_role(
         project["id"],
-        name="旁白",
+        name="Narrator",
         voice_id=VOICE_ID,
     )["roles"][-1]
     updated = store.update(
@@ -227,8 +227,8 @@ def test_roles_timing_split_merge_waveform_and_bundle_roundtrip(tmp_path: Path) 
         json.dumps(
             {
                 "id": VOICE_ID,
-                "name": "可迁移音色",
-                "reference_text": "准确参考文字。",
+                "name": "Portable voice",
+                "reference_text": "Accurate reference text.",
                 "duration_seconds": 3.0,
                 "created_at": "now",
             }
@@ -240,7 +240,7 @@ def test_roles_timing_split_merge_waveform_and_bundle_roundtrip(tmp_path: Path) 
     imported_store = DubProjectStore(tmp_path / "imported-data" / "projects")
     imported = imported_store.import_bundle(bundle)
     assert imported["id"] != project["id"]
-    assert imported["title"].endswith("- 导入")
+    assert imported["title"].endswith("- Imported")
     assert imported_store.source_audio(imported["id"]).read_bytes() == store.source_audio(project["id"]).read_bytes()
     assert (imported_store.root.parent / "voices" / VOICE_ID / "reference.wav").is_file()
     assert [item["source_text"] for item in imported["segments"]] == [
@@ -270,7 +270,7 @@ def test_project_bundle_rejects_path_traversal(tmp_path: Path) -> None:
         archive.writestr("manifest.json", json.dumps({"format": "timbreloom-project", "version": 1}))
         archive.writestr("../outside.txt", "must-not-escape")
 
-    with pytest.raises(ValueError, match="不安全"):
+    with pytest.raises(ValueError, match="unsafe"):
         store.import_bundle(bundle)
     assert not (tmp_path / "outside.txt").exists()
 
@@ -287,7 +287,7 @@ def test_render_job_uses_cache_and_rerenders_only_changed_segment(tmp_path: Path
         return {
             "id": voice_id,
             "created_at": "voice-created",
-            "reference_text": "准确参考文字。",
+            "reference_text": "Accurate reference text.",
             "audio_path": reference,
         }
 
@@ -300,8 +300,8 @@ def test_render_job_uses_cache_and_rerenders_only_changed_segment(tmp_path: Path
     ) -> dict[str, float]:
         calls.append(target_text)
         assert reference_path == reference
-        assert reference_text == "准确参考文字。"
-        assert language == "chinese"
+        assert reference_text == "Accurate reference text."
+        assert language == "english"
         _write_wav(output_path, duration=0.25)
         return {
             "duration_seconds": 0.25,
@@ -325,7 +325,7 @@ def test_render_job_uses_cache_and_rerenders_only_changed_segment(tmp_path: Path
 
     store.update(
         project["id"],
-        segment_updates=[{"id": "seg-00002", "active_text": "第二句已经修改。"}],
+        segment_updates=[{"id": "seg-00002", "active_text": "The second sentence has been edited."}],
     )
     second = service.create_job(project["id"], mode="all")
     second_done = _wait_for_job(service, project["id"], second["job_id"])
@@ -333,7 +333,7 @@ def test_render_job_uses_cache_and_rerenders_only_changed_segment(tmp_path: Path
     assert second_done["status"] == "complete"
     assert second_done["generated"] == 1
     assert second_done["cached"] == 1
-    assert calls == ["第一句。", "第二句。", "第二句已经修改。"]
+    assert calls == ["First sentence.", "Second sentence.", "The second sentence has been edited."]
 
 
 def test_failed_segment_can_be_retried_independently(tmp_path: Path) -> None:
@@ -346,7 +346,7 @@ def test_failed_segment_can_be_retried_independently(tmp_path: Path) -> None:
     def load_voice(_: str) -> dict:
         return {
             "created_at": "voice-created",
-            "reference_text": "参考文字。",
+            "reference_text": "Reference text.",
             "audio_path": reference,
         }
 
@@ -357,7 +357,7 @@ def test_failed_segment_can_be_retried_independently(tmp_path: Path) -> None:
         _language: str,
         output_path: Path,
     ) -> dict[str, float]:
-        if target_text == "第二句。" and should_fail["value"]:
+        if target_text == "Second sentence." and should_fail["value"]:
             raise RuntimeError("synthetic failure")
         _write_wav(output_path)
         return {
@@ -395,7 +395,7 @@ def test_queued_job_recovers_after_service_restart(tmp_path: Path) -> None:
     def load_voice(_: str) -> dict:
         return {
             "created_at": "voice-created",
-            "reference_text": "参考文字。",
+            "reference_text": "Reference text.",
             "audio_path": reference,
         }
 
@@ -467,13 +467,13 @@ def test_timeline_export_uses_original_onsets_and_active_text(tmp_path: Path) ->
 
     project = {
         "segments": [
-            {"start": 0.25, "end": 0.5, "active_text": "修改后的第一句。"},
-            {"start": 0.75, "end": 1.0, "active_text": "第二句。"},
+            {"start": 0.25, "end": 0.5, "active_text": "The edited first sentence."},
+            {"start": 0.75, "end": 1.0, "active_text": "Second sentence."},
         ]
     }
     srt = render_project_srt(project)
     assert "00:00:00,250 --> 00:00:00,500" in srt
-    assert "修改后的第一句。" in srt
+    assert "The edited first sentence." in srt
 
 
 def test_video_project_export_creates_mp4_record(tmp_path: Path) -> None:
@@ -488,7 +488,7 @@ def test_video_project_export_creates_mp4_record(tmp_path: Path) -> None:
         transcript=_transcript(),
         source_audio=source_audio,
         source_media=source_video,
-        target_language="chinese",
+        target_language="english",
         default_voice_id=VOICE_ID,
     )
 
@@ -496,7 +496,7 @@ def test_video_project_export_creates_mp4_record(tmp_path: Path) -> None:
         return {
             "id": VOICE_ID,
             "created_at": "voice-created",
-            "reference_text": "参考文字。",
+            "reference_text": "Reference text.",
             "audio_path": reference,
         }
 
@@ -574,7 +574,7 @@ def test_export_job_is_persistent_and_completes(tmp_path: Path) -> None:
         return {
             "id": VOICE_ID,
             "created_at": "voice-created",
-            "reference_text": "参考文字。",
+            "reference_text": "Reference text.",
             "audio_path": reference,
         }
 
@@ -607,7 +607,7 @@ def test_export_job_is_persistent_and_completes(tmp_path: Path) -> None:
             break
         time.sleep(0.01)
     else:
-        raise AssertionError("导出任务没有按时结束。")
+        raise AssertionError("The export job did not finish in time.")
 
     assert completed["status"] == "complete"
     assert completed["progress"] == 1.0

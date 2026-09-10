@@ -1,4 +1,5 @@
-import { createProgressiveAudioPlayer } from "./audio-player.js?v=1";
+import { createProgressiveAudioPlayer } from "./audio-player.js?v=2";
+import { countLabel } from "./text-format.js?v=1";
 
 export function createDubbingWorkspace({
   getVoices, getTranscripts, isGeminiConfigured, formatDuration,
@@ -88,14 +89,14 @@ export function createDubbingWorkspace({
     audio: dubStreamAudio,
     status: dubStreamStatus,
     toggle: dubStreamToggle,
-    waitingLabel: "等待首段",
+    waitingLabel: "Waiting for first segment",
   });
 
   function populateDubVoiceOptions() {
     const previous = dubDefaultVoice.value;
     const previousRoleVoice = dubRoleVoice.value;
-    dubDefaultVoice.replaceChildren(new Option("选择已保存音色", ""));
-    dubRoleVoice.replaceChildren(new Option("选择音色", ""));
+    dubDefaultVoice.replaceChildren(new Option("Choose a saved voice", ""));
+    dubRoleVoice.replaceChildren(new Option("Choose a voice", ""));
     for (const voice of getVoices()) {
       dubDefaultVoice.add(new Option(voice.name, voice.id));
       dubRoleVoice.add(new Option(voice.name, voice.id));
@@ -110,11 +111,11 @@ export function createDubbingWorkspace({
 
   function populateDubTranscriptOptions() {
     const previous = dubTranscriptSelect.value;
-    dubTranscriptSelect.replaceChildren(new Option("选择转录记录", ""));
+    dubTranscriptSelect.replaceChildren(new Option("Choose a transcript", ""));
     for (const transcript of getTranscripts()) {
       dubTranscriptSelect.add(
         new Option(
-          `${transcript.title || transcript.source_filename} · ${transcript.segment_count} 段`,
+          `${transcript.title || transcript.source_filename} · ${countLabel(transcript.segment_count, "segment")}`,
           transcript.id,
         ),
       );
@@ -130,8 +131,8 @@ export function createDubbingWorkspace({
       const empty = document.createElement("p");
       empty.className = "empty-copy";
       empty.textContent = getTranscripts().length
-        ? "还没有配音项目。"
-        : "先在本地转录中建立一份带时间戳的转录。";
+        ? "No dubbing projects yet."
+        : "Create a timestamped transcript in Transcription first.";
       dubProjectList.append(empty);
       return;
     }
@@ -145,10 +146,10 @@ export function createDubbingWorkspace({
       const title = document.createElement("strong");
       title.textContent = project.title;
       const meta = document.createElement("span");
-      meta.textContent = `${project.source_has_video ? "视频" : "音频"} · ${project.ready_count} / ${project.segment_count} 段已生成`;
+      meta.textContent = `${project.source_has_video ? "Video" : "Audio"} · ${project.ready_count} / ${countLabel(project.segment_count, "segment")} generated`;
       const state = document.createElement("small");
       state.textContent = project.failed_count
-        ? `${project.failed_count} 段失败 · ${formatTranscriptDate(project.updated_at)}`
+        ? `${countLabel(project.failed_count, "failed segment")} · ${formatTranscriptDate(project.updated_at)}`
         : formatTranscriptDate(project.updated_at);
       button.append(title, meta, state);
       button.addEventListener("click", () => loadDubProject(project.id, true));
@@ -178,22 +179,22 @@ export function createDubbingWorkspace({
   function dubStatusCopy(segment) {
     const render = segment.render;
     const labels = {
-      missing: "未生成",
-      stale: "需要更新",
-      rendering: "生成中",
-      ready: "可试听",
-      error: "生成失败",
+      missing: "Not generated",
+      stale: "Needs update",
+      rendering: "Generating",
+      ready: "Ready to play",
+      error: "Generation failed",
     };
     let detail = labels[render.status] || render.status;
     if (render.status === "ready") {
       if (render.overflow_seconds > 0.05) {
         detail = render.fit_limited
-          ? `已到安全变速上限，仍超出 ${render.overflow_seconds.toFixed(1)} 秒`
-          : `超出原时长 ${render.overflow_seconds.toFixed(1)} 秒`;
+          ? `Safe speed limit reached; still ${render.overflow_seconds.toFixed(1)} sec over`
+          : `${render.overflow_seconds.toFixed(1)} sec beyond the original duration`;
       } else if (segment.fit_mode === "slot" && render.natural_overflow_seconds > 0.05) {
-        detail = `${render.duration_seconds.toFixed(1)} 秒 · 以 ${render.fit_speed.toFixed(2)}x 安全适配`;
+        detail = `${render.duration_seconds.toFixed(1)} sec · Safely fitted at ${render.fit_speed.toFixed(2)}x`;
       } else {
-        detail = `${render.duration_seconds.toFixed(1)} 秒 · 时间槽内`;
+        detail = `${render.duration_seconds.toFixed(1)} sec · Within slot`;
       }
     } else if (render.status === "error" && render.error) {
       detail = render.error;
@@ -218,21 +219,21 @@ export function createDubbingWorkspace({
       && segments.every((segment) => segment.render.status === "ready");
 
     dubSelectionCount.textContent = selectedCount
-      ? `已选择 ${selectedCount} / ${segments.length} 段`
-      : "尚未选择片段";
+      ? `${selectedCount} / ${countLabel(segments.length, "segment")} selected`
+      : "No segments selected";
     if (active) {
-      dubEditorStatus.textContent = "配音生成正在运行，进度会持久保存";
+      dubEditorStatus.textContent = "Dubbing is running. Progress is saved automatically.";
     } else if (dirtyCount) {
-      dubEditorStatus.textContent = `${dirtyCount} 处修改尚未保存`;
+      dubEditorStatus.textContent = countLabel(dirtyCount, "unsaved change");
     } else if (failedCount) {
-      dubEditorStatus.textContent = `${failedCount} 个失败片段可以独立重试`;
+      dubEditorStatus.textContent = `${countLabel(failedCount, "failed segment")} can be retried individually`;
     } else {
       const readyCount = segments.filter((segment) => segment.render.status === "ready").length;
-      dubEditorStatus.textContent = `${readyCount} / ${segments.length} 段可以使用缓存`;
+      dubEditorStatus.textContent = `${readyCount} / ${countLabel(segments.length, "segment")} cached`;
     }
 
     dubSaveButton.disabled = !project || !dirtyCount || active;
-    dubSaveButton.textContent = dirtyCount ? `保存 ${dirtyCount} 处修改` : "保存修改";
+    dubSaveButton.textContent = dirtyCount ? `Save ${countLabel(dirtyCount, "change")}` : "Save Changes";
     dubGenerateSelected.disabled = !project || !selectedCount || active;
     dubGenerateAll.disabled = !project || active;
     dubRetryFailed.disabled = !project || !failedCount || active;
@@ -329,8 +330,8 @@ export function createDubbingWorkspace({
       (segment) => segment.render.overlap_next_seconds > 0.05,
     ).length;
     dubTimelineSummary.textContent = overlapCount
-      ? `${readyCount} / ${project.segments.length} 已生成 · ${overlapCount} 处重叠`
-      : `${readyCount} / ${project.segments.length} 已生成 · ${formatDuration(duration)}`;
+      ? `${readyCount} / ${project.segments.length} generated · ${countLabel(overlapCount, "overlap")}`
+      : `${readyCount} / ${project.segments.length} generated · ${formatDuration(duration)}`;
 
     for (const segment of project.segments) {
       const left = Math.min(100, Math.max(0, (segment.start / duration) * 100));
@@ -346,7 +347,7 @@ export function createDubbingWorkspace({
       slot.classList.toggle("is-selected", selectedDubSegments.has(segment.id));
       slot.setAttribute(
         "aria-label",
-        `${formatTimecode(segment.start)} 到 ${formatTimecode(segment.end)}，${dubStatusCopy(segment).detail}`,
+        `${formatTimecode(segment.start)} to ${formatTimecode(segment.end)}, ${dubStatusCopy(segment).detail}`,
       );
       slot.title = `${formatTimecode(segment.start)} · ${dubStatusCopy(segment).detail}`;
       slot.addEventListener("click", (event) => {
@@ -380,40 +381,40 @@ export function createDubbingWorkspace({
     const blocking = (counts.missing || 0) + (counts.stale || 0) + (counts.error || 0) + (counts.unassigned || 0);
     const timing = (counts.overlap || 0) + (counts.fit_limited || 0);
     dubQuality.dataset.state = counts.error ? "error" : blocking ? "pending" : timing ? "warning" : "ready";
-    dubQualityTitle.textContent = blocking ? "准备导出" : timing ? "可以导出，建议检查时间" : "项目检查通过";
+    dubQualityTitle.textContent = blocking ? "Preparing to export" : timing ? "Ready to export. Check timing." : "Project checks passed";
     const details = [];
-    if (counts.unassigned) details.push(`${counts.unassigned} 段未分配音色`);
-    if (counts.missing) details.push(`${counts.missing} 段未生成`);
-    if (counts.stale) details.push(`${counts.stale} 段需要更新`);
-    if (counts.error) details.push(`${counts.error} 段失败`);
-    if (counts.overlap) details.push(`${counts.overlap} 处仍会重叠`);
-    if (counts.fit_limited) details.push(`${counts.fit_limited} 段超过安全变速范围`);
+    if (counts.unassigned) details.push(`Unassigned: ${counts.unassigned}`);
+    if (counts.missing) details.push(`Not generated: ${counts.missing}`);
+    if (counts.stale) details.push(`Needs update: ${counts.stale}`);
+    if (counts.error) details.push(`Failed: ${counts.error}`);
+    if (counts.overlap) details.push(`Overlaps: ${counts.overlap}`);
+    if (counts.fit_limited) details.push(`Beyond safe speed limits: ${counts.fit_limited}`);
     dubQualitySummary.textContent = details.length
-      ? `${details.join(" · ")}。时长适配只在 0.8x 到 1.25x 内变速，永不截断台词。`
-      : "所有片段都有最新语音，时间线没有检测到明显重叠。";
+      ? `${details.join(" · ")}. Duration fitting uses 0.8x to 1.25x speed and never cuts dialogue.`
+      : "Every segment has up-to-date audio. No obvious timeline overlaps were detected.";
   }
 
   function populateDubRoles(project) {
     const previous = dubApplyRole.value;
-    dubApplyRole.replaceChildren(new Option("选择角色", ""));
+    dubApplyRole.replaceChildren(new Option("Choose a role", ""));
     for (const role of project.roles || []) {
       const voice = getVoices().find((item) => item.id === role.voice_id);
-      dubApplyRole.add(new Option(`${role.name}${voice ? ` · ${voice.name}` : " · 未分配音色"}`, role.id));
+      dubApplyRole.add(new Option(`${role.name}${voice ? ` · ${voice.name}` : " · No voice assigned"}`, role.id));
     }
     if ((project.roles || []).some((role) => role.id === previous)) dubApplyRole.value = previous;
   }
 
   function dubExportSummaryCopy(result) {
-    const output = result.mp4_url ? "MP4、WAV 和 SRT" : "WAV 和 SRT";
+    const output = result.mp4_url ? "MP4, WAV, and SRT" : "WAV and SRT";
     const warnings = result.warning_count
-      ? `，${result.warning_count} 段超过原时间槽，完整语音未截断`
+      ? `; ${countLabel(result.warning_count, "segment")} beyond the original slots, with all speech preserved`
       : "";
     if (result.mp4_url) {
       const gain = Math.round((result.original_audio_gain || 0) * 100);
-      const mix = gain ? `，原声保留 ${gain}%` : "，原声已静音";
-      return `${output} 已导出${mix}${warnings}。`;
+      const mix = gain ? `; original audio at ${gain}%` : "; original audio muted";
+      return `${output} exported${mix}${warnings}.`;
     }
-    return `${output} 已按原时间线导出${warnings}。`;
+    return `${output} exported along the original timeline${warnings}.`;
   }
 
   function startDubPolling(job) {
@@ -445,11 +446,11 @@ export function createDubbingWorkspace({
     dubBundleDownload.href = `/api/dub/projects/${project.id}/bundle`;
     dubBundleDownload.download = `${project.title || "timbreloom"}.timbreloom`;
     const mediaKind = project.source_has_video ? "VIDEO" : "AUDIO";
-    dubProjectMeta.textContent = `${mediaKind} · ${formatDuration(project.duration_seconds)} · ${project.source_language.toUpperCase()} · ${project.segments.length} 段 · ${project.source_filename}`;
+    dubProjectMeta.textContent = `${mediaKind} · ${formatDuration(project.duration_seconds)} · ${project.source_language.toUpperCase()} · ${countLabel(project.segments.length, "segment")} · ${project.source_filename}`;
     dubOriginalAudioField.hidden = !project.source_has_video;
     dubExportButtonText.textContent = project.source_has_video
-      ? "导出 MP4 + WAV + SRT"
-      : "导出 WAV + SRT";
+      ? "Export MP4 + WAV + SRT"
+      : "Export WAV + SRT";
     if (project.source_has_video) {
       dubSourceAudio.pause();
       dubSourceAudio.src = `${project.source_audio_url}?v=${Date.now()}`;
@@ -471,7 +472,7 @@ export function createDubbingWorkspace({
     renderDubQuality(project);
     renderDubTimeline(project);
     loadDubWaveform(project.id).catch((error) => {
-      dubTimelineSummary.textContent = `波形加载失败 · ${error.message}`;
+      dubTimelineSummary.textContent = `Waveform could not load · ${error.message}`;
     });
 
     const latestExport = project.exports?.at(-1);
@@ -496,7 +497,7 @@ export function createDubbingWorkspace({
       const check = document.createElement("input");
       check.type = "checkbox";
       check.className = "segment-check";
-      check.setAttribute("aria-label", `选择 ${formatTimecode(segment.start)} 的配音片段`);
+      check.setAttribute("aria-label", `Select dubbing segment at ${formatTimecode(segment.start)}`);
       check.addEventListener("change", () => {
         setDubSegmentSelection(segment.id, check.checked);
       });
@@ -513,7 +514,7 @@ export function createDubbingWorkspace({
       const source = document.createElement("div");
       source.className = "dub-source-copy";
       const sourceLabel = document.createElement("span");
-      sourceLabel.textContent = "原始 ASR";
+      sourceLabel.textContent = "Original ASR";
       const sourceText = document.createElement("p");
       sourceText.textContent = segment.source_text;
       source.append(sourceLabel, sourceText);
@@ -523,7 +524,7 @@ export function createDubbingWorkspace({
       const textarea = document.createElement("textarea");
       textarea.rows = 3;
       textarea.value = segment.active_text;
-      textarea.setAttribute("aria-label", `${formatTimecode(segment.start)} 的配音文字`);
+      textarea.setAttribute("aria-label", `Dubbing text at ${formatTimecode(segment.start)}`);
       textarea.addEventListener("input", () => {
         segment.active_text = textarea.value;
         markDubDirty(segment.id);
@@ -531,14 +532,14 @@ export function createDubbingWorkspace({
       const timeFields = document.createElement("div");
       timeFields.className = "dub-time-fields";
       const startLabel = document.createElement("label");
-      startLabel.textContent = "开始秒";
+      startLabel.textContent = "Start (sec)";
       const startInput = document.createElement("input");
       startInput.type = "number";
       startInput.min = "0";
       startInput.step = "0.01";
       startInput.value = Number(segment.start).toFixed(3);
       const endLabel = document.createElement("label");
-      endLabel.textContent = "结束秒";
+      endLabel.textContent = "End (sec)";
       const endInput = document.createElement("input");
       endInput.type = "number";
       endInput.min = "0";
@@ -559,8 +560,8 @@ export function createDubbingWorkspace({
       const selects = document.createElement("div");
       selects.className = "dub-editor-selects";
       const roleSelect = document.createElement("select");
-      roleSelect.setAttribute("aria-label", `${formatTimecode(segment.start)} 的角色`);
-      roleSelect.add(new Option("无角色", ""));
+      roleSelect.setAttribute("aria-label", `Role at ${formatTimecode(segment.start)}`);
+      roleSelect.add(new Option("No role", ""));
       for (const role of project.roles || []) roleSelect.add(new Option(role.name, role.id));
       roleSelect.value = segment.role_id || "";
       roleSelect.addEventListener("change", () => {
@@ -573,9 +574,9 @@ export function createDubbingWorkspace({
         markDubDirty(segment.id);
       });
       const fit = document.createElement("select");
-      fit.setAttribute("aria-label", `${formatTimecode(segment.start)} 的时长适配`);
-      fit.add(new Option("自然时长", "natural"));
-      fit.add(new Option("安全适配时间槽", "slot"));
+      fit.setAttribute("aria-label", `Duration fit at ${formatTimecode(segment.start)}`);
+      fit.add(new Option("Natural duration", "natural"));
+      fit.add(new Option("Fit slot safely", "slot"));
       fit.value = segment.fit_mode || "natural";
       fit.addEventListener("change", () => {
         segment.fit_mode = fit.value;
@@ -583,8 +584,8 @@ export function createDubbingWorkspace({
       });
       selects.append(roleSelect, fit);
       const voice = document.createElement("select");
-      voice.setAttribute("aria-label", `${formatTimecode(segment.start)} 的配音音色`);
-      voice.add(new Option("未分配音色", ""));
+      voice.setAttribute("aria-label", `Dubbing voice at ${formatTimecode(segment.start)}`);
+      voice.add(new Option("No voice assigned", ""));
       for (const item of getVoices()) voice.add(new Option(item.name, item.id));
       voice.value = segment.voice_id || "";
       voice.addEventListener("change", () => {
@@ -608,7 +609,7 @@ export function createDubbingWorkspace({
       const play = document.createElement("button");
       play.type = "button";
       play.className = "micro-button";
-      play.textContent = "试听";
+      play.textContent = "Preview";
       play.disabled = !segment.render.audio_url;
       play.addEventListener("click", () => {
         dubPreviewAudio.src = `${segment.render.audio_url}?v=${Date.now()}`;
@@ -617,7 +618,7 @@ export function createDubbingWorkspace({
       const regenerate = document.createElement("button");
       regenerate.type = "button";
       regenerate.className = "micro-button";
-      regenerate.textContent = segment.render.status === "ready" ? "重新生成" : "生成此段";
+      regenerate.textContent = segment.render.status === "ready" ? "Regenerate" : "Generate segment";
       regenerate.addEventListener("click", () => startDubJob("selected", [segment.id]));
       actions.append(play, regenerate);
       render.append(badge, detail, actions);
@@ -746,7 +747,7 @@ export function createDubbingWorkspace({
       row.voice.value = role.voice_id || "";
       markDubDirty(segment.id);
     }
-    dubEditorStatus.textContent = `已把 ${role.name} 应用到 ${selectedDubSegments.size} 段，尚未保存`;
+    dubEditorStatus.textContent = `Applied ${role.name} to ${countLabel(selectedDubSegments.size, "segment")}. Save to keep changes.`;
   });
 
   dubProjectTitleInput.addEventListener("input", () => {
@@ -779,7 +780,7 @@ export function createDubbingWorkspace({
       };
     });
     dubSaveButton.disabled = true;
-    dubSaveButton.textContent = "正在保存";
+    dubSaveButton.textContent = "Saving";
     try {
       const response = await fetch(`/api/dub/projects/${projectId}`, {
         method: "PATCH",
@@ -822,28 +823,28 @@ export function createDubbingWorkspace({
   function renderDubJob(job) {
     const percent = Math.max(0, Math.min(100, Math.round(job.progress * 100)));
     const titles = {
-      queued: "任务已保存",
-      rendering: "正在逐段生成",
-      complete: "所选片段已完成",
-      partial: "部分片段需要重试",
-      cancelled: "任务已停止",
-      error: "任务异常停止",
-      validating: "正在检查项目",
-      fitting: "正在安全适配时长",
-      mixing: "正在混合时间线",
-      muxing: "正在封装视频",
+      queued: "Job saved",
+      rendering: "Generating segments",
+      complete: "Selected segments complete",
+      partial: "Some segments need a retry",
+      cancelled: "Job stopped",
+      error: "Job stopped unexpectedly",
+      validating: "Checking project",
+      fitting: "Fitting duration safely",
+      mixing: "Mixing timeline",
+      muxing: "Muxing video",
     };
-    dubProgressTitle.textContent = titles[job.phase] || "正在生成配音";
+    dubProgressTitle.textContent = titles[job.phase] || "Generating dubbing";
     dubProgressText.textContent = job.message;
     dubProgressPercent.textContent = `${percent}%`;
     dubProgressFill.style.width = `${percent}%`;
     dubProgressTrack.setAttribute("aria-valuenow", percent.toString());
     if (job.kind === "export") {
-      dubProgressMeta.textContent = "任务状态保存在项目中，刷新或重启服务后仍可继续";
-      dubCurrentText.textContent = "安全时长适配不会截断任何台词";
+      dubProgressMeta.textContent = "Job progress is saved in the project and can resume after a refresh or service restart";
+      dubCurrentText.textContent = "Safe duration fitting preserves every line";
       dubCancelButton.hidden = true;
     } else {
-      dubProgressMeta.textContent = `${job.processed} / ${job.total} 段 · 新生成 ${job.generated} · 缓存 ${job.cached} · 失败 ${job.failed}`;
+      dubProgressMeta.textContent = `${job.processed} / ${countLabel(job.total, "segment")} · ${job.generated} new · ${job.cached} cached · ${job.failed} failed`;
       dubCurrentText.textContent = job.current_text || "";
       dubCancelButton.hidden = false;
       if (job.stream) dubStreamPlayer.update(job.stream, job.job_id);
@@ -980,7 +981,7 @@ export function createDubbingWorkspace({
     const segmentId = [...selectedDubSegments][0];
     const segment = currentDubProject.segments.find((item) => item.id === segmentId);
     if (dubPlayheadSeconds <= segment.start || dubPlayheadSeconds >= segment.end) {
-      showError("先把播放头放到所选片段内部，再执行拆分。");
+      showError("Move the playhead inside the selected segment before splitting.");
       return;
     }
     if (!(await saveDubChanges())) return;
@@ -1022,7 +1023,7 @@ export function createDubbingWorkspace({
     if (!currentDubProject?.source_has_video) return;
     dubSourceVideo.hidden = true;
     dubSourceAudio.hidden = false;
-    dubEditorStatus.textContent = "浏览器无法预览该视频编码，已切换为源音频预览";
+    dubEditorStatus.textContent = "This browser cannot preview the video codec. Switched to source audio.";
   });
 
   dubCancelButton.addEventListener("click", async () => {
@@ -1046,8 +1047,8 @@ export function createDubbingWorkspace({
     if (!currentDubProject) return;
     if (!(await saveDubChanges())) return;
     dubExportButton.disabled = true;
-    dubExportButtonText.textContent = "正在建立任务...";
-    dubEditorStatus.textContent = "正在保存可恢复的导出任务";
+    dubExportButtonText.textContent = "Creating job...";
+    dubEditorStatus.textContent = "Saving a resumable export job";
     try {
       const response = await fetch(`/api/dub/projects/${currentDubProject.id}/export-jobs`, {
         method: "POST",
@@ -1063,7 +1064,7 @@ export function createDubbingWorkspace({
     } catch (error) {
       showError(error.message);
     } finally {
-      dubExportButtonText.textContent = currentDubProject?.source_has_video ? "导出 MP4 + WAV + SRT" : "导出 WAV + SRT";
+      dubExportButtonText.textContent = currentDubProject?.source_has_video ? "Export MP4 + WAV + SRT" : "Export WAV + SRT";
       updateDubControls();
     }
   });
@@ -1073,15 +1074,15 @@ export function createDubbingWorkspace({
     const segmentIds = currentDubProject.segments
       .filter((segment) => selectedDubSegments.has(segment.id))
       .map((segment) => segment.id);
-    const taskNames = { translate: "翻译", punctuation: "补标点", cleanup: "整理断句" };
+    const taskNames = { translate: "translate", punctuation: "add punctuation", cleanup: "clean up text" };
     const task = dubGeminiTask.value;
-    const languageCopy = task === "translate" ? `为${dubGeminiTargetLanguage.value}` : "";
+    const languageCopy = task === "translate" ? ` into ${dubGeminiTargetLanguage.value}` : "";
     const confirmed = window.confirm(
-      `将所选 ${segmentIds.length} 段配音文字发送到 Gemini ${languageCopy}${taskNames[task]}。不会上传音频，云端调用可能产生费用。是否继续？`,
+      `Send ${countLabel(segmentIds.length, "selected segment")} to Gemini to ${taskNames[task]}${languageCopy}? Audio will not be uploaded. Cloud usage may incur charges.`,
     );
     if (!confirmed || !(await saveDubChanges())) return;
     dubGeminiTranslate.disabled = true;
-    dubEditorStatus.textContent = `Gemini 正在逐段${taskNames[task]}，请保持页面打开`;
+    dubEditorStatus.textContent = `Asking Gemini to ${taskNames[task]} each segment. Keep this page open.`;
     try {
       const response = await fetch(`/api/dub/projects/${currentDubProject.id}/gemini-batch`, {
         method: "POST",
@@ -1102,7 +1103,7 @@ export function createDubbingWorkspace({
         row.textarea.value = result.text;
         markDubDirty(result.segment_id);
       }
-      dubEditorStatus.textContent = `Gemini 已处理 ${payload.results.length} 段，结果尚未保存`;
+      dubEditorStatus.textContent = `Gemini processed ${countLabel(payload.results.length, "segment")}. Save to keep the results.`;
     } catch (error) {
       showError(error.message);
     } finally {
@@ -1116,7 +1117,7 @@ export function createDubbingWorkspace({
     populateVoices: populateDubVoiceOptions,
     populateTranscripts: populateDubTranscriptOptions,
     updateProvider(configured, failed = false) {
-      dubGeminiStatus.textContent = failed ? "检查失败" : configured ? "已配置" : "未配置";
+      dubGeminiStatus.textContent = failed ? "Check failed" : configured ? "Configured" : "Not configured";
       dubGeminiStatus.dataset.state = failed ? "error" : configured ? "ready" : "missing";
       updateDubControls();
     },

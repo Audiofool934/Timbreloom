@@ -36,7 +36,7 @@ class ASRJob:
     created_at: str
     status: str = "queued"
     phase: str = "queued"
-    message: str = "等待转录"
+    message: str = "Waiting to transcribe"
     progress: float = 0.0
     duration_seconds: float = 0.0
     audio_ready: bool = False
@@ -142,7 +142,7 @@ class ASRService:
             try:
                 payload = json.loads((directory / "job.json").read_text(encoding="utf-8"))
                 if payload["schema_version"] != 1 or payload["job_id"] != job_id:
-                    raise ValueError("不支持的转录任务格式。")
+                    raise ValueError("Unsupported transcription job format.")
                 source = local_file(directory, payload["source_path"])
                 kwargs = {
                     item.name: payload[item.name] for item in fields(ASRJob)
@@ -156,7 +156,7 @@ class ASRService:
                 self._jobs[job_id] = job
                 return job
             except (OSError, ValueError, KeyError, TypeError) as exc:
-                raise FileNotFoundError("转录任务不存在或记录损坏。") from exc
+                raise FileNotFoundError("Transcription job not found or its record is damaged.") from exc
 
     def recover(self) -> int:
         recovered = 0
@@ -169,10 +169,10 @@ class ASRService:
                 continue
             if job.cancel_event.is_set():
                 self._update(job, status="cancelled", phase="cancelled",
-                             message="服务重启时确认了此前的停止请求")
+                             message="Previous stop request confirmed after service restart")
                 continue
             self._update(job, status="queued", phase="queued", error=None,
-                         message="服务重启后继续本地转录")
+                         message="Resuming local transcription after service restart")
             self.launch(job)
             recovered += 1
         return recovered
@@ -183,7 +183,7 @@ class ASRService:
             return job
         with self._jobs_lock:
             job.cancel_event.set()
-            self._update(job, message="正在停止转录")
+            self._update(job, message="Stopping transcription")
         return job
 
     def _process_job(self, job: ASRJob) -> None:
@@ -195,25 +195,25 @@ class ASRService:
                 job,
                 status="running",
                 phase="probing",
-                message="正在检查媒体文件",
+                message="Checking media file",
                 progress=0.05,
             )
             media_info = probe_media(job.source_path)
             if not media_info.has_audio:
-                raise ValueError("媒体文件中没有可用音轨。")
+                raise ValueError("The media file has no usable audio track.")
             if media_info.duration_seconds <= 0:
-                raise ValueError("无法确定媒体时长。")
+                raise ValueError("Cannot determine media duration.")
             if media_info.duration_seconds > MAX_ASR_DURATION_SECONDS:
-                raise ValueError("单个转录文件最长支持 8 小时。")
+                raise ValueError("Transcription files must be no longer than 8 hours.")
             self._update(job, duration_seconds=media_info.duration_seconds)
 
             if job.cancel_event.is_set():
-                raise InterruptedError("转录已取消。")
+                raise InterruptedError("Transcription canceled.")
 
             self._update(
                 job,
                 phase="preparing",
-                message="正在提取并标准化音频",
+                message="Extracting and normalizing audio",
                 progress=0.14,
             )
             if not (job.audio_ready and audio_path.is_file()
@@ -223,12 +223,12 @@ class ASRService:
                 self._update(job, audio_ready=True, audio_sha256=file_digest(audio_path))
 
             if job.cancel_event.is_set():
-                raise InterruptedError("转录已取消。")
+                raise InterruptedError("Transcription canceled.")
 
             self._update(
                 job,
                 phase="transcribing",
-                message="正在使用本地 Whisper 转录，音频不会上传",
+                message="Transcribing with local Whisper. Audio stays on this Mac.",
                 progress=0.24,
             )
             language = None if job.requested_language == "auto" else job.requested_language
@@ -254,12 +254,12 @@ class ASRService:
                 self._update(job, raw_ready=True)
 
             if job.cancel_event.is_set():
-                raise InterruptedError("转录已取消。")
+                raise InterruptedError("Transcription canceled.")
 
             self._update(
                 job,
                 phase="saving",
-                message="正在保存时间戳和字幕数据",
+                message="Saving timestamps and subtitles",
                 progress=0.9,
             )
             transcript = build_transcript(
@@ -294,7 +294,7 @@ class ASRService:
                 job,
                 status="complete",
                 phase="complete",
-                message="本地转录完成",
+                message="Local transcription complete",
                 progress=1.0,
                 result=summary,
             )
@@ -311,15 +311,15 @@ class ASRService:
                 job,
                 status="error",
                 phase="error",
-                message="转录没有完成",
+                message="Transcription did not complete",
                 error=str(exc),
             )
 
     def transcript_dir(self, transcript_id: str) -> Path:
         if not transcript_id or not all(character in "0123456789abcdef" for character in transcript_id):
-            raise FileNotFoundError("转录不存在。")
+            raise FileNotFoundError("Transcript not found.")
         if len(transcript_id) != 32:
-            raise FileNotFoundError("转录不存在。")
+            raise FileNotFoundError("Transcript not found.")
         return self.transcript_root / transcript_id
 
     def source_media(self, transcript_id: str) -> Path:
@@ -331,7 +331,7 @@ class ASRService:
             if path.is_file()
         )
         if len(candidates) != 1:
-            raise FileNotFoundError("转录的原始媒体不存在或不唯一。")
+            raise FileNotFoundError("The original transcript media is missing or ambiguous.")
         return candidates[0]
 
     def get_transcript(self, transcript_id: str) -> dict[str, Any]:

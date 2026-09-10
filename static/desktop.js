@@ -1,4 +1,4 @@
-import { installDesktopAudio } from "./desktop-audio.js?v=2";
+import { installDesktopAudio } from "./desktop-audio.js?v=3";
 
 // The native shell exposes only a small command surface, never local filesystem access.
 export function notifyDesktop(type, payload = {}) {
@@ -44,10 +44,10 @@ export function installDesktop({ switchView, hasUnsavedEdits }) {
   window.addEventListener("pagehide", saveDraft);
 
   const headings = [
-    ["clone", "声音克隆", "选择一个音色，把想说的话写下来。"],
-    ["vc", "原声换色", "保留表演的节奏、停顿与情绪，只改变声音的质感。"],
-    ["asr", "本地转录", "从一段声音开始，留下可编辑的文字与字幕。"],
-    ["dub", "配音项目", "逐句打磨台词与声音，让配音回到画面的时间线上。"],
+    ["clone", "Voice cloning", "Choose a voice. Give it something to say."],
+    ["vc", "Voice conversion", "Keep the timing, pauses, and expression. Give the performance a new voice."],
+    ["asr", "Transcription", "Turn a recording into editable text and subtitles."],
+    ["dub", "Dubbing studio", "Refine each line and voice, then bring the dialogue back to the picture."],
   ];
   for (const [id, title, description] of headings) {
     const section = byId(`${id}View`);
@@ -55,13 +55,13 @@ export function installDesktop({ switchView, hasUnsavedEdits }) {
     section.querySelector(".lede").textContent = description;
   }
   const labels = {
-    "LOCAL ARCHIVE": "保存在这台 Mac", "LOCAL CONVERSION ARCHIVE": "保存在这台 Mac", "LOCAL DUB ARCHIVE": "保存在这台 Mac",
-    "SAVED VOICE": "已保存音色", "LONG-FORM GENERATION": "语音生成", "GENERATED LOCALLY": "本地生成",
-    "LOCAL TRANSCRIPTION": "音频转录", "EDITABLE TRANSCRIPT": "文字与字幕", "CREATE VOICE": "从片段保存音色",
-    "PERSISTENT DUB PROJECT": "配音工作台", "ORIGINAL TIMECODE MAP": "原始时间线", "CAST & VOICE ASSIGNMENT": "音色分配",
-    "PERSISTENT SEGMENT RENDER": "片段生成", "TIMELINE EXPORT READY": "导出完成", "LIVE PLAYBACK": "连续试听",
-    "GEMINI · OPTIONAL CLOUD": "Gemini · 可选云端", "GEMINI TRANSLATION · OPTIONAL CLOUD": "Gemini · 可选云端",
-    "NATIVE SPEECH-TO-SPEECH": "音色转换", "PERFORMANCE PRESERVED": "保留原始表演", "LOCAL VOICE CONVERSION": "音色转换", "VOICE CONVERSION COMPLETE": "转换完成",
+    "LOCAL ARCHIVE": "Saved on this Mac", "LOCAL CONVERSION ARCHIVE": "Saved on this Mac", "LOCAL DUB ARCHIVE": "Saved on this Mac",
+    "SAVED VOICE": "Saved voice", "LONG-FORM GENERATION": "Speech generation", "GENERATED LOCALLY": "Generated locally",
+    "LOCAL TRANSCRIPTION": "Transcription", "EDITABLE TRANSCRIPT": "Text and subtitles", "CREATE VOICE": "Save a voice from segments",
+    "PERSISTENT DUB PROJECT": "Dubbing studio", "ORIGINAL TIMECODE MAP": "Original timeline", "CAST & VOICE ASSIGNMENT": "Voice assignment",
+    "PERSISTENT SEGMENT RENDER": "Segment generation", "TIMELINE EXPORT READY": "Export complete", "LIVE PLAYBACK": "Continuous playback",
+    "GEMINI · OPTIONAL CLOUD": "Gemini · Optional cloud", "GEMINI TRANSLATION · OPTIONAL CLOUD": "Gemini · Optional cloud",
+    "NATIVE SPEECH-TO-SPEECH": "Voice conversion", "PERFORMANCE PRESERVED": "Original performance preserved", "LOCAL VOICE CONVERSION": "Voice conversion", "VOICE CONVERSION COMPLETE": "Conversion complete",
   };
   document.querySelectorAll(".result-kicker, .action-label, .stream-kicker, .saved-label").forEach((element) => {
     const label = labels[element.textContent.trim()];
@@ -69,12 +69,12 @@ export function installDesktop({ switchView, hasUnsavedEdits }) {
     const text = [...element.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
     if (text) text.textContent = label;
   });
-  document.querySelector("#asrForm .local-engine-note p").textContent = "本地识别 · 带词级时间戳";
-  byId("vcRtfMetric").previousElementSibling.textContent = "耗时 / 时长";
-  document.querySelector(".target-panel h2").textContent = "生成文稿";
-  document.querySelector(".target-panel .panel-heading p").textContent = "按标点自然分段，长文也可以连续生成。";
-  byId("targetText").placeholder = "写下一句话，或粘贴一整篇文稿。\n\n用标点和换行，安排声音的停顿。";
-  document.querySelector(".prosody-guide summary strong").textContent = "标点与停顿";
+  document.querySelector("#asrForm .local-engine-note p").textContent = "Local recognition · Word timestamps";
+  byId("vcRtfMetric").previousElementSibling.textContent = "Processing / duration";
+  document.querySelector(".target-panel h2").textContent = "Your script";
+  document.querySelector(".target-panel .panel-heading p").textContent = "Natural breaks for continuous, long-form speech.";
+  byId("targetText").placeholder = "Write a sentence or paste a full script.\n\nUse punctuation and paragraph breaks to guide the pauses.";
+  document.querySelector(".prosody-guide summary strong").textContent = "Punctuation and pauses";
   document.querySelector(".prosody-guide summary").append(icon("chevron.right"));
   document.querySelectorAll(".button-arrow").forEach((node) => node.replaceChildren(icon("arrow.right")));
   document.querySelectorAll(".upload-icon").forEach((node) => node.replaceChildren(icon("square.and.arrow.down")));
@@ -91,22 +91,22 @@ export function installDesktop({ switchView, hasUnsavedEdits }) {
     if (event.key === "Enter" || event.key === " ") { event.preventDefault(); byId("dubBundleImport").click(); }
   });
   document.querySelectorAll("button[aria-label]").forEach((button) => { button.title ||= button.getAttribute("aria-label"); });
-  for (const [id, name] of [["dubRoleName", "新角色名称"], ["dubRoleVoice", "新角色音色"], ["dubApplyRole", "应用角色"]]) {
+  for (const [id, name] of [["dubRoleName", "New role name"], ["dubRoleVoice", "New role voice"], ["dubApplyRole", "Apply role"]]) {
     byId(id)?.setAttribute("aria-label", name);
   }
   document.querySelectorAll(".dropzone input").forEach((input) => {
     input.setAttribute("aria-label", input.closest(".dropzone").querySelector("strong").textContent);
   });
-  for (const [id, title] of [["generateButton", "生成语音 · ⌘↩"], ["vcStartButton", "开始换色 · ⌘↩"],
-    ["asrStartButton", "开始转录 · ⌘↩"], ["saveTranscriptButton", "保存文字修改 · ⌘S"], ["dubSaveButton", "保存项目 · ⌘S"]]) {
+  for (const [id, title] of [["generateButton", "Generate speech · ⌘↩"], ["vcStartButton", "Convert voice · ⌘↩"],
+    ["asrStartButton", "Transcribe · ⌘↩"], ["saveTranscriptButton", "Save text changes · ⌘S"], ["dubSaveButton", "Save project · ⌘S"]]) {
     byId(id)?.setAttribute("title", title);
   }
 
   // Library empty states remain connected to the real import and creation workflows.
   for (const [id, symbol, title, hint, label, action] of [
-    ["vcJobList", "waveform", "还没有换色作品", "导入原始录音，选择音色后开始。", "导入录音", () => window.timbreloomCommands.openFile()],
-    ["transcriptList", "text.alignleft", "声音会在这里变成文字", "导入音频或视频，完成的转录会自动保留。", "导入媒体", () => window.timbreloomCommands.openFile()],
-    ["dubProjectList", "rectangle.stack", "开始你的第一个配音项目", "先准备一份转录，再为台词选择声音。", "前往本地转录", () => window.timbreloomCommands.selectView("asr")],
+    ["vcJobList", "waveform", "Your next voice starts here", "Import a performance and choose a voice to begin.", "Import Audio", () => window.timbreloomCommands.openFile()],
+    ["transcriptList", "text.alignleft", "Make room for the words", "Import audio or video. Finished transcripts are saved automatically.", "Import Media", () => window.timbreloomCommands.openFile()],
+    ["dubProjectList", "rectangle.stack", "Start your first dubbing project", "Start with a transcript, then choose voices for the dialogue.", "Open transcription", () => window.timbreloomCommands.selectView("asr")],
   ]) {
     const list = byId(id);
     if (!list) continue;
@@ -134,7 +134,7 @@ export function installDesktop({ switchView, hasUnsavedEdits }) {
   };
   const dismiss = document.createElement("button");
   dismiss.type = "button"; dismiss.className = "icon-button desktop-error-dismiss";
-  dismiss.setAttribute("aria-label", "关闭错误提示"); dismiss.append(icon("xmark"));
+  dismiss.setAttribute("aria-label", "Dismiss error"); dismiss.append(icon("xmark"));
   dismiss.addEventListener("click", () => { byId("errorCard").hidden = true; });
   byId("errorCard").append(dismiss);
 
@@ -195,7 +195,7 @@ export function installDesktop({ switchView, hasUnsavedEdits }) {
       const view = currentView();
       const button = byId(view === "dub" ? "dubSaveButton" : "saveTranscriptButton");
       if (["asr", "dub"].includes(view) && button && !button.disabled && button.getClientRects().length) button.click();
-      else announce(saved ? "文字草稿已保存在这台 Mac" : "草稿暂时无法保存，请保留窗口");
+      else announce(saved ? "Text draft saved on this Mac" : "Draft could not be saved. Keep this window open.");
     },
     hasUnsavedChanges() {
       saveDraft();

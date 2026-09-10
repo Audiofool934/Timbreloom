@@ -24,11 +24,11 @@ def serve(port):
     def transcribe(request, cancel_event=None):
         time.sleep(1)
         if request.initial_prompt == "UI_TEST_FAILURE":
-            raise RuntimeError("测试中的转录失败，请重新导入媒体后重试。")
-        return {"language": "zh", "text": "风穿过树林。我们慢慢走，听叶子落下的声音。", "segments": [
-            {"id": 0, "start": 0.0, "end": 1.0, "text": "风穿过树林。", "words": []},
-            {"id": 1, "start": 1.0, "end": 2.0, "text": "我们慢慢走，", "words": []},
-            {"id": 2, "start": 2.0, "end": 3.0, "text": "听叶子落下的声音。", "words": []},
+            raise RuntimeError("Synthetic transcription failure. Import the media again and retry.")
+        return {"language": "en", "text": "Wind moves through the trees. We walk slowly, listening to falling leaves.", "segments": [
+            {"id": 0, "start": 0.0, "end": 1.0, "text": "Wind moves through the trees.", "words": []},
+            {"id": 1, "start": 1.0, "end": 2.0, "text": "We walk slowly,", "words": []},
+            {"id": 2, "start": 2.0, "end": 3.0, "text": "listening to falling leaves.", "words": []},
         ]}
 
     app._asr_provider.transcribe = transcribe

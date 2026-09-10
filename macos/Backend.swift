@@ -82,7 +82,7 @@ final class Backend {
               state.app == "timbreloom",
               URL(fileURLWithPath: state.project_root).resolvingSymlinksInPath() == root.resolvingSymlinksInPath(),
               URL(fileURLWithPath: state.data_root).resolvingSymlinksInPath() == dataRoot.resolvingSymlinksInPath() else {
-            throw DesktopError.message("本地端口已被另一服务占用。请关闭该服务后重试。")
+            throw DesktopError.message("The local port is in use by another service. Close that service and try again.")
         }
         workBusy = state.busy
         updateActivity()
@@ -108,7 +108,7 @@ final class Backend {
                 while Date() < deadline && !stopping {
                     try await Task.sleep(nanoseconds: 150_000_000)
                     guard process?.isRunning == true else {
-                        throw DesktopError.message("本地引擎未能启动。请打开运行日志查看原因，或重试连接。")
+                        throw DesktopError.message("The local engine could not start. Open the runtime log for details or retry the connection.")
                     }
                     do {
                         _ = try await runtime()
@@ -117,7 +117,7 @@ final class Backend {
                     } catch let error as DesktopError { throw error }
                     catch { continue }
                 }
-                if !stopping { throw DesktopError.message("启动超过 30 秒。可以重试，或打开运行日志查看原因。") }
+                if !stopping { throw DesktopError.message("Startup took more than 30 seconds. Retry or open the runtime log for details.") }
             } catch { if !stopping { onError?(error.localizedDescription) } }
         }
     }
@@ -129,7 +129,7 @@ final class Backend {
                 Task { @MainActor in
                     guard let self, !self.stopping, !self.connecting else { return }
                     do { _ = try await self.runtime() }
-                    catch { self.onError?("本地服务连接已断开，正在重新连接。"); self.start() }
+                    catch { self.onError?("The local service disconnected. Reconnecting."); self.start() }
                 }
             }
             monitor?.tolerance = 2
@@ -140,7 +140,7 @@ final class Backend {
         if !stopping && (connecting || workBusy) {
             if activity == nil {
                 activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated,
-                    reason: "Timbreloom 正在准备或处理本地音频")
+                    reason: "Timbreloom is preparing or processing local audio")
             }
         } else if let current = activity {
             ProcessInfo.processInfo.endActivity(current)
@@ -152,8 +152,8 @@ final class Backend {
         let python = root.appendingPathComponent(".venv/bin/python")
         guard FileManager.default.isExecutableFile(atPath: python.path),
               FileManager.default.fileExists(atPath: root.appendingPathComponent("app.py").path) else {
-            throw DesktopError.message(embedded ? "应用内的本地引擎不完整，请重新安装 Timbreloom。"
-                : "找不到项目或 Python 环境。此本机版依赖 \(root.path)，请恢复该目录后重试。")
+            throw DesktopError.message(embedded ? "The bundled local engine is incomplete. Reinstall Timbreloom."
+                : "The project or Python environment was not found. This development app requires \(root.path). Restore that folder and try again.")
         }
         try FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         // Keep one previous log without unbounded growth. Logs contain no environment dump.

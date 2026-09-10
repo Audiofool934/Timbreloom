@@ -94,7 +94,7 @@ class ModelStore:
         try:
             state = json.loads((self._work(model_id) / "status.json").read_text())
             if state.get("state") in ACTIVE_STATES:
-                state.update(state="paused", message="下载已暂停，点击继续下载。")
+                state.update(state="paused", message="Download paused. Select Resume to continue.")
             return state
         except (OSError, ValueError):
             return {}
@@ -124,7 +124,7 @@ class ModelStore:
                 models.append({key: model[key] for key in ("id", "name", "purpose", "description", "bytes", "sources")} | {
                     "state": state, "ready": installed, "downloaded_bytes": received,
                     "progress": received / model["bytes"],
-                    "message": "已下载，可离线使用" if installed else job.get("message", "按需下载，准备好后即可离线使用"),
+                    "message": "Downloaded and ready for offline use" if installed else job.get("message", "Download when needed, then use offline"),
                 })
         return {"directory": str(self.root), "models": models, "network_policy": "user-initiated-downloads-only"}
 
@@ -133,7 +133,7 @@ class ModelStore:
             raise KeyError(model_id)
         with self._lock:
             if self._closed:
-                raise RuntimeError("应用正在退出，请重新打开后继续下载。")
+                raise RuntimeError("The app is closing. Reopen it to continue downloading.")
             if self.ready(model_id) or (self._threads.get(model_id) and self._threads[model_id].is_alive()):
                 return self.snapshot()
             work = self._work(model_id)
@@ -143,11 +143,11 @@ class ModelStore:
                 fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError as exc:
                 lease.close()
-                raise RuntimeError("另一个 Timbreloom 窗口正在下载此模型。") from exc
+                raise RuntimeError("Another Timbreloom window is downloading this model.") from exc
             cancel = threading.Event()
             self._cancel[model_id] = cancel
             self._jobs[model_id] = self._load_status(model_id)
-            self._update(model_id, state="downloading", message="正在连接下载源…")
+            self._update(model_id, state="downloading", message="Connecting to download server…")
             thread = threading.Thread(target=self._run, args=(model_id, cancel, lease), daemon=True,
                                       name=f"model-download-{model_id}")
             self._threads[model_id] = thread
@@ -161,7 +161,7 @@ class ModelStore:
             if event := self._cancel.get(model_id):
                 event.set()
                 if self._threads[model_id].is_alive():
-                    self._update(model_id, message="正在暂停，已下载内容会保留…")
+                    self._update(model_id, message="Pausing. Downloaded data will be kept…")
             return self.snapshot()
 
     def close(self) -> None:
@@ -176,7 +176,7 @@ class ModelStore:
 
     def _progress(self, model_id: str, completed: int, received: int, name: str) -> None:
         self._update(model_id, state="downloading", downloaded_bytes=completed + received,
-                     message=f"正在下载 {name}")
+                     message=f"Downloading {name}")
 
     def _download_file(self, client: httpx.Client, model_id: str, file: dict, stage: Path,
                        completed: int, cancel: threading.Event) -> None:
@@ -204,11 +204,11 @@ class ModelStore:
             response.raise_for_status()
             if response.status_code == 206:
                 if not re.fullmatch(rf"bytes {offset}-\d+/{file['size']}", response.headers.get("content-range", "")):
-                    raise ValueError("下载源返回了无效的续传数据，请重试。")
+                    raise ValueError("The server returned invalid resume data. Try again.")
             elif response.status_code == 200:
                 offset = 0  # A server may ignore Range; never append a full response to a partial file.
             else:
-                raise ValueError("下载源暂时不可用，请稍后重试。")
+                raise ValueError("The download server is unavailable. Try again later.")
             received = offset
             last_update = 0.0
             with partial.open("ab" if offset else "wb") as handle:
@@ -216,7 +216,7 @@ class ModelStore:
                     if cancel.is_set():
                         raise InterruptedError()
                     if received + len(chunk) > file["size"]:
-                        raise ValueError("下载文件大小与固定版本不符，请重试。")
+                        raise ValueError("The file size does not match the pinned version. Try again.")
                     handle.write(chunk)
                     received += len(chunk)
                     now = time.monotonic()
@@ -225,11 +225,11 @@ class ModelStore:
                         last_update = now
             self._progress(model_id, completed, received, Path(file["path"]).name)
         if received != file["size"]:
-            raise ValueError("连接提前结束，已下载内容保留，可继续下载。")
-        self._update(model_id, state="verifying", message="正在校验下载文件…")
+            raise ValueError("The connection ended early. Downloaded data is saved; resume to continue.")
+        self._update(model_id, state="verifying", message="Verifying downloaded files…")
         if _digest(partial, cancel) != file["sha256"]:
             partial.unlink()
-            raise ValueError("文件校验未通过，请重试下载。")
+            raise ValueError("File verification failed. Download again.")
         os.replace(partial, final)
 
     def _publish(self, model: dict, stage: Path) -> None:
@@ -254,7 +254,7 @@ class ModelStore:
             on_disk = sum(min(file["size"], sum(path.stat().st_size for path in
                 (stage / file["path"], stage / (file["path"] + ".partial")) if path.is_file())) for file in model["files"])
             if shutil.disk_usage(self.root).free < model["bytes"] - on_disk + 64 * 1024 * 1024:
-                raise ValueError("磁盘空间不足，请释放空间后继续下载。")
+                raise ValueError("Not enough disk space. Free up space and resume the download.")
             with httpx.Client(follow_redirects=True, timeout=httpx.Timeout(20, connect=15), transport=self.transport) as client:
                 for file in model["files"]:
                     if cancel.is_set():
@@ -264,19 +264,19 @@ class ModelStore:
                     self._update(model_id, downloaded_bytes=completed)
             if cancel.is_set():
                 raise InterruptedError()
-            self._update(model_id, state="installing", message="正在完成安装…")
+            self._update(model_id, state="installing", message="Finishing installation…")
             self._publish(model, stage)
-            self._update(model_id, state="ready", downloaded_bytes=model["bytes"], message="已下载，可离线使用")
+            self._update(model_id, state="ready", downloaded_bytes=model["bytes"], message="Downloaded and ready for offline use")
         except InterruptedError:
-            self._update(model_id, state="paused", message="下载已暂停，已下载内容保留。")
+            self._update(model_id, state="paused", message="Download paused. Downloaded data is saved.")
         except httpx.HTTPStatusError as exc:
-            self._update(model_id, state="error", message=f"下载源返回 {exc.response.status_code}，请稍后重试。")
+            self._update(model_id, state="error", message=f"Download server returned {exc.response.status_code}. Try again later.")
         except httpx.HTTPError:
-            self._update(model_id, state="error", message="网络连接中断，请检查网络后继续下载。")
+            self._update(model_id, state="error", message="Connection lost. Check your network and resume the download.")
         except OSError:
-            self._update(model_id, state="error", message="无法写入模型目录，请检查磁盘空间和访问权限。")
+            self._update(model_id, state="error", message="Cannot write to the models folder. Check disk space and permissions.")
         except Exception as exc:
-            self._update(model_id, state="error", message=str(exc) if isinstance(exc, ValueError) else "模型下载失败，请重试。")
+            self._update(model_id, state="error", message=str(exc) if isinstance(exc, ValueError) else "Model download failed. Try again.")
         finally:
             lease.close()
 

@@ -6,10 +6,10 @@ struct WorkspaceMode {
     let symbol: String
     let caption: String
     static let all = [
-        WorkspaceMode(id: "clone", title: "声音克隆", symbol: "waveform", caption: "让文字拥有你的声音"),
-        WorkspaceMode(id: "vc", title: "原声换色", symbol: "waveform.path", caption: "保留表演，改变音色"),
-        WorkspaceMode(id: "asr", title: "本地转录", symbol: "text.bubble", caption: "听见声音，留下文字"),
-        WorkspaceMode(id: "dub", title: "配音项目", symbol: "rectangle.stack", caption: "声音与画面的工作台"),
+        WorkspaceMode(id: "clone", title: "Voice cloning", symbol: "waveform", caption: "Give text your voice"),
+        WorkspaceMode(id: "vc", title: "Voice conversion", symbol: "waveform.path", caption: "Keep the performance"),
+        WorkspaceMode(id: "asr", title: "Transcription", symbol: "text.bubble", caption: "Turn sound into text"),
+        WorkspaceMode(id: "dub", title: "Dubbing studio", symbol: "rectangle.stack", caption: "Bring voice to picture"),
     ]
 }
 
@@ -93,9 +93,9 @@ final class Sidebar: NSViewController {
     var onRetry: (() -> Void)?
     var onModels: (() -> Void)?
     private var buttons: [ModeButton] = []
-    private let status = NSTextField(wrappingLabelWithString: "正在连接本地引擎")
+    private let status = NSTextField(wrappingLabelWithString: "Connecting to local engine")
     private let dot = NSImageView()
-    private let retry = NSButton(title: "重新连接", target: nil, action: nil)
+    private let retry = NSButton(title: "Reconnect", target: nil, action: nil)
 
     override func loadView() {
         let backdrop = NSVisualEffectView()
@@ -109,9 +109,9 @@ final class Sidebar: NSViewController {
         let brand = NSTextField(labelWithString: "TIMBRELOOM")
         brand.font = .systemFont(ofSize: 11, weight: .bold)
         brand.textColor = .secondaryLabelColor
-        let name = NSTextField(labelWithString: "声音工作台")
+        let name = NSTextField(labelWithString: "Voice Studio")
         name.font = .systemFont(ofSize: 21, weight: .semibold)
-        let caption = NSTextField(labelWithString: "在这台 Mac 上，编织声音。")
+        let caption = NSTextField(labelWithString: "Shape your sound on this Mac.")
         caption.font = .systemFont(ofSize: 11)
         caption.textColor = .secondaryLabelColor
         let header = NSStackView(views: [brand, name, caption])
@@ -120,7 +120,7 @@ final class Sidebar: NSViewController {
         header.spacing = 9
         place(header, top: 27, leading: 22, trailing: 16)
 
-        let label = NSTextField(labelWithString: "工作空间")
+        let label = NSTextField(labelWithString: "Workspace")
         label.font = .systemFont(ofSize: 11, weight: .medium)
         label.textColor = .tertiaryLabelColor
         place(label, top: 138, leading: 24, trailing: 16)
@@ -151,7 +151,7 @@ final class Sidebar: NSViewController {
             button.heightAnchor.constraint(equalToConstant: 58).isActive = true
             buttons.append(button)
         }
-        let local = NSTextField(labelWithString: "本地引擎")
+        let local = NSTextField(labelWithString: "Local engine")
         local.font = .systemFont(ofSize: 11, weight: .medium)
         local.textColor = .secondaryLabelColor
         status.font = .systemFont(ofSize: 11)
@@ -170,13 +170,13 @@ final class Sidebar: NSViewController {
         retry.isHidden = true
         let divider = NSBox()
         divider.boxType = .separator
-        let hint = NSTextField(labelWithString: "⌘O 导入    ⌘↩ 开始处理")
+        let hint = NSTextField(labelWithString: "⌘O Import    ⌘↩ Start")
         hint.font = .systemFont(ofSize: 10)
         hint.textColor = .tertiaryLabelColor
-        let models = NSButton(title: "模型管理", target: self, action: #selector(manageModels))
+        let models = NSButton(title: "Models", target: self, action: #selector(manageModels))
         models.bezelStyle = .rounded
         models.controlSize = .small
-        models.toolTip = "选择、下载和管理本地模型 · ⌘,"
+        models.toolTip = "Choose, download, and manage local models · ⌘,"
         let footer = NSStackView(views: [line, status, retry, models, divider, hint])
         footer.orientation = .vertical
         footer.alignment = .leading
@@ -203,7 +203,7 @@ final class Sidebar: NSViewController {
     func select(_ id: String) {
         for button in buttons {
             button.selected = WorkspaceMode.all[button.tag].id == id
-            button.setAccessibilityValue(button.selected ? "已选择" : "")
+            button.setAccessibilityValue(button.selected ? "Selected" : "")
         }
     }
     func setStatus(_ text: String, state: String) {

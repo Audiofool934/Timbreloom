@@ -143,7 +143,7 @@ def main() -> None:
                     path = output / "outputs" / name
                     metrics = audio_quality(path)
                     with path.open("rb") as media:
-                        response = client.post("/api/asr/jobs", data={"language": "zh"},
+                        response = client.post("/api/asr/jobs", data={"language": "en"},
                                                files={"media": (name, media, "audio/wav")})
                     response.raise_for_status()
                     decoded = _poll(client, f"/api/asr/jobs/{response.json()['job_id']}", timeout=1800)

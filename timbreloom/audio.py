@@ -16,7 +16,7 @@ def stitch_wav_files(
 ) -> float:
     """Concatenate PCM WAV files with constant memory and a short safe pause."""
     if not sources:
-        raise ValueError("没有可拼接的音频分段。")
+        raise ValueError("No audio segments to join.")
 
     total_frames = 0
     expected_params: tuple[int, int, int] | None = None
@@ -35,7 +35,7 @@ def stitch_wav_files(
                     output.setsampwidth(params[1])
                     output.setframerate(params[2])
                 elif params != expected_params:
-                    raise ValueError("音频分段格式不一致，无法安全拼接。")
+                    raise ValueError("Audio segment formats differ and cannot be joined safely.")
 
                 while frames := current.readframes(65_536):
                     output.writeframesraw(frames)

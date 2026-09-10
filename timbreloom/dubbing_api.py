@@ -208,7 +208,7 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
-                status_code=500, detail=f"创建配音项目失败：{exc}"
+                status_code=500, detail=f"Could not create dubbing project: {exc}"
             ) from exc
         return {"ok": True, "project": _public_dub_project(context, project)}
 
@@ -347,12 +347,12 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
             )
             filename = str(segment["render"].get("filename", ""))
             if not filename:
-                raise FileNotFoundError("该片段还没有可试听的音频。")
+                raise FileNotFoundError("This segment has no audio to preview yet.")
             path = context.store.render_path(project_id, filename)
             if not path.is_file():
-                raise FileNotFoundError("该片段的试听文件不存在。")
+                raise FileNotFoundError("The segment preview file was not found.")
         except StopIteration as exc:
-            raise HTTPException(status_code=404, detail="配音片段不存在。") from exc
+            raise HTTPException(status_code=404, detail="Dubbing segment not found.") from exc
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return FileResponse(path, media_type="audio/wav")
@@ -419,7 +419,7 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
-                status_code=500, detail=f"导出配音项目失败：{exc}"
+                status_code=500, detail=f"Could not export dubbing project: {exc}"
             ) from exc
         export["wav_url"] = (
             f"/api/dub/projects/{project_id}/exports/{export['wav_filename']}"
@@ -494,7 +494,7 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
                 bundle,
                 path,
                 context.max_upload_bytes,
-                "Timbreloom 项目包不能超过 2 GB。",
+                "Timbreloom project bundles cannot exceed 2 GB.",
             )
             project = await asyncio.to_thread(context.store.import_bundle, path)
         except ValueError as exc:
@@ -516,10 +516,10 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
                 if (value := item.get(key))
             }
             if filename not in allowed or Path(filename).name != filename:
-                raise FileNotFoundError("配音导出文件不存在。")
+                raise FileNotFoundError("Dubbing export file not found.")
             path = context.store.project_dir(project_id) / "exports" / filename
             if not path.is_file():
-                raise FileNotFoundError("配音导出文件不存在。")
+                raise FileNotFoundError("Dubbing export file not found.")
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         media_types = {
@@ -538,10 +538,10 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
     ) -> dict[str, Any]:
         if not request.confirm_cloud:
             raise HTTPException(
-                status_code=400, detail="必须明确确认后才能把所选文字发送到 Gemini。"
+                status_code=400, detail="Explicit confirmation is required before sending selected text to Gemini."
             )
         if not context.gemini.configured:
-            raise HTTPException(status_code=503, detail="没有配置 GEMINI_API_KEY。")
+            raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not configured.")
         try:
             project = context.store.load(project_id)
             segment = next(
@@ -554,7 +554,7 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except StopIteration as exc:
-            raise HTTPException(status_code=404, detail="配音片段不存在。") from exc
+            raise HTTPException(status_code=404, detail="Dubbing segment not found.") from exc
         try:
             result = await asyncio.to_thread(
                 context.gemini.transform,
@@ -566,7 +566,7 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
-                status_code=502, detail=f"Gemini 处理失败：{exc}"
+                status_code=502, detail=f"Gemini processing failed: {exc}"
             ) from exc
         result["segment_id"] = request.segment_id
         result["cloud_request"] = True
@@ -580,19 +580,19 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
     ) -> dict[str, Any]:
         if not request.confirm_cloud:
             raise HTTPException(
-                status_code=400, detail="必须明确确认后才能把所选文字发送到 Gemini。"
+                status_code=400, detail="Explicit confirmation is required before sending selected text to Gemini."
             )
         if not context.gemini.configured:
-            raise HTTPException(status_code=503, detail="没有配置 GEMINI_API_KEY。")
+            raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not configured.")
         try:
             project = context.store.load(project_id)
             by_id = {item["id"]: item for item in project["segments"]}
             segment_ids = list(dict.fromkeys(request.segment_ids))
             if not set(segment_ids).issubset(by_id):
-                raise ValueError("选择中包含不存在的配音片段。")
+                raise ValueError("The selection includes a missing dubbing segment.")
             total_chars = sum((len(by_id[item]["active_text"]) for item in segment_ids))
             if total_chars > 60000:
-                raise ValueError("批量 Gemini 处理的文字总量不能超过 60,000 个字符。")
+                raise ValueError("Batch Gemini requests cannot exceed 60,000 characters.")
 
             def run_batch() -> list[dict[str, Any]]:
                 results = []
@@ -612,7 +612,7 @@ def create_router(get_context: Callable[[], DubbingContext]) -> APIRouter:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
-                status_code=502, detail=f"Gemini 批量处理失败：{exc}"
+                status_code=502, detail=f"Gemini batch processing failed: {exc}"
             ) from exc
         return {
             "ok": True,

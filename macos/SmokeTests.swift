@@ -160,7 +160,8 @@ final class SmokeDelegate: NSObject, NSApplicationDelegate {
         try await waitFor("empty library next step", "!document.getElementById('asrView').hidden")
         try require(workspace.selectedView == "asr", "In-app navigation did not synchronize native import type")
         workspace.selectView("clone")
-        _ = try await js("document.getElementById('targetText').value = '桌面草稿恢复测试。'; document.getElementById('targetText').dispatchEvent(new Event('input', {bubbles:true})); true")
+        _ = try await js("document.getElementById('targetText').value = 'Desktop draft recovery test.'; document.getElementById('targetText').dispatchEvent(new Event('input', {bubbles:true})); true")
+        try await waitFor("singular English segment estimate", "document.getElementById('segmentEstimate').textContent.includes('1 segment ·')")
         _ = try await js("""
           window.originalGetUserMedia = navigator.mediaDevices.getUserMedia;
           navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Synthetic denial', 'NotAllowedError'); };
@@ -185,7 +186,7 @@ final class SmokeDelegate: NSObject, NSApplicationDelegate {
         try require(released == true, "Cancelling recording did not release its track")
         workspace.command("openFile")
         try await waitFor("reference import", "document.getElementById('referenceAudio').files.length === 1")
-        _ = try await js("document.getElementById('referenceText').value = '测试参考声音。'; document.getElementById('voiceName').value = '温暖旁白'; document.getElementById('saveVoiceButton').click(); true")
+        _ = try await js("document.getElementById('referenceText').value = 'A test reference voice.'; document.getElementById('voiceName').value = 'Warm narrator'; document.getElementById('saveVoiceButton').click(); true")
         try await waitFor("saved reference voice", "!!document.getElementById('voiceSelect').value")
         dialogs.cancelNextOpen = true
         workspace.command("openFile")
@@ -210,7 +211,7 @@ final class SmokeDelegate: NSObject, NSApplicationDelegate {
         _ = try await js("document.getElementById('asrProgressCard').scrollIntoView({behavior:'instant', block:'center'}); true")
         try await capture("transcription-progress")
         try await waitFor("ASR completion", "!document.getElementById('transcriptEditor').hidden")
-        _ = try await js("const field = document.querySelector('#transcriptSegments textarea'); field.value = '原生保存测试。'; field.dispatchEvent(new Event('input', {bubbles:true})); true")
+        _ = try await js("const field = document.querySelector('#transcriptSegments textarea'); field.value = 'Native save test.'; field.dispatchEvent(new Event('input', {bubbles:true})); true")
         try await waitFor("dirty transcript", "!document.getElementById('saveTranscriptButton').disabled")
         workspace.command("save")
         try await waitFor("saved transcript", "document.getElementById('saveTranscriptButton').disabled")
@@ -244,9 +245,9 @@ final class SmokeDelegate: NSObject, NSApplicationDelegate {
         }
         try require(dialogs.saveCount == 1, "Download did not use native save delegate")
         let srt = try String(contentsOf: dialogs.output, encoding: .utf8)
-        try require(srt.contains("原生保存测试。") && srt.contains("-->"), "Exported subtitle content is wrong")
+        try require(srt.contains("Native save test.") && srt.contains("-->"), "Exported subtitle content is wrong")
         workspace.selectView("dub")
-        _ = try await js("document.getElementById('dubTranscriptSelect').selectedIndex = 1; document.getElementById('dubDefaultVoice').selectedIndex = 1; document.getElementById('dubTitleInput').value = '秋日声音手记'; true")
+        _ = try await js("document.getElementById('dubTranscriptSelect').selectedIndex = 1; document.getElementById('dubDefaultVoice').selectedIndex = 1; document.getElementById('dubTitleInput').value = 'Autumn field notes'; true")
         workspace.command("primaryAction")
         try await waitFor("native shortcut creates project", "!document.getElementById('dubEditor').hidden")
         _ = try await js("document.getElementById('dubEditor').scrollIntoView({behavior:'instant'}); true")
@@ -276,7 +277,7 @@ final class SmokeDelegate: NSObject, NSApplicationDelegate {
         try await Task.sleep(nanoseconds: 150_000_000)
         try require(workspace.webView.url?.host == "127.0.0.1", "External navigation escaped the workspace")
         workspace.webView.reload()
-        try await waitFor("draft after reload", "document.getElementById('targetText')?.value === '桌面草稿恢复测试。'")
+        try await waitFor("draft after reload", "document.getElementById('targetText')?.value === 'Desktop draft recovery test.'")
         print("Native dialog results are supplied by the test harness; OS panel appearance and microphone consent require manual QA.")
     }
 }

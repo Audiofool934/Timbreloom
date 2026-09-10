@@ -15,14 +15,14 @@ import httpx
 
 
 REFERENCE_TEXT = (
-    "你好，这是用于验证声音克隆的参考录音。"
-    "今天的天气很好，我们正在测试一个本地语音工作台。"
-    "请确保每句话都能清楚完整地读出来。"
+    "Hello. This reference recording is used to validate voice cloning. "
+    "It is a beautiful day, and we are testing a local voice studio. "
+    "Please make sure that every sentence is spoken clearly and completely."
 )
 SOURCE_TEXT = (
-    "第一段台词用来检查本地转录和时间线。"
-    "第二段台词会测试角色、声音缓存以及安全时长适配。"
-    "最后，我们会导出一段带有新声音的视频。"
+    "The first line checks local transcription and the timeline. "
+    "The second tests roles, cached voices, and safe duration fitting. "
+    "Finally, we export a short video with a new voice."
 )
 
 
@@ -97,8 +97,8 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
         reference = work / "reference.wav"
         source_audio = work / "source.wav"
         source_video = work / "source.mp4"
-        _run([_tool("say"), "-v", "Tingting", "-r", "165", "-o", str(reference_say), REFERENCE_TEXT])
-        _run([_tool("say"), "-v", "Eddy (Chinese (China mainland))", "-r", "175", "-o", str(source_say), SOURCE_TEXT])
+        _run([_tool("say"), "-v", "Samantha", "-r", "165", "-o", str(reference_say), REFERENCE_TEXT])
+        _run([_tool("say"), "-v", "Eddy (English (US))", "-r", "175", "-o", str(source_say), SOURCE_TEXT])
         for raw, wav in ((reference_say, reference), (source_say, source_audio)):
             _run(
                 [
@@ -158,7 +158,7 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
             with source_video.open("rb") as media:
                 asr_response = client.post(
                     "/api/asr/jobs",
-                    data={"language": "zh", "initial_prompt": "本地语音工作台，时间线，角色，声音缓存"},
+                    data={"language": "en", "initial_prompt": "local voice studio, timeline, roles, cached voices"},
                     files={"media": (source_video.name, media, "video/mp4")},
                 )
             asr_response.raise_for_status()
@@ -177,7 +177,7 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
                 json={
                     "transcript_id": transcript_id,
                     "title": f"Timbreloom {health['version']} E2E",
-                    "target_language": "chinese",
+                    "target_language": "english",
                     "default_voice_id": voice["id"],
                 },
             )
@@ -209,7 +209,7 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
 
             role_response = client.post(
                 f"/api/dub/projects/{project_id}/roles",
-                json={"name": "旁白", "voice_id": voice["id"]},
+                json={"name": "Narrator", "voice_id": voice["id"]},
             )
             role_response.raise_for_status()
             project = role_response.json()["project"]

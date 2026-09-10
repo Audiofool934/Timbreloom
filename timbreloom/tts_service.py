@@ -29,7 +29,7 @@ class GenerationJob:
     created_at: str
     status: str = "queued"
     phase: str = "queued"
-    message: str = "等待生成"
+    message: str = "Waiting to generate"
     progress: float = 0.0
     segments_completed: int = 0
     current_segment: int = 0
@@ -106,7 +106,7 @@ class TTSService:
 
     def get_job(self, job_id: str) -> GenerationJob:
         if not re.fullmatch(r"[0-9a-f]{32}", job_id):
-            raise FileNotFoundError("生成任务不存在。")
+            raise FileNotFoundError("Generation job not found.")
         with self._lock:
             if job_id in self._jobs:
                 return self._jobs[job_id]
@@ -116,7 +116,7 @@ class TTSService:
                     (directory / "job.json").read_text(encoding="utf-8")
                 )
                 if payload["schema_version"] != 1 or payload["job_id"] != job_id:
-                    raise ValueError("不支持的生成任务格式。")
+                    raise ValueError("Unsupported generation job format.")
                 reference = local_file(directory, payload["reference_source"])
                 segments = [TextSegment(**segment) for segment in payload["segments"]]
                 kwargs = {
@@ -139,12 +139,12 @@ class TTSService:
                 ):
                     job.status = job.phase = "error"
                     job.error = job.message = (
-                        "生成配置已改变，请重新建立任务以避免混用不同配置的片段。"
+                        "Generation settings have changed. Create a new job to avoid mixing segments from different settings."
                     )
                 self._jobs[job_id] = job
                 return job
             except (OSError, ValueError, KeyError, TypeError) as exc:
-                raise FileNotFoundError("生成任务不存在或记录损坏。") from exc
+                raise FileNotFoundError("Generation job not found or its record is damaged.") from exc
 
     def _validate_chunks(self, job: GenerationJob) -> None:
         valid = []
@@ -188,7 +188,7 @@ class TTSService:
                     job,
                     status="cancelled",
                     phase="cancelled",
-                    message="服务重启时确认了此前的停止请求",
+                    message="Previous stop request confirmed after service restart",
                 )
                 continue
             self._update(
@@ -196,7 +196,7 @@ class TTSService:
                 status="queued",
                 phase="queued",
                 error=None,
-                message="服务重启后继续生成，复用已完成片段",
+                message="Resuming generation after service restart, reusing completed segments",
             )
             self.launch(job)
             recovered += 1
@@ -207,7 +207,7 @@ class TTSService:
         with self._lock:
             if job.status in {"queued", "running"}:
                 job.cancel_event.set()
-                self._update(job, message="将在当前分段结束后取消")
+                self._update(job, message="Canceling after the current segment")
         return job
 
     def voice_in_use(self, voice_id: str) -> bool:
@@ -264,7 +264,7 @@ class TTSService:
                 job,
                 status="running",
                 phase="preparing",
-                message="正在准备参考音色",
+                message="Preparing the reference voice",
                 progress=0.02,
             )
 
@@ -274,19 +274,19 @@ class TTSService:
                 self._update(job, reference_duration_seconds=duration)
 
             if job.cancel_event.is_set():
-                raise InterruptedError("生成已取消。")
+                raise InterruptedError("Generation canceled.")
 
             total = len(job.segments)
             for index, segment in enumerate(job.segments, start=1):
                 if job.cancel_event.is_set():
-                    raise InterruptedError("生成已取消。")
+                    raise InterruptedError("Generation canceled.")
 
                 preview = " ".join(segment.text.split())
                 preview_text = preview if len(preview) <= 180 else f"{preview[:177]}..."
                 self._update(
                     job,
                     phase="generating",
-                    message=f"正在生成第 {index} / {total} 段",
+                    message=f"Generating segment {index} of {total}",
                     current_segment=index,
                     current_text=preview_text,
                     progress=0.04 + 0.88 * ((index - 1) / total),
@@ -316,18 +316,18 @@ class TTSService:
                         ):
                             segment_path.unlink(missing_ok=True)
                             raise RuntimeError(
-                                "生成音频明显短于本段文字，可能存在漏读。"
+                                "The generated audio is too short for this text and may contain skipped words."
                             )
                         break
                     except Exception as exc:
                         last_error = exc
                         metrics = None
                         if attempt < self.max_attempts:
-                            self._update(job, message=f"第 {index} 段正在重试")
+                            self._update(job, message=f"Retrying segment {index}")
                             time.sleep(0.25)
 
                 if metrics is None:
-                    raise RuntimeError(f"第 {index} 段生成失败：{last_error}")
+                    raise RuntimeError(f"Segment {index} failed: {last_error}")
 
                 segment_paths.append(segment_path)
                 peak_memory = max(peak_memory, metrics["peak_memory_gb"])
@@ -349,12 +349,12 @@ class TTSService:
                 )
 
             if job.cancel_event.is_set():
-                raise InterruptedError("生成已取消。")
+                raise InterruptedError("Generation canceled.")
 
             self._update(
                 job,
                 phase="assembling",
-                message="正在无损拼接所有分段",
+                message="Joining all segments without re-encoding",
                 progress=0.95,
                 current_text="",
             )
@@ -384,7 +384,7 @@ class TTSService:
                 job,
                 status="complete",
                 phase="complete",
-                message="全部分段已生成并拼接完成",
+                message="All segments generated and joined",
                 progress=1.0,
                 current_segment=len(job.segments),
                 result=result,
@@ -402,6 +402,6 @@ class TTSService:
                 job,
                 status="error",
                 phase="error",
-                message="生成停止，没有跳过失败分段",
+                message="Generation stopped. Failed segments were not skipped.",
                 error=str(exc),
             )

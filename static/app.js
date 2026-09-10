@@ -1,9 +1,10 @@
-import { createProgressiveAudioPlayer } from "./audio-player.js?v=1";
-import { createAudioRecorder, cancelRecordingOutside, cancelActiveRecording, cancelRecordingFor } from "./audio-recorder.js?v=3";
-import { createDubbingWorkspace } from "./dubbing.js?v=3";
-import { readJob, JobConnectionError } from "./job-client.js?v=1";
-import { installDesktop, notifyDesktop } from "./desktop.js?v=5";
-import { installModelManager } from "./model-manager.js?v=1";
+import { createProgressiveAudioPlayer } from "./audio-player.js?v=2";
+import { createAudioRecorder, cancelRecordingOutside, cancelActiveRecording, cancelRecordingFor } from "./audio-recorder.js?v=4";
+import { createDubbingWorkspace } from "./dubbing.js?v=4";
+import { readJob, JobConnectionError } from "./job-client.js?v=2";
+import { installDesktop, notifyDesktop } from "./desktop.js?v=6";
+import { installModelManager } from "./model-manager.js?v=2";
+import { countLabel } from "./text-format.js?v=1";
 
 const form = document.querySelector("#cloneForm");
 const audioInput = document.querySelector("#referenceAudio");
@@ -182,21 +183,21 @@ const cloneStreamPlayer = createProgressiveAudioPlayer({
   audio: cloneStreamAudio,
   status: cloneStreamStatus,
   toggle: cloneStreamToggle,
-  waitingLabel: "等待首段",
+  waitingLabel: "Waiting for first segment",
 });
 const vcStreamPlayer = createProgressiveAudioPlayer({
   card: vcStreamCard,
   audio: vcStreamAudio,
   status: vcStreamStatus,
   toggle: vcStreamToggle,
-  waitingLabel: "等待第一段",
+  waitingLabel: "Waiting for first segment",
 });
 const asrStreamPlayer = createProgressiveAudioPlayer({
   card: asrStreamCard,
   audio: asrStreamAudio,
   status: asrStreamStatus,
   toggle: asrStreamToggle,
-  waitingLabel: "正在准备音轨",
+  waitingLabel: "Preparing audio track",
 });
 function switchView(view) {
   cancelRecordingOutside(view);
@@ -228,22 +229,22 @@ function formatBytes(bytes) {
 
 function formatDuration(seconds) {
   const rounded = Math.max(0, Math.round(Number(seconds) || 0));
-  if (rounded < 60) return `${rounded} 秒`;
+  if (rounded < 60) return `${rounded} sec`;
   const minutes = Math.floor(rounded / 60);
   const remaining = rounded % 60;
-  return remaining ? `${minutes} 分 ${remaining} 秒` : `${minutes} 分钟`;
+  return remaining ? `${minutes} min ${remaining} sec` : `${minutes} min`;
 }
 
 function updateFile(file) {
   if (!file) {
     dropzone.classList.remove("has-file");
-    fileTitle.textContent = "拖入录音，或点击选择";
-    fileMeta.textContent = "WAV、M4A、MP3、FLAC · 最大 40 MB";
+    fileTitle.textContent = "Drop a recording or choose a file";
+    fileMeta.textContent = "WAV, M4A, MP3, FLAC · Up to 40 MB";
     return;
   }
   dropzone.classList.add("has-file");
   fileTitle.textContent = file.name;
-  fileMeta.textContent = `${formatBytes(file.size)} · 已留在本机`;
+  fileMeta.textContent = `${formatBytes(file.size)} · Kept on this Mac`;
   if (!voiceName.value.trim()) {
     voiceName.value = file.name.replace(/\.[^.]+$/, "");
   }
@@ -260,7 +261,7 @@ cloneRecorderController = createAudioRecorder({
   cancelButton: cloneRecordCancel,
   preview: cloneRecordPreview,
   maxSeconds: 30,
-  idleMessage: "最长 30 秒 · 录音只会留在本机",
+  idleMessage: "Up to 30 seconds · Recorded on this Mac",
   onFile: updateFile,
 });
 
@@ -275,7 +276,7 @@ vcRecorderController = createAudioRecorder({
   cancelButton: vcRecordCancel,
   preview: vcRecordPreview,
   maxSeconds: 30 * 60,
-  idleMessage: "最长 30 分钟 · 停止后可先试听",
+  idleMessage: "Up to 30 minutes · Preview after recording",
   onFile: updateVcFile,
 });
 
@@ -290,7 +291,7 @@ asrRecorderController = createAudioRecorder({
   cancelButton: asrRecordCancel,
   preview: asrRecordPreview,
   maxSeconds: 8 * 60 * 60,
-  idleMessage: "最长 8 小时 · 停止后直接进入本地转录",
+  idleMessage: "Up to 8 hours · Transcribe after recording",
   onFile: updateAsrFile,
 });
 
@@ -330,7 +331,7 @@ function selectedVoice() {
 function applyVoiceMode() {
   const voice = selectedVoice();
   const usesSavedVoice = Boolean(voice);
-  if (usesSavedVoice) cancelRecordingFor("clone", "已切换到保存音色，录音已取消。");
+  if (usesSavedVoice) cancelRecordingFor("clone", "Switched to a saved voice. Recording canceled.");
   uploadVoiceFields.hidden = usesSavedVoice;
   savedVoiceCard.hidden = !usesSavedVoice;
   deleteVoiceButton.hidden = !usesSavedVoice;
@@ -342,7 +343,7 @@ function applyVoiceMode() {
 
   if (voice) {
     savedVoiceName.textContent = voice.name;
-    savedVoiceMeta.textContent = `${voice.duration_seconds.toFixed(1)} 秒参考录音 · ${voice.original_filename}`;
+    savedVoiceMeta.textContent = `${voice.duration_seconds.toFixed(1)} sec reference · ${voice.original_filename}`;
     savedVoiceTranscript.textContent = voice.transcript_preview;
   }
 }
@@ -356,9 +357,9 @@ async function loadVoices(preferredId = "") {
     || voiceSelect.value
     || window.localStorage.getItem("voiceCloneSelectedVoice")
     || "";
-  voiceSelect.replaceChildren(new Option("本次上传新录音", ""));
+  voiceSelect.replaceChildren(new Option("Upload a new recording", ""));
   for (const voice of voices) {
-    voiceSelect.add(new Option(`${voice.name} · ${voice.duration_seconds.toFixed(1)} 秒`, voice.id));
+    voiceSelect.add(new Option(`${voice.name} · ${voice.duration_seconds.toFixed(1)} sec`, voice.id));
   }
   if (previous && voices.some((voice) => voice.id === previous)) {
     voiceSelect.value = previous;
@@ -374,7 +375,7 @@ saveVoiceButton.addEventListener("click", async () => {
   voiceSaveStatus.textContent = "";
   const file = audioInput.files[0];
   if (!file || !referenceText.value.trim() || !voiceName.value.trim()) {
-    voiceSaveStatus.textContent = "请先选择录音，并填写准确文字和音色名称。";
+    voiceSaveStatus.textContent = "Choose a recording, then enter its exact transcript and a voice name.";
     return;
   }
 
@@ -383,26 +384,26 @@ saveVoiceButton.addEventListener("click", async () => {
   payload.append("reference_text", referenceText.value);
   payload.append("reference_audio", file);
   saveVoiceButton.disabled = true;
-  saveVoiceButton.textContent = "正在保存";
+  saveVoiceButton.textContent = "Saving";
 
   try {
     const response = await fetch("/api/voices", { method: "POST", body: payload });
     if (!response.ok) throw new Error(await readError(response));
     const result = await response.json();
-    voiceSaveStatus.textContent = `已保存音色「${result.voice.name}」。`;
+    voiceSaveStatus.textContent = `Saved voice: ${result.voice.name}.`;
     await loadVoices(result.voice.id);
   } catch (error) {
     voiceSaveStatus.textContent = error.message;
   } finally {
     saveVoiceButton.disabled = false;
-    saveVoiceButton.textContent = "保存音色";
+    saveVoiceButton.textContent = "Save voice";
   }
 });
 
 deleteVoiceButton.addEventListener("click", async () => {
   const voice = selectedVoice();
   if (!voice) return;
-  if (!window.confirm(`确定删除音色「${voice.name}」吗？`)) return;
+  if (!window.confirm(`Delete the voice ${voice.name}?`)) return;
   try {
     const response = await fetch(`/api/voices/${voice.id}`, { method: "DELETE" });
     if (!response.ok) throw new Error(await readError(response));
@@ -413,13 +414,13 @@ deleteVoiceButton.addEventListener("click", async () => {
 });
 
 targetText.addEventListener("input", () => {
-  targetCount.textContent = targetText.value.length.toLocaleString("zh-CN");
+  targetCount.textContent = targetText.value.length.toLocaleString("en-US");
   window.clearTimeout(previewTimer);
   if (!targetText.value.trim()) {
-    segmentEstimate.textContent = "等待输入";
+    segmentEstimate.textContent = "Waiting for text";
     return;
   }
-  segmentEstimate.textContent = "正在估算";
+  segmentEstimate.textContent = "Estimating";
   previewTimer = window.setTimeout(refreshSegmentPreview, 450);
 });
 
@@ -430,7 +431,7 @@ async function refreshSegmentPreview() {
     const response = await fetch("/api/segments/preview", { method: "POST", body: payload });
     if (!response.ok) throw new Error(await readError(response));
     const preview = await response.json();
-    segmentEstimate.textContent = `预计 ${preview.segments} 段，约 ${formatDuration(preview.estimated_duration_seconds)}`;
+    segmentEstimate.textContent = `About ${countLabel(preview.segments, "segment")} · ${formatDuration(preview.estimated_duration_seconds)}`;
   } catch (error) {
     segmentEstimate.textContent = error.message;
   }
@@ -439,16 +440,16 @@ async function refreshSegmentPreview() {
 function setModelState(status, detail, label = "") {
   modelState.dataset.state = status;
   if (status === "ready") {
-    modelStateText.textContent = label || "本地模型已就绪";
+    modelStateText.textContent = label || "Local model ready";
   } else if (status === "loading") {
-    modelStateText.textContent = label || "正在准备本地模型";
+    modelStateText.textContent = label || "Preparing local model";
   } else if (status === "error") {
-    modelStateText.textContent = label || "模型加载失败";
+    modelStateText.textContent = label || "Model loading failed";
     modelState.title = detail || "";
   } else if (status === "missing") {
-    modelStateText.textContent = "按需下载本地模型";
+    modelStateText.textContent = "Download models when needed";
   } else {
-    modelStateText.textContent = label || "本地模型按需加载";
+    modelStateText.textContent = label || "Local models load when needed";
   }
   notifyDesktop("status", { state: status, label: modelStateText.textContent });
 }
@@ -456,20 +457,20 @@ function setModelState(status, detail, label = "") {
 async function refreshHealth() {
   try {
     const response = await fetch("/api/health?library=false", { cache: "no-store" });
-    if (!response.ok) throw new Error("本地服务暂时未连接");
+    if (!response.ok) throw new Error("Local service disconnected");
     const health = await response.json();
     if (health.active_local_workload === "asr") {
-      setModelState("loading", "", "Whisper 正在本地转录");
+      setModelState("loading", "", "Whisper is transcribing locally");
     } else if (health.active_local_workload === "voice-conversion") {
-      setModelState("loading", "", "Seed-VC 正在原声换色");
+      setModelState("loading", "", "Seed-VC is converting a voice");
     } else if (health.active_local_workload === "tts") {
-      setModelState("loading", "", "Qwen 正在生成音频");
+      setModelState("loading", "", "Qwen is generating audio");
     } else {
       setModelState(health.model_status, health.error);
     }
     updateProviders(health.providers || []);
   } catch (error) {
-    setModelState("error", error.message, "本地服务暂时未连接");
+    setModelState("error", error.message, "Local service disconnected");
   } finally {
     clearTimeout(statusTimer);
     statusTimer = window.setTimeout(refreshHealth, document.hidden ? 30000 : 5000);
@@ -479,9 +480,9 @@ async function refreshHealth() {
 async function readError(response) {
   try {
     const body = await response.json();
-    return body.detail || "请求失败。";
+    return body.detail || "Request failed.";
   } catch {
-    return `请求失败，状态码 ${response.status}。`;
+    return `Request failed with status ${response.status}.`;
   }
 }
 
@@ -496,28 +497,28 @@ function resetJobControls() {
   window.localStorage.removeItem("voiceCloneCurrentJob");
   window.clearTimeout(pollTimer);
   generateButton.disabled = false;
-  buttonText.textContent = "开始生成";
+  buttonText.textContent = "Generate speech";
   cancelButton.disabled = false;
-  cancelButton.textContent = "停止任务";
+  cancelButton.textContent = "Stop job";
 }
 
 function renderJob(job) {
   const percent = Math.max(0, Math.min(100, Math.round(job.progress * 100)));
   const phaseTitles = {
-    queued: "任务已建立",
-    preparing: "正在准备参考音色",
-    generating: "正在分段生成",
-    assembling: "正在拼接完整音频",
-    complete: "生成完成",
-    cancelled: "任务已停止",
-    error: "任务已停止",
+    queued: "Job created",
+    preparing: "Preparing the reference voice",
+    generating: "Generating segments",
+    assembling: "Joining the full audio",
+    complete: "Generation complete",
+    cancelled: "Job stopped",
+    error: "Job stopped",
   };
-  progressTitle.textContent = phaseTitles[job.phase] || "正在生成";
+  progressTitle.textContent = phaseTitles[job.phase] || "Generating";
   progressText.textContent = job.message;
   progressPercent.textContent = `${percent}%`;
   progressSegments.textContent = job.segment_total
-    ? `已完成 ${job.segments_completed} / ${job.segment_total} 段`
-    : "正在计算分段";
+    ? `${job.segments_completed} / ${countLabel(job.segment_total, "segment")} complete`
+    : "Calculating segments";
   currentSegmentText.textContent = job.current_text || "";
   progressFill.style.width = `${percent}%`;
   progressTrack.setAttribute("aria-valuenow", percent.toString());
@@ -532,7 +533,7 @@ function showResult(result) {
   downloadLink.href = result.audio_url;
   downloadLink.download = result.filename;
   document.querySelector("#durationMetric").textContent = formatDuration(result.audio_duration_seconds);
-  document.querySelector("#segmentMetric").textContent = `${result.segment_count} 段`;
+  document.querySelector("#segmentMetric").textContent = countLabel(result.segment_count, "segment");
   document.querySelector("#timeMetric").textContent = formatDuration(result.generation_seconds);
   document.querySelector("#memoryMetric").textContent = `${result.peak_memory_gb.toFixed(1)} GB`;
   resultCard.hidden = false;
@@ -561,7 +562,7 @@ async function pollJob() {
   } catch (error) {
     if (error instanceof JobConnectionError && currentJobId) {
       progressCard.hidden = false;
-      progressTitle.textContent = "等待本地服务恢复";
+      progressTitle.textContent = "Waiting for local service to reconnect";
       progressText.textContent = error.message;
       pollTimer = window.setTimeout(pollJob, 1500);
       return;
@@ -581,7 +582,7 @@ form.addEventListener("submit", async (event) => {
   progressCard.hidden = false;
   cloneStreamPlayer.reset();
   generateButton.disabled = true;
-  buttonText.textContent = "生成进行中";
+  buttonText.textContent = "Generating";
 
   const payload = new FormData();
   payload.append("target_text", targetText.value);
@@ -595,7 +596,7 @@ form.addEventListener("submit", async (event) => {
 
   renderJob({
     phase: "queued",
-    message: "正在执行无丢字语义分段",
+    message: "Splitting text at natural breaks, preserving every word",
     progress: 0,
     segment_total: 0,
     segments_completed: 0,
@@ -620,7 +621,7 @@ form.addEventListener("submit", async (event) => {
 cancelButton.addEventListener("click", async () => {
   if (!currentJobId) return;
   cancelButton.disabled = true;
-  cancelButton.textContent = "正在停止";
+  cancelButton.textContent = "Stopping";
   try {
     const response = await fetch(`/api/jobs/${currentJobId}/cancel`, { method: "POST" });
     if (!response.ok) throw new Error(await readError(response));
@@ -636,15 +637,15 @@ async function restoreJob() {
   currentJobId = savedJobId;
   progressCard.hidden = false;
   generateButton.disabled = true;
-  buttonText.textContent = "生成进行中";
+  buttonText.textContent = "Generating";
   await pollJob();
 }
 
 function populateVcVoiceOptions() {
   const previous = vcVoiceSelect.value || window.localStorage.getItem("timbreloomVcVoice") || "";
-  vcVoiceSelect.replaceChildren(new Option("选择已保存音色", ""));
+  vcVoiceSelect.replaceChildren(new Option("Choose a saved voice", ""));
   for (const voice of voices) {
-    vcVoiceSelect.add(new Option(`${voice.name} · ${voice.duration_seconds.toFixed(1)} 秒`, voice.id));
+    vcVoiceSelect.add(new Option(`${voice.name} · ${voice.duration_seconds.toFixed(1)} sec`, voice.id));
   }
   if (previous && voices.some((voice) => voice.id === previous)) {
     vcVoiceSelect.value = previous;
@@ -655,13 +656,13 @@ function populateVcVoiceOptions() {
 function updateVcControls() {
   vcStartButton.disabled = vcJobRunning || !vcProviderReady || !voices.length;
   if (!vcProviderReady) {
-    vcButtonText.textContent = "Seed-VC 尚未就绪";
+    vcButtonText.textContent = "Seed-VC is not ready";
   } else if (!voices.length) {
-    vcButtonText.textContent = "请先保存一个音色";
+    vcButtonText.textContent = "Save a voice first";
   } else if (vcJobRunning) {
-    vcButtonText.textContent = "换色进行中";
+    vcButtonText.textContent = "Converting voice";
   } else {
-    vcButtonText.textContent = "开始原声换色";
+    vcButtonText.textContent = "Convert voice";
   }
 }
 
@@ -672,13 +673,13 @@ vcVoiceSelect.addEventListener("change", () => {
 function updateVcFile(file) {
   if (!file) {
     vcDropzone.classList.remove("has-file");
-    vcFileTitle.textContent = "拖入带表演的音频或视频";
-    vcFileMeta.textContent = "含 TS、M2TS、MTS · 原节奏、停顿和情绪会被保留";
+    vcFileTitle.textContent = "Drop an audio or video performance";
+    vcFileMeta.textContent = "Includes TS, M2TS, MTS · Keeps timing, pauses, and expression";
     return;
   }
   vcDropzone.classList.add("has-file");
   vcFileTitle.textContent = file.name;
-  vcFileMeta.textContent = `${formatBytes(file.size)} · 仅在本机处理`;
+  vcFileMeta.textContent = `${formatBytes(file.size)} · Processed on this Mac`;
 }
 
 vcMedia.addEventListener("change", () => {
@@ -718,7 +719,7 @@ function renderVcResult(job) {
   const result = job.result;
   vcResultCard.hidden = false;
   vcSourceLabel.textContent = job.source_filename;
-  vcOutputLabel.textContent = `${job.voice_name} · ${result.diffusion_steps} 步 · ${result.chunk_count || 1} 段`;
+  vcOutputLabel.textContent = `${job.voice_name} · ${result.diffusion_steps} steps · ${countLabel(result.chunk_count || 1, "segment")}`;
   vcSourceAudio.hidden = job.source_has_video;
   vcSourceVideo.hidden = !job.source_has_video;
   if (job.source_has_video) {
@@ -736,31 +737,31 @@ function renderVcResult(job) {
   vcVoiceMetric.textContent = job.voice_name;
   vcTimeMetric.textContent = formatDuration(result.generation_seconds);
   const elapsedRatio = Number(result.generation_seconds) / Number(result.duration_seconds);
-  vcRtfMetric.textContent = Number.isFinite(elapsedRatio) ? `${elapsedRatio.toFixed(2)} × 时长` : "-";
+  vcRtfMetric.textContent = Number.isFinite(elapsedRatio) ? `${elapsedRatio.toFixed(2)} × duration` : "-";
 }
 
 function renderVcJob(job) {
   const percent = Math.max(0, Math.min(100, Math.round(Number(job.progress || 0) * 100)));
   const titles = {
-    queued: "任务已建立",
-    probing: "正在检查媒体",
-    preparing: "正在准备原声",
-    chunking: "正在规划长音频",
-    converting: "正在迁移音色",
-    stitching: "正在拼接长音频",
-    muxing: "正在写回视频",
-    complete: "原声换色完成",
-    cancelled: "任务已停止",
-    error: "任务没有完成",
+    queued: "Job created",
+    probing: "Checking media",
+    preparing: "Preparing source audio",
+    chunking: "Planning long audio segments",
+    converting: "Converting voice",
+    stitching: "Joining audio segments",
+    muxing: "Adding audio to video",
+    complete: "Voice conversion complete",
+    cancelled: "Job stopped",
+    error: "Job did not complete",
   };
   vcProgressCard.hidden = job.status === "complete";
-  vcProgressTitle.textContent = titles[job.phase] || "正在原声换色";
+  vcProgressTitle.textContent = titles[job.phase] || "Converting voice";
   vcProgressText.textContent = job.error || job.message;
   vcProgressPercent.textContent = `${percent}%`;
   vcProgressFill.style.width = `${percent}%`;
   vcProgressTrack.setAttribute("aria-valuenow", percent.toString());
   const chunkProgress = job.chunk_total > 1
-    ? ` · 第 ${Math.max(1, job.current_chunk)}/${job.chunk_total} 段`
+    ? ` · Segment ${Math.max(1, job.current_chunk)}/${job.chunk_total}`
     : "";
   vcProgressMeta.textContent = job.duration_seconds
     ? `${job.source_filename} · ${formatDuration(job.duration_seconds)} · ${job.voice_name}${chunkProgress}`
@@ -768,7 +769,7 @@ function renderVcJob(job) {
   vcJobRunning = job.status === "queued" || job.status === "running";
   vcCancelButton.hidden = !vcJobRunning;
   vcCancelButton.disabled = false;
-  vcCancelButton.textContent = "停止任务";
+  vcCancelButton.textContent = "Stop job";
   vcRetryButton.hidden = !["error", "cancelled"].includes(job.status);
   if (job.stream) vcStreamPlayer.update(job.stream, job.id);
   updateVcControls();
@@ -780,16 +781,16 @@ function renderVcJobList() {
   if (!vcJobs.length) {
     const empty = document.createElement("p");
     empty.className = "empty-copy";
-    empty.textContent = "还没有原声换色记录。";
+    empty.textContent = "No voice conversions yet.";
     vcJobList.append(empty);
     return;
   }
   const statusNames = {
-    queued: "等待中",
-    running: "处理中",
-    complete: "已完成",
-    cancelled: "已停止",
-    error: "失败",
+    queued: "Queued",
+    running: "Processing",
+    complete: "Complete",
+    cancelled: "Stopped",
+    error: "Failed",
   };
   for (const job of vcJobs) {
     const button = document.createElement("button");
@@ -853,7 +854,7 @@ vcForm.addEventListener("submit", async (event) => {
   if (!await modelManager.ensure("seed-vc")) return;
   const file = vcMedia.files[0];
   if (!file || !vcVoiceSelect.value || !vcRights.checked) {
-    showError("请选择原始媒体和目标音色，并确认使用权。");
+    showError("Choose source media and a target voice, then confirm usage permission.");
     return;
   }
   const preset = document.querySelector('input[name="vcPreset"]:checked')?.value || "balanced";
@@ -886,7 +887,7 @@ vcForm.addEventListener("submit", async (event) => {
 vcCancelButton.addEventListener("click", async () => {
   if (!currentVcJobId) return;
   vcCancelButton.disabled = true;
-  vcCancelButton.textContent = "正在停止";
+  vcCancelButton.textContent = "Stopping";
   try {
     const response = await fetch(`/api/voice-conversions/${currentVcJobId}/cancel`, { method: "POST" });
     if (!response.ok) throw new Error(await readError(response));
@@ -931,11 +932,11 @@ function updateProviders(providerList) {
   const seedVc = providerList.find((provider) => provider.id === "local-seed-vc");
   vcProviderReady = Boolean(seedVc && seedVc.configured);
   vcEngineState.textContent = vcProviderReady
-    ? "项目内隔离运行 · 离线转换"
-    : "运行环境缺失 · 请执行 setup_seed_vc.sh";
+    ? "Isolated runtime · Offline conversion"
+    : "Runtime missing · Run setup_seed_vc.sh";
   updateVcControls();
   geminiConfigured = Boolean(gemini && gemini.configured);
-  geminiStatus.textContent = geminiConfigured ? "已配置" : "未配置";
+  geminiStatus.textContent = geminiConfigured ? "Configured" : "Not configured";
   geminiStatus.dataset.state = geminiConfigured ? "ready" : "missing";
   dubWorkspace.updateProvider(geminiConfigured);
   updateTranscriptSelection();
@@ -949,9 +950,9 @@ async function loadProviders() {
     updateProviders(payload.providers || []);
   } catch (error) {
     vcProviderReady = false;
-    vcEngineState.textContent = "Seed-VC 状态检查失败";
+    vcEngineState.textContent = "Seed-VC status check failed";
     updateVcControls();
-    geminiStatus.textContent = "检查失败";
+    geminiStatus.textContent = "Check failed";
     geminiStatus.dataset.state = "error";
     dubWorkspace.updateProvider(false, true);
   }
@@ -960,13 +961,13 @@ async function loadProviders() {
 function updateAsrFile(file) {
   if (!file) {
     asrDropzone.classList.remove("has-file");
-    asrFileTitle.textContent = "拖入音频或视频";
-    asrFileMeta.textContent = "本地处理 · 不上传云端";
+    asrFileTitle.textContent = "Drop audio or video here";
+    asrFileMeta.textContent = "Processed locally · No cloud upload";
     return;
   }
   asrDropzone.classList.add("has-file");
   asrFileTitle.textContent = file.name;
-  asrFileMeta.textContent = `${formatBytes(file.size)} · 等待本地转录`;
+  asrFileMeta.textContent = `${formatBytes(file.size)} · Ready to transcribe locally`;
 }
 
 asrMedia.addEventListener("change", () => {
@@ -1001,23 +1002,23 @@ asrDropzone.addEventListener("drop", (event) => {
 function renderAsrJob(job) {
   const percent = Math.max(0, Math.min(100, Math.round(job.progress * 100)));
   const titles = {
-    queued: "任务已建立",
-    probing: "正在检查媒体",
-    preparing: "正在准备音频",
-    transcribing: "Whisper 正在转录",
-    saving: "正在保存时间戳",
-    complete: "转录完成",
-    cancelled: "任务已停止",
-    error: "任务没有完成",
+    queued: "Job created",
+    probing: "Checking media",
+    preparing: "Preparing audio",
+    transcribing: "Whisper is transcribing",
+    saving: "Saving timestamps",
+    complete: "Transcription complete",
+    cancelled: "Job stopped",
+    error: "Job did not complete",
   };
-  asrProgressTitle.textContent = titles[job.phase] || "正在本地转录";
+  asrProgressTitle.textContent = titles[job.phase] || "Transcribing locally";
   asrProgressText.textContent = job.message;
   asrProgressPercent.textContent = `${percent}%`;
   asrProgressFill.style.width = `${percent}%`;
   asrProgressTrack.setAttribute("aria-valuenow", percent.toString());
   asrProgressMeta.textContent = job.duration_seconds
     ? `${job.source_filename} · ${formatDuration(job.duration_seconds)}`
-    : job.source_filename || "等待媒体检查";
+    : job.source_filename || "Waiting for media check";
   if (job.stream) asrStreamPlayer.update(job.stream, job.job_id);
 }
 
@@ -1026,9 +1027,9 @@ function resetAsrControls() {
   window.localStorage.removeItem("timbreloomCurrentAsrJob");
   window.clearTimeout(asrPollTimer);
   asrStartButton.disabled = false;
-  asrButtonText.textContent = "开始本地转录";
+  asrButtonText.textContent = "Transcribe";
   asrCancelButton.disabled = false;
-  asrCancelButton.textContent = "停止任务";
+  asrCancelButton.textContent = "Stop job";
 }
 
 async function pollAsrJob() {
@@ -1054,7 +1055,7 @@ async function pollAsrJob() {
   } catch (error) {
     if (error instanceof JobConnectionError && currentAsrJobId) {
       asrProgressCard.hidden = false;
-      asrProgressTitle.textContent = "等待本地服务恢复";
+      asrProgressTitle.textContent = "Waiting for local service to reconnect";
       asrProgressText.textContent = error.message;
       asrPollTimer = window.setTimeout(pollAsrJob, 1500);
       return;
@@ -1071,14 +1072,14 @@ asrForm.addEventListener("submit", async (event) => {
   if (currentAsrJobId) return;
   const file = asrMedia.files[0];
   if (!file) {
-    showError("请选择需要转录的音频或视频。");
+    showError("Choose audio or video to transcribe.");
     return;
   }
   errorCard.hidden = true;
   asrProgressCard.hidden = false;
   asrStreamPlayer.reset();
   asrStartButton.disabled = true;
-  asrButtonText.textContent = "转录进行中";
+  asrButtonText.textContent = "Transcribing";
 
   const payload = new FormData();
   payload.append("media", file);
@@ -1086,7 +1087,7 @@ asrForm.addEventListener("submit", async (event) => {
   payload.append("initial_prompt", asrPrompt.value);
   renderAsrJob({
     phase: "queued",
-    message: "正在把媒体保存在本地项目中",
+    message: "Saving media in the local project",
     progress: 0,
     source_filename: file.name,
     duration_seconds: 0,
@@ -1110,7 +1111,7 @@ asrForm.addEventListener("submit", async (event) => {
 asrCancelButton.addEventListener("click", async () => {
   if (!currentAsrJobId) return;
   asrCancelButton.disabled = true;
-  asrCancelButton.textContent = "正在停止";
+  asrCancelButton.textContent = "Stopping";
   try {
     const response = await fetch(`/api/asr/jobs/${currentAsrJobId}/cancel`, { method: "POST" });
     if (!response.ok) throw new Error(await readError(response));
@@ -1126,14 +1127,14 @@ async function restoreAsrJob() {
   currentAsrJobId = savedJobId;
   asrProgressCard.hidden = false;
   asrStartButton.disabled = true;
-  asrButtonText.textContent = "转录进行中";
+  asrButtonText.textContent = "Transcribing";
   await pollAsrJob();
 }
 
 function formatTranscriptDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -1146,7 +1147,7 @@ function renderTranscriptList(preferredId = "") {
   if (!transcripts.length) {
     const empty = document.createElement("p");
     empty.className = "empty-copy";
-    empty.textContent = "还没有转录记录。";
+    empty.textContent = "No transcripts yet.";
     transcriptList.append(empty);
     return;
   }
@@ -1161,7 +1162,7 @@ function renderTranscriptList(preferredId = "") {
     const title = document.createElement("strong");
     title.textContent = transcript.title || transcript.source_filename;
     const meta = document.createElement("span");
-    meta.textContent = `${formatDuration(transcript.duration_seconds)} · ${transcript.segment_count} 段`;
+    meta.textContent = `${formatDuration(transcript.duration_seconds)} · ${countLabel(transcript.segment_count, "segment")}`;
     const date = document.createElement("small");
     date.textContent = formatTranscriptDate(transcript.created_at);
     button.append(title, meta, date);
@@ -1212,15 +1213,15 @@ function updateTranscriptSelection() {
   selectAllSegments.indeterminate = selected.length > 0 && selected.length < total;
 
   if (!selected.length) {
-    selectionCount.textContent = "尚未选择片段";
-    selectionDuration.textContent = "选择连续的 2 至 30 秒可保存为音色";
+    selectionCount.textContent = "No segments selected";
+    selectionDuration.textContent = "Select 2 to 30 consecutive seconds to save a voice";
   } else {
     const contiguous = selectionIsContiguous(selected);
     const duration = selected[selected.length - 1].end - selected[0].start;
-    selectionCount.textContent = `已选择 ${selected.length} 段`;
+    selectionCount.textContent = `${countLabel(selected.length, "segment")} selected`;
     selectionDuration.textContent = contiguous
-      ? `${formatTimecode(selected[0].start)} 至 ${formatTimecode(selected[selected.length - 1].end)} · ${duration.toFixed(1)} 秒`
-      : "所选片段不连续，不能保存为音色";
+      ? `${formatTimecode(selected[0].start)} to ${formatTimecode(selected[selected.length - 1].end)} · ${duration.toFixed(1)} sec`
+      : "Select consecutive segments to save a voice";
   }
 
   const contiguous = selectionIsContiguous(selected);
@@ -1237,7 +1238,7 @@ function updateTranscriptSelection() {
 function markSegmentDirty(segmentId) {
   dirtyTranscriptSegments.add(segmentId);
   saveTranscriptButton.disabled = false;
-  saveTranscriptButton.textContent = `保存 ${dirtyTranscriptSegments.size} 处修改`;
+  saveTranscriptButton.textContent = `Save ${countLabel(dirtyTranscriptSegments.size, "change")}`;
 }
 
 function renderTranscript(transcript) {
@@ -1248,13 +1249,13 @@ function renderTranscript(transcript) {
   transcriptSegments.replaceChildren();
   transcriptEditor.hidden = false;
   transcriptTitle.textContent = transcript.title || transcript.source_filename;
-  transcriptMeta.textContent = `${formatDuration(transcript.duration_seconds)} · ${transcript.language.toUpperCase()} · ${transcript.segments.length} 段 · ${transcript.model}`;
+  transcriptMeta.textContent = `${formatDuration(transcript.duration_seconds)} · ${transcript.language.toUpperCase()} · ${countLabel(transcript.segments.length, "segment")} · ${transcript.model}`;
   transcriptAudio.src = `${transcript.audio_url}?v=${Date.now()}`;
   exportTxt.href = transcript.export_urls.txt;
   exportSrt.href = transcript.export_urls.srt;
   exportVtt.href = transcript.export_urls.vtt;
   saveTranscriptButton.disabled = true;
-  saveTranscriptButton.textContent = "保存文字修改";
+  saveTranscriptButton.textContent = "Save text changes";
   transcriptVoiceStatus.textContent = "";
   geminiActionStatus.textContent = "";
 
@@ -1266,7 +1267,7 @@ function renderTranscript(transcript) {
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "segment-check";
-    check.setAttribute("aria-label", `选择 ${formatTimecode(segment.start)} 的片段`);
+    check.setAttribute("aria-label", `Select segment at ${formatTimecode(segment.start)}`);
     check.addEventListener("change", () => {
       if (check.checked) selectedTranscriptSegments.add(segment.id);
       else selectedTranscriptSegments.delete(segment.id);
@@ -1286,7 +1287,7 @@ function renderTranscript(transcript) {
     const textarea = document.createElement("textarea");
     textarea.rows = 3;
     textarea.value = segment.text;
-    textarea.setAttribute("aria-label", `${formatTimecode(segment.start)} 的转录文字`);
+    textarea.setAttribute("aria-label", `Transcript text at ${formatTimecode(segment.start)}`);
     textarea.addEventListener("input", () => {
       segment.text = textarea.value;
       markSegmentDirty(segment.id);
@@ -1334,7 +1335,7 @@ async function saveTranscriptChanges() {
     text: segmentRows.get(segmentId).textarea.value,
   }));
   saveTranscriptButton.disabled = true;
-  saveTranscriptButton.textContent = "正在保存";
+  saveTranscriptButton.textContent = "Saving";
   try {
     const response = await fetch(`/api/transcripts/${currentTranscript.id}`, {
       method: "PATCH",
@@ -1345,15 +1346,15 @@ async function saveTranscriptChanges() {
     const payload = await response.json();
     currentTranscript = { ...currentTranscript, ...payload.transcript };
     dirtyTranscriptSegments.clear();
-    saveTranscriptButton.textContent = "文字已保存";
+    saveTranscriptButton.textContent = "Text saved";
     window.setTimeout(() => {
-      if (!dirtyTranscriptSegments.size) saveTranscriptButton.textContent = "保存文字修改";
+      if (!dirtyTranscriptSegments.size) saveTranscriptButton.textContent = "Save text changes";
     }, 1400);
     return true;
   } catch (error) {
     showError(error.message);
     saveTranscriptButton.disabled = false;
-    saveTranscriptButton.textContent = `保存 ${dirtyTranscriptSegments.size} 处修改`;
+    saveTranscriptButton.textContent = `Save ${countLabel(dirtyTranscriptSegments.size, "change")}`;
     return false;
   }
 }
@@ -1365,7 +1366,7 @@ createVoiceFromTranscript.addEventListener("click", async () => {
   const selected = selectedSegmentsInOrder();
   transcriptVoiceStatus.textContent = "";
   createVoiceFromTranscript.disabled = true;
-  createVoiceFromTranscript.textContent = "正在保存音色";
+  createVoiceFromTranscript.textContent = "Saving voice";
   try {
     if (!(await saveTranscriptChanges())) return;
     const payload = new FormData();
@@ -1377,12 +1378,12 @@ createVoiceFromTranscript.addEventListener("click", async () => {
     });
     if (!response.ok) throw new Error(await readError(response));
     const result = await response.json();
-    transcriptVoiceStatus.textContent = `已保存音色「${result.voice.name}」。`;
+    transcriptVoiceStatus.textContent = `Saved voice: ${result.voice.name}.`;
     await loadVoices(result.voice.id);
   } catch (error) {
     transcriptVoiceStatus.textContent = error.message;
   } finally {
-    createVoiceFromTranscript.textContent = "从所选片段保存音色";
+    createVoiceFromTranscript.textContent = "Save selection as voice";
     updateTranscriptSelection();
   }
 });
@@ -1392,19 +1393,19 @@ async function runGemini(task) {
   const selected = selectedSegmentsInOrder();
   if (selected.length !== 1) return;
   const actionNames = {
-    punctuation: "补充标点",
-    cleanup: "整理断句",
-    translate: `翻译为${geminiTargetLanguage.value}`,
+    punctuation: "add punctuation",
+    cleanup: "clean up text",
+    translate: `translate into ${geminiTargetLanguage.value}`,
   };
   const confirmed = window.confirm(
-    `将当前选中的一段文字发送到 Gemini 进行${actionNames[task]}。不会上传音频，云端调用可能产生费用。是否继续？`,
+    `Send the selected text to Gemini to ${actionNames[task]}? Audio will not be uploaded. Cloud usage may incur charges.`,
   );
   if (!confirmed) return;
   if (!(await saveTranscriptChanges())) return;
 
   const buttons = [geminiPunctuation, geminiCleanup, geminiTranslate];
   buttons.forEach((button) => { button.disabled = true; });
-  geminiActionStatus.textContent = `正在使用 Gemini ${actionNames[task]}…`;
+  geminiActionStatus.textContent = `Asking Gemini to ${actionNames[task]}…`;
   try {
     const response = await fetch(`/api/transcripts/${currentTranscript.id}/gemini`, {
       method: "POST",
@@ -1422,7 +1423,7 @@ async function runGemini(task) {
     row.textarea.value = result.text;
     selected[0].text = result.text;
     markSegmentDirty(result.segment_id);
-    geminiActionStatus.textContent = "Gemini 结果已放入编辑框，尚未保存。";
+    geminiActionStatus.textContent = "Gemini results are in the editor. Save to keep your changes.";
   } catch (error) {
     geminiActionStatus.textContent = error.message;
   } finally {

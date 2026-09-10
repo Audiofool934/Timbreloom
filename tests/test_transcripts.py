@@ -9,6 +9,7 @@ from timbreloom.transcripts import (
     save_transcript,
     selected_segment_range,
     update_segment_texts,
+    join_segment_texts,
 )
 
 
@@ -16,12 +17,12 @@ def _transcript() -> dict:
     return build_transcript(
         transcript_id="a" * 32,
         raw_result={
-            "text": "第一句。第二句。第三句。",
-            "language": "zh",
+            "text": "First sentence. Second sentence. Third sentence.",
+            "language": "en",
             "segments": [
-                {"start": 0.0, "end": 2.1, "text": "第一句。"},
-                {"start": 2.1, "end": 4.4, "text": "第二句。"},
-                {"start": 4.4, "end": 6.8, "text": "第三句。"},
+                {"start": 0.0, "end": 2.1, "text": "First sentence."},
+                {"start": 2.1, "end": 4.4, "text": "Second sentence."},
+                {"start": 4.4, "end": 6.8, "text": "Third sentence."},
             ],
         },
         source_filename="sample.wav",
@@ -40,12 +41,12 @@ def test_transcript_round_trip_preserves_timestamps(tmp_path: Path) -> None:
     ]
     update_segment_texts(
         transcript,
-        {"seg-00002": "第二句，已经人工修正。"},
+        {"seg-00002": "Second sentence, manually corrected."},
     )
     save_transcript(tmp_path, transcript)
     loaded = load_transcript(tmp_path)
 
-    assert loaded["segments"][1]["text"] == "第二句，已经人工修正。"
+    assert loaded["segments"][1]["text"] == "Second sentence, manually corrected."
     assert [
         (segment["start"], segment["end"]) for segment in loaded["segments"]
     ] == original_times
@@ -68,10 +69,18 @@ def test_voice_selection_requires_contiguous_segments() -> None:
         ["seg-00001", "seg-00002"],
     )
     assert (start, end) == (0.0, 4.4)
-    assert text == "第一句。第二句。"
+    assert text == "First sentence. Second sentence."
 
-    with pytest.raises(ValueError, match="连续"):
+    with pytest.raises(ValueError, match="consecutive"):
         selected_segment_range(
             transcript,
             ["seg-00001", "seg-00003"],
         )
+
+
+@pytest.mark.parametrize(("parts", "expected"), [
+    (["Hello.", "Welcome back."], "Hello. Welcome back."),
+    (["\u4f60\u597d\u3002", "\u6b22\u8fce\u3002"], "\u4f60\u597d\u3002\u6b22\u8fce\u3002"),
+])
+def test_joining_preserves_language_specific_spacing(parts: list[str], expected: str) -> None:
+    assert join_segment_texts({"text": part} for part in parts) == expected

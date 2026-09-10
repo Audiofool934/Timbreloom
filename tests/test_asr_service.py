@@ -24,13 +24,13 @@ class FakeASRProvider:
         request.raw_output_path.parent.mkdir(parents=True, exist_ok=True)
         request.raw_output_path.write_text("{}", encoding="utf-8")
         return {
-            "text": "这是本地转录。",
-            "language": "zh",
+            "text": "This is local transcription.",
+            "language": "en",
             "segments": [
                 {
                     "start": 0.0,
                     "end": 3.0,
-                    "text": "这是本地转录。",
+                    "text": "This is local transcription.",
                     "words": [],
                 }
             ],
@@ -73,7 +73,7 @@ def test_asr_service_preserves_raw_and_canonical_results(
     transcript = service.get_transcript(job.job_id)
     assert transcript["segments"][0]["start"] == 0.0
     assert transcript["segments"][0]["end"] == 3.0
-    assert transcript["text"] == "这是本地转录。"
+    assert transcript["text"] == "This is local transcription."
     assert (transcript_dir / "qa.json").is_file()
 
     restarted = ASRService(transcript_root, FakeASRProvider())
@@ -111,7 +111,7 @@ def test_interrupted_asr_reuses_audio_and_resumes_after_restart(tmp_path, monkey
     assert len(preparations) == 1
     restored = restarted.get_job(job.job_id)
     assert restored.status == "complete"
-    assert restarted.get_transcript(job.job_id)["text"] == "这是本地转录。"
+    assert restarted.get_transcript(job.job_id)["text"] == "This is local transcription."
     assert restarted.recover() == 0
 
 

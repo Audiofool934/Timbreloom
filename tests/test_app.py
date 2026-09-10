@@ -1,6 +1,7 @@
 import io
 import os
 import wave
+import pytest
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -32,15 +33,15 @@ def test_local_api_rejects_other_websites_and_rebound_hostnames() -> None:
 def test_home_renders_local_privacy_copy() -> None:
     response = client.get("/")
     assert response.status_code == 200
-    assert "参考录音仅在这台 Mac 上处理" in response.text
+    assert "Everything is generated and joined on this Mac" in response.text
     assert "TEMPERATURE 1.0" in response.text
-    assert "当前 Base 克隆模型没有隐藏的情绪标签" in response.text
+    assert "The Base cloning model has no hidden emotion tags" in response.text
     assert response.text.count('class="recorder-panel"') == 3
-    assert response.text.count("开始录音") == 3
+    assert response.text.count('>Record</button>') == 3
     assert response.text.count('<section id="cloneStreamCard"') == 1
     assert response.text.count('class="stream-card"') == 3
     assert response.text.count('class="stream-card compact-stream-card"') == 1
-    assert "边生成边听" in response.text
+    assert "Listen as it generates" in response.text
 
 
 def test_transport_stream_media_suffixes_are_supported() -> None:
@@ -73,7 +74,7 @@ def test_voice_conversion_requires_rights_confirmation() -> None:
         files={"media": ("source.wav", _wav_bytes(), "audio/wav")},
     )
     assert response.status_code == 400
-    assert "有权使用" in response.json()["detail"]
+    assert "permission to use" in response.json()["detail"]
 
 
 def test_voice_conversion_presets_expose_balanced_default() -> None:
@@ -109,7 +110,7 @@ def test_gemini_requires_explicit_cloud_confirmation() -> None:
         },
     )
     assert response.status_code == 400
-    assert "明确确认" in response.json()["detail"]
+    assert "Explicit confirmation" in response.json()["detail"]
 
 
 def test_generate_rejects_unsupported_file_before_model_load() -> None:
@@ -123,7 +124,7 @@ def test_generate_rejects_unsupported_file_before_model_load() -> None:
         files={"reference_audio": ("voice.txt", b"not audio", "text/plain")},
     )
     assert response.status_code == 400
-    assert "不支持该文件格式" in response.json()["detail"]
+    assert "Unsupported file format" in response.json()["detail"]
 
 
 def test_text_validation_collapses_whitespace() -> None:
@@ -147,9 +148,9 @@ def test_segment_generation_uses_temperature_one(monkeypatch, tmp_path: Path) ->
 
     app._generate_segment(
         reference_path=tmp_path / "reference.wav",
-        reference_text="准确的参考文字。",
-        target_text="测试新的表现力设置。",
-        language="chinese",
+        reference_text="An accurate reference transcript.",
+        target_text="Testing the new expression settings.",
+        language="english",
         output_path=tmp_path / "output.wav",
     )
 
@@ -158,12 +159,16 @@ def test_segment_generation_uses_temperature_one(monkeypatch, tmp_path: Path) ->
     assert request.max_tokens == app.GENERATION_TOKEN_LIMIT
 
 
-def test_long_text_segmentation_is_lossless_and_groups_sentences() -> None:
+@pytest.mark.parametrize("sentence", [
+    "Sentence {index} confirms that segmentation preserves every word and groups multiple sentences together.",
+    "\u8fd9\u662f\u7b2c{index}\u53e5\u8bdd\uff0c\u7528\u6765\u786e\u8ba4\u5206\u6bb5\u4e0d\u4f1a\u6f0f\u5b57\uff0c\u800c\u4e14\u4e0d\u4f1a\u628a\u6bcf\u53e5\u8bdd\u5355\u72ec\u751f\u6210\u3002",
+])
+def test_long_text_segmentation_is_lossless_and_groups_sentences(sentence: str) -> None:
     sentences = [
-        f"这是第{index}句话，用来确认分段不会漏字，而且不会把每句话单独生成。"
+        sentence.format(index=index)
         for index in range(1, 31)
     ]
-    source = "".join(sentences)
+    source = " ".join(sentences)
     segments = segment_text(source)
 
     assert "".join(segment.text for segment in segments) == source
@@ -175,8 +180,12 @@ def test_long_text_segmentation_is_lossless_and_groups_sentences() -> None:
     assert all(sentence in "".join(segment.text for segment in segments) for sentence in sentences)
 
 
-def test_unpunctuated_text_is_split_without_losing_characters() -> None:
-    source = "连续长文本" * 400
+@pytest.mark.parametrize("phrase", [
+    "continuous speech without punctuation ",
+    "\u8fde\u7eed\u957f\u6587\u672c",
+])
+def test_unpunctuated_text_is_split_without_losing_characters(phrase: str) -> None:
+    source = (phrase * 400).strip()
     segments = segment_text(source)
     assert len(segments) > 1
     assert "".join(segment.text for segment in segments) == source
@@ -208,13 +217,13 @@ def test_voice_profile_is_saved_and_listed(monkeypatch, tmp_path: Path) -> None:
 
     response = client.post(
         "/api/voices",
-        data={"name": "测试音色", "reference_text": "这是一段准确的参考文字。"},
+        data={"name": "Test voice", "reference_text": "This is an accurate reference transcript."},
         files={"reference_audio": ("voice.wav", _wav_bytes(), "audio/wav")},
     )
 
     assert response.status_code == 201
     voice = response.json()["voice"]
-    assert voice["name"] == "测试音色"
+    assert voice["name"] == "Test voice"
     assert (voice_dir / voice["id"] / "reference.wav").is_file()
     listed = client.get("/api/voices").json()["voices"]
     assert [item["id"] for item in listed] == [voice["id"]]
@@ -232,7 +241,7 @@ def test_background_job_generates_every_segment_and_stitches(
     _write_wav(reference_path, 3.0)
 
     source = "".join(
-        f"这是第{index}句话，用来测试后台生成会按顺序处理全部分段。"
+        f"Sentence {index} checks that background generation processes every segment in the correct order. "
         for index in range(1, 31)
     )
     segments = segment_text(source)
@@ -247,7 +256,7 @@ def test_background_job_generates_every_segment_and_stitches(
         assert reference_path.is_file()
         assert reference_text
         assert target_text
-        assert language == "chinese"
+        assert language == "english"
         _write_wav(output_path)
         return {
             "duration_seconds": 30.0,
@@ -260,12 +269,12 @@ def test_background_job_generates_every_segment_and_stitches(
     job = app.GenerationJob(
         job_id="a" * 32,
         voice_id=None,
-        voice_name="测试音色",
+        voice_name="Test voice",
         reference_source=reference_path,
         reference_is_normalized=True,
-        reference_text="准确参考文字",
+        reference_text="Accurate reference text",
         reference_duration_seconds=3.0,
-        language="chinese",
+        language="english",
         segments=segments,
         job_dir=job_dir,
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -349,7 +358,7 @@ def test_dub_job_stream_contains_only_processed_ready_segments(
         "segments": [
             {
                 "id": "seg-1",
-                "active_text": "第一段已经完成。",
+                "active_text": "The first segment is complete.",
                 "render": {
                     "status": "ready",
                     "filename": ready_path.name,
@@ -358,7 +367,7 @@ def test_dub_job_stream_contains_only_processed_ready_segments(
             },
             {
                 "id": "seg-2",
-                "active_text": "第二段还在生成。",
+                "active_text": "The second segment is still generating.",
                 "render": {"status": "rendering", "filename": ""},
             },
         ],
@@ -390,7 +399,7 @@ def test_dub_job_stream_contains_only_processed_ready_segments(
 
     assert payload["stream"]["available"] == 1
     assert payload["stream"]["total"] == 2
-    assert payload["stream"]["chunks"][0]["label"] == "第一段已经完成。"
+    assert payload["stream"]["chunks"][0]["label"] == "The first segment is complete."
 
 
 def test_background_job_stops_instead_of_skipping_suspicious_audio(
@@ -403,7 +412,7 @@ def test_background_job_stops_instead_of_skipping_suspicious_audio(
     job_dir.mkdir()
     reference_path = tmp_path / "reference.wav"
     _write_wav(reference_path, 3.0)
-    segments = segment_text("这段内容需要足够长来触发漏读防护。" * 30)
+    segments = segment_text("This passage must be long enough to trigger the skipped word guard. " * 30)
     attempts = 0
 
     def suspicious_generate(
@@ -427,12 +436,12 @@ def test_background_job_stops_instead_of_skipping_suspicious_audio(
     job = app.GenerationJob(
         job_id="b" * 32,
         voice_id=None,
-        voice_name="测试音色",
+        voice_name="Test voice",
         reference_source=reference_path,
         reference_is_normalized=True,
-        reference_text="准确参考文字",
+        reference_text="Accurate reference text",
         reference_duration_seconds=3.0,
-        language="chinese",
+        language="english",
         segments=segments,
         job_dir=job_dir,
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -449,7 +458,7 @@ def test_background_job_stops_instead_of_skipping_suspicious_audio(
     assert attempts == app.MAX_GENERATION_ATTEMPTS
     assert job.status == "error"
     assert job.segments_completed == 0
-    assert "漏读" in (job.error or "")
+    assert "skipped words" in (job.error or "")
     assert not list(output_dir.glob("*.wav"))
 
 
@@ -464,30 +473,30 @@ def test_dub_project_api_creates_and_updates_persistent_project(
     _write_wav(transcript_dir / "source.wav", 3.0)
     transcript = {
         "id": "a" * 32,
-        "title": "API 配音测试",
+        "title": "API dubbing test",
         "source_filename": "source.wav",
         "duration_seconds": 3.0,
-        "language": "zh",
+        "language": "en",
         "segments": [
-            {"id": "seg-00001", "start": 0.0, "end": 1.2, "text": "原始第一句。"},
-            {"id": "seg-00002", "start": 1.4, "end": 2.7, "text": "原始第二句。"},
+            {"id": "seg-00001", "start": 0.0, "end": 1.2, "text": "The original first sentence."},
+            {"id": "seg-00002", "start": 1.4, "end": 2.7, "text": "The original second sentence."},
         ],
     }
 
     class FakeASRService:
         def get_transcript(self, transcript_id: str) -> dict:
             if transcript_id != transcript["id"]:
-                raise FileNotFoundError("转录不存在。")
+                raise FileNotFoundError("Transcript not found.")
             return transcript
 
         def transcript_dir(self, transcript_id: str) -> Path:
             if transcript_id != transcript["id"]:
-                raise FileNotFoundError("转录不存在。")
+                raise FileNotFoundError("Transcript not found.")
             return transcript_dir
 
         def source_media(self, transcript_id: str) -> Path:
             if transcript_id != transcript["id"]:
-                raise FileNotFoundError("转录不存在。")
+                raise FileNotFoundError("Transcript not found.")
             return transcript_dir / "source.wav"
 
     reference = tmp_path / "reference.wav"
@@ -496,11 +505,11 @@ def test_dub_project_api_creates_and_updates_persistent_project(
 
     def fake_voice(requested_voice_id: str) -> dict:
         if requested_voice_id != voice_id:
-            raise FileNotFoundError("音色不存在。")
+            raise FileNotFoundError("Voice not found.")
         return {
             "id": voice_id,
             "created_at": "voice-created",
-            "reference_text": "准确参考文字。",
+            "reference_text": "Accurate reference text.",
             "audio_path": reference,
         }
 
@@ -521,29 +530,29 @@ def test_dub_project_api_creates_and_updates_persistent_project(
         "/api/dub/projects",
         json={
             "transcript_id": transcript["id"],
-            "title": "我的配音项目",
-            "target_language": "chinese",
+            "title": "My dubbing project",
+            "target_language": "english",
             "default_voice_id": voice_id,
         },
     )
     assert created_response.status_code == 201
     project = created_response.json()["project"]
     project_id = project["id"]
-    assert project["segments"][0]["source_text"] == "原始第一句。"
+    assert project["segments"][0]["source_text"] == "The original first sentence."
     assert project["source_audio_url"].endswith("/audio")
 
     updated_response = client.patch(
         f"/api/dub/projects/{project_id}",
         json={
             "segments": [
-                {"id": "seg-00001", "active_text": "用于配音的新文字。"}
+                {"id": "seg-00001", "active_text": "New text for dubbing."}
             ]
         },
     )
     assert updated_response.status_code == 200
     updated = updated_response.json()["project"]
-    assert updated["segments"][0]["source_text"] == "原始第一句。"
-    assert updated["segments"][0]["active_text"] == "用于配音的新文字。"
+    assert updated["segments"][0]["source_text"] == "The original first sentence."
+    assert updated["segments"][0]["active_text"] == "New text for dubbing."
     assert client.get(f"/api/dub/projects/{project_id}/audio").status_code == 200
 
     gemini_response = client.post(
@@ -556,7 +565,7 @@ def test_dub_project_api_creates_and_updates_persistent_project(
         },
     )
     assert gemini_response.status_code == 400
-    assert "明确确认" in gemini_response.json()["detail"]
+    assert "Explicit confirmation" in gemini_response.json()["detail"]
 
     class FakeGeminiProvider:
         configured = True

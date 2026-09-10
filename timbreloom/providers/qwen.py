@@ -58,7 +58,7 @@ class LocalQwenTTSProvider(TTSProvider):
 
     def get_model(self) -> Any:
         if not self.descriptor.configured:
-            raise RuntimeError("请先在“模型管理”中下载 Qwen3-TTS，再开始生成。")
+            raise RuntimeError("Download Qwen3-TTS from Models before generating speech.")
         if self._model is not None:
             return self._model
 
@@ -96,7 +96,7 @@ class LocalQwenTTSProvider(TTSProvider):
 
     def synthesize(self, request: TTSRequest) -> TTSResult:
         if not self.descriptor.configured:
-            raise RuntimeError("请先在“模型管理”中下载 Qwen3-TTS，再开始生成。")
+            raise RuntimeError("Download Qwen3-TTS from Models before generating speech.")
         import mlx.core as mx
         from mlx_audio.audio_io import write as audio_write
 
@@ -117,10 +117,10 @@ class LocalQwenTTSProvider(TTSProvider):
             )
 
             if not results:
-                raise RuntimeError("模型没有返回音频。")
+                raise RuntimeError("The model did not return audio.")
             audio_parts = [result.audio for result in results if result.audio.size > 0]
             if not audio_parts:
-                raise RuntimeError("模型返回了空音频。")
+                raise RuntimeError("The model returned empty audio.")
 
             audio = audio_parts[0] if len(audio_parts) == 1 else mx.concatenate(audio_parts)
             mx.eval(audio)
@@ -128,7 +128,7 @@ class LocalQwenTTSProvider(TTSProvider):
             generated_duration = int(audio.shape[0]) / sample_rate
             if generated_duration >= request.max_audio_seconds - 1.0:
                 raise RuntimeError(
-                    f"分段音频接近 {request.max_tokens:,} token 上限，为避免截断已停止。"
+                    f"Segment audio is near the {request.max_tokens:,} token limit. Stopped to prevent truncation."
                 )
             peak_memory = max(float(result.peak_memory_usage) for result in results)
             audio_write(request.output_path, audio, sample_rate, format="wav")

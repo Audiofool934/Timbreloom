@@ -60,7 +60,7 @@ class LocalWhisperASRProvider(ASRProvider):
     ) -> dict[str, Any]:
         descriptor = self.descriptor
         if not descriptor.ready:
-            raise RuntimeError("请先在“模型管理”中下载 Whisper，再开始转录。")
+            raise RuntimeError("Download Whisper from Models before starting transcription.")
 
         request.raw_output_path.parent.mkdir(parents=True, exist_ok=True)
         log_path = request.raw_output_path.with_suffix(".log")
@@ -104,7 +104,7 @@ class LocalWhisperASRProvider(ASRProvider):
                                 process.wait(timeout=5)
                             except subprocess.TimeoutExpired:
                                 process.kill()
-                            raise InterruptedError("转录已取消。")
+                            raise InterruptedError("Transcription canceled.")
                         time.sleep(0.2)
                 finally:
                     if process.poll() is None:
@@ -112,7 +112,7 @@ class LocalWhisperASRProvider(ASRProvider):
 
         if process.returncode != 0:
             detail = log_path.read_text(encoding="utf-8", errors="replace")[-4_000:].strip()
-            raise RuntimeError(detail or "本地 Whisper 转录失败。")
+            raise RuntimeError(detail or "Local Whisper transcription failed.")
         if not request.raw_output_path.is_file():
-            raise RuntimeError("本地 Whisper 没有产生转录结果。")
+            raise RuntimeError("Local Whisper did not produce a transcript.")
         return json.loads(request.raw_output_path.read_text(encoding="utf-8"))

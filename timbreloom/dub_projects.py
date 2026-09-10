@@ -38,16 +38,16 @@ def _utc_now() -> str:
 def _clean_title(value: str, fallback: str) -> str:
     title = " ".join(str(value).strip().split()) or fallback
     if len(title) > 160:
-        raise ValueError("配音项目名称不能超过 160 个字符。")
+        raise ValueError("Dubbing project names cannot exceed 160 characters.")
     return title
 
 
 def _clean_text(value: str) -> str:
     text = str(value).replace("\r\n", "\n").replace("\r", "\n").strip()
     if not text:
-        raise ValueError("配音文字不能为空。")
+        raise ValueError("Dubbing text cannot be empty.")
     if len(text) > MAX_SEGMENT_TEXT_CHARS:
-        raise ValueError(f"单个配音片段不能超过 {MAX_SEGMENT_TEXT_CHARS:,} 个字符。")
+        raise ValueError(f"Each dubbing segment is limited to {MAX_SEGMENT_TEXT_CHARS:,} characters.")
     return text
 
 
@@ -67,7 +67,7 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
 
 def _safe_filename(value: str) -> str:
     if not value or Path(value).name != value:
-        raise ValueError("项目文件名无效。")
+        raise ValueError("Invalid project filename.")
     return value
 
 
@@ -118,7 +118,7 @@ def _upgrade_project(project: dict[str, Any]) -> bool:
                     roles.append(
                         {
                             "id": role_id,
-                            "name": "默认角色" if not roles else f"角色 {len(roles) + 1}",
+                            "name": "Default role" if not roles else f"Role {len(roles) + 1}",
                             "voice_id": voice_id,
                             "color": ROLE_COLORS[len(roles) % len(ROLE_COLORS)],
                         }
@@ -129,72 +129,72 @@ def _upgrade_project(project: dict[str, Any]) -> bool:
         project.setdefault("last_export_job_id", None)
         project["schema_version"] = DUB_PROJECT_SCHEMA_VERSION
         return True
-    raise ValueError("不支持该配音项目数据版本。")
+    raise ValueError("Unsupported dubbing project version.")
 
 
 def validate_project(project: dict[str, Any]) -> None:
     if project.get("schema_version") != DUB_PROJECT_SCHEMA_VERSION:
-        raise ValueError("不支持该配音项目数据版本。")
+        raise ValueError("Unsupported dubbing project version.")
     project_id = str(project.get("id", ""))
     if not PROJECT_ID_PATTERN.fullmatch(project_id):
-        raise ValueError("配音项目 ID 无效。")
+        raise ValueError("Invalid dubbing project ID.")
     _safe_filename(str(project.get("source_audio_filename", "")))
     source_media_filename = str(project.get("source_media_filename", ""))
     if source_media_filename:
         _safe_filename(source_media_filename)
     if bool(project.get("source_has_video")) and not source_media_filename:
-        raise ValueError("视频配音项目缺少原始媒体文件。")
+        raise ValueError("The video dubbing project is missing its original media file.")
     segments = project.get("segments")
     if not isinstance(segments, list) or not segments:
-        raise ValueError("配音项目没有有效片段。")
+        raise ValueError("The dubbing project has no valid segments.")
 
     roles = project.get("roles")
     if not isinstance(roles, list):
-        raise ValueError("配音项目角色格式无效。")
+        raise ValueError("Invalid project role format.")
     role_ids: set[str] = set()
     for role in roles:
         role_id = str(role.get("id", ""))
         if not PROJECT_ID_PATTERN.fullmatch(role_id) or role_id in role_ids:
-            raise ValueError("配音角色 ID 无效或重复。")
+            raise ValueError("Invalid or duplicate role ID.")
         role_ids.add(role_id)
-        _clean_title(str(role.get("name", "")), "未命名角色")
+        _clean_title(str(role.get("name", "")), "Untitled role")
         voice_id = role.get("voice_id")
         if voice_id is not None and not PROJECT_ID_PATTERN.fullmatch(str(voice_id)):
-            raise ValueError("配音角色的音色 ID 无效。")
+            raise ValueError("Invalid voice ID for this role.")
 
     seen_ids: set[str] = set()
     previous_start = -1.0
     for index, segment in enumerate(segments):
         if not isinstance(segment, dict):
-            raise ValueError("配音片段格式无效。")
+            raise ValueError("Invalid dubbing segment format.")
         segment_id = str(segment.get("id", ""))
         if not segment_id or segment_id in seen_ids:
-            raise ValueError("配音片段 ID 无效或重复。")
+            raise ValueError("Invalid or duplicate dubbing segment ID.")
         seen_ids.add(segment_id)
         if int(segment.get("order", -1)) != index:
-            raise ValueError("配音片段顺序无效。")
+            raise ValueError("Invalid dubbing segment order.")
         start = _number(segment.get("start"), -1.0)
         end = _number(segment.get("end"), -1.0)
         if start < 0 or end < start or start < previous_start:
-            raise ValueError("配音片段时间戳无效。")
+            raise ValueError("Invalid dubbing segment timestamps.")
         previous_start = start
         if not str(segment.get("source_text", "")).strip():
-            raise ValueError("原始 ASR 文字不能为空。")
+            raise ValueError("Original ASR text cannot be empty.")
         _clean_text(str(segment.get("active_text", "")))
         voice_id = segment.get("voice_id")
         if voice_id is not None and not PROJECT_ID_PATTERN.fullmatch(str(voice_id)):
-            raise ValueError("配音片段的音色 ID 无效。")
+            raise ValueError("Invalid voice ID for this dubbing segment.")
         role_id = segment.get("role_id")
         if role_id is not None and str(role_id) not in role_ids:
-            raise ValueError("配音片段引用了不存在的角色。")
+            raise ValueError("The dubbing segment refers to a missing role.")
         if segment.get("fit_mode") not in FIT_MODES:
-            raise ValueError("片段时长适配模式无效。")
+            raise ValueError("Invalid segment duration fit mode.")
         gain = _number(segment.get("gain"), 1.0)
         if not 0.0 <= gain <= 2.0:
-            raise ValueError("片段音量必须在 0 到 2 之间。")
+            raise ValueError("Segment gain must be between 0 and 2.")
         render = segment.get("render")
         if not isinstance(render, dict) or render.get("status") not in RENDER_STATUSES:
-            raise ValueError("片段渲染状态无效。")
+            raise ValueError("Invalid segment render state.")
         filename = str(render.get("filename", ""))
         if filename:
             _safe_filename(filename)
@@ -318,7 +318,7 @@ def _reindex_segments(project: dict[str, Any]) -> None:
 def _split_text_near(text: str, ratio: float) -> tuple[str, str]:
     value = str(text).strip()
     if len(value) < 2:
-        raise ValueError("文字太短，不能安全拆分。")
+        raise ValueError("The text is too short to split safely.")
     target = min(len(value) - 1, max(1, round(len(value) * ratio)))
     boundaries = [
         index + 1
@@ -331,7 +331,7 @@ def _split_text_near(text: str, ratio: float) -> tuple[str, str]:
     if not left or not right:
         left, right = value[:target].strip(), value[target:].strip()
     if not left or not right:
-        raise ValueError("无法在不丢失文字的前提下拆分该片段。")
+        raise ValueError("Cannot split this segment without losing text.")
     return left, right
 
 
@@ -362,7 +362,7 @@ class DubProjectStore:
 
     def project_dir(self, project_id: str) -> Path:
         if not PROJECT_ID_PATTERN.fullmatch(project_id):
-            raise FileNotFoundError("配音项目不存在。")
+            raise FileNotFoundError("Dubbing project not found.")
         return self.root / project_id
 
     def _project_path(self, project_id: str) -> Path:
@@ -379,18 +379,18 @@ class DubProjectStore:
         default_voice_id: str | None = None,
     ) -> dict[str, Any]:
         if not source_audio.is_file():
-            raise FileNotFoundError("转录源音频不存在。")
+            raise FileNotFoundError("Transcript source audio not found.")
         if source_media is not None and not source_media.is_file():
-            raise FileNotFoundError("转录原始媒体不存在。")
+            raise FileNotFoundError("Original transcript media not found.")
         transcript_segments = transcript.get("segments")
         if not isinstance(transcript_segments, list) or not transcript_segments:
-            raise ValueError("转录没有可用片段。")
+            raise ValueError("The transcript has no usable segments.")
         if default_voice_id is not None and not PROJECT_ID_PATTERN.fullmatch(default_voice_id):
-            raise ValueError("默认音色 ID 无效。")
+            raise ValueError("Invalid default voice ID.")
 
         project_id = uuid.uuid4().hex
         created_at = _utc_now()
-        fallback_title = str(transcript.get("title", "")).strip() or "未命名配音项目"
+        fallback_title = str(transcript.get("title", "")).strip() or "Untitled dubbing project"
         source_media_filename = f"source-media{source_media.suffix.lower()}" if source_media else ""
         project = {
             "schema_version": DUB_PROJECT_SCHEMA_VERSION,
@@ -419,7 +419,7 @@ class DubProjectStore:
             project["roles"].append(
                 {
                     "id": default_role_id,
-                    "name": "默认角色",
+                    "name": "Default role",
                     "voice_id": default_voice_id,
                     "color": ROLE_COLORS[0],
                 }
@@ -471,7 +471,7 @@ class DubProjectStore:
         path = self._project_path(project_id)
         with self._lock:
             if not path.is_file():
-                raise FileNotFoundError("配音项目不存在。")
+                raise FileNotFoundError("Dubbing project not found.")
             project = json.loads(path.read_text(encoding="utf-8"))
             upgraded = _upgrade_project(project)
             if upgraded:
@@ -518,7 +518,7 @@ class DubProjectStore:
             for update in segment_updates:
                 segment_id = str(update.get("id", ""))
                 if segment_id not in by_id:
-                    raise ValueError("修改中包含不存在的配音片段。")
+                    raise ValueError("The changes include a missing dubbing segment.")
                 segment = by_id[segment_id]
                 invalidated = False
                 if "active_text" in update:
@@ -529,7 +529,7 @@ class DubProjectStore:
                 if "voice_id" in update:
                     voice_id = update["voice_id"] or None
                     if voice_id is not None and not PROJECT_ID_PATTERN.fullmatch(str(voice_id)):
-                        raise ValueError("音色 ID 无效。")
+                        raise ValueError("Invalid voice ID.")
                     if voice_id != segment["voice_id"]:
                         segment["voice_id"] = voice_id
                         segment["role_id"] = None
@@ -541,7 +541,7 @@ class DubProjectStore:
                         None,
                     ) if role_id else None
                     if role_id and role is None:
-                        raise ValueError("角色 ID 无效。")
+                        raise ValueError("Invalid role ID.")
                     voice_id = role.get("voice_id") if role else segment.get("voice_id")
                     previous_voice = segment.get("voice_id")
                     if role_id != segment.get("role_id") or voice_id != previous_voice:
@@ -552,12 +552,12 @@ class DubProjectStore:
                 if "gain" in update:
                     gain = _number(update["gain"], -1.0)
                     if not 0.0 <= gain <= 2.0:
-                        raise ValueError("片段音量必须在 0 到 2 之间。")
+                        raise ValueError("Segment gain must be between 0 and 2.")
                     segment["gain"] = round(gain, 3)
                 if "fit_mode" in update:
                     fit_mode = str(update["fit_mode"])
                     if fit_mode not in FIT_MODES:
-                        raise ValueError("时长适配模式无效。")
+                        raise ValueError("Invalid duration fit mode.")
                     segment["fit_mode"] = fit_mode
                 if "start" in update:
                     segment["start"] = round(_number(update["start"], -1.0), 3)
@@ -586,7 +586,7 @@ class DubProjectStore:
         role_id: str | None = None,
     ) -> dict[str, Any]:
         if voice_id is not None and not PROJECT_ID_PATTERN.fullmatch(voice_id):
-            raise ValueError("音色 ID 无效。")
+            raise ValueError("Invalid voice ID.")
         with self._lock:
             project = self.load(project_id)
             role = next(
@@ -594,11 +594,11 @@ class DubProjectStore:
                 None,
             ) if role_id else None
             if role_id and role is None:
-                raise ValueError("角色不存在。")
+                raise ValueError("Role not found.")
             if role is None:
                 role = {
                     "id": uuid.uuid4().hex,
-                    "name": _clean_title(name, "未命名角色"),
+                    "name": _clean_title(name, "Untitled role"),
                     "voice_id": voice_id,
                     "color": ROLE_COLORS[len(project["roles"]) % len(ROLE_COLORS)],
                 }
@@ -628,11 +628,11 @@ class DubProjectStore:
             try:
                 index = next(i for i, item in enumerate(project["segments"]) if item["id"] == segment_id)
             except StopIteration as exc:
-                raise ValueError("配音片段不存在。") from exc
+                raise ValueError("Dubbing segment not found.") from exc
             segment = project["segments"][index]
             split_at = round(float(split_at), 3)
             if split_at <= segment["start"] + 0.05 or split_at >= segment["end"] - 0.05:
-                raise ValueError("拆分点需要距离片段两端至少 0.05 秒。")
+                raise ValueError("The split point must be at least 0.05 seconds from either end.")
             ratio = (split_at - segment["start"]) / (segment["end"] - segment["start"])
             source_left, source_right = _split_text_near(segment["source_text"], ratio)
             active_left, active_right = _split_text_near(segment["active_text"], ratio)
@@ -671,18 +671,18 @@ class DubProjectStore:
     def merge_segments(self, project_id: str, segment_ids: list[str]) -> dict[str, Any]:
         unique_ids = list(dict.fromkeys(segment_ids))
         if len(unique_ids) < 2:
-            raise ValueError("合并至少需要两个片段。")
+            raise ValueError("Select at least two segments to merge.")
         with self._lock:
             project = self.load(project_id)
             by_id = {item["id"]: item for item in project["segments"]}
             if not set(unique_ids).issubset(by_id):
-                raise ValueError("选择中包含不存在的配音片段。")
+                raise ValueError("The selection includes a missing dubbing segment.")
             selected = sorted((by_id[item] for item in unique_ids), key=lambda item: item["order"])
             orders = [item["order"] for item in selected]
             if orders != list(range(orders[0], orders[-1] + 1)):
-                raise ValueError("只能合并时间线上连续的片段。")
+                raise ValueError("Only consecutive timeline segments can be merged.")
             if len({item.get("role_id") for item in selected}) > 1 or len({item.get("voice_id") for item in selected}) > 1:
-                raise ValueError("请先把所选片段设为同一个角色和音色，再执行合并。")
+                raise ValueError("Assign the same role and voice to all selected segments before merging.")
             first = selected[0]
             merged = {
                 **first,
@@ -725,7 +725,7 @@ class DubProjectStore:
             channels = audio_file.getnchannels()
             sample_width = audio_file.getsampwidth()
             if sample_width != 2 or channels not in {1, 2}:
-                raise ValueError("项目源音频不是可分析的 PCM WAV。")
+                raise ValueError("The project source audio is not a supported PCM WAV file.")
             bucket = max(1, (frames + points - 1) // points)
             peaks = []
             for start in range(0, frames, bucket):
@@ -818,20 +818,20 @@ class DubProjectStore:
 
     def import_bundle(self, bundle: Path) -> dict[str, Any]:
         if not zipfile.is_zipfile(bundle):
-            raise ValueError("导入文件不是有效的 Timbreloom 项目包。")
+            raise ValueError("The imported file is not a valid Timbreloom project bundle.")
         import_root = self.root / ".imports" / uuid.uuid4().hex
         import_root.mkdir(parents=True, exist_ok=False)
         try:
             with zipfile.ZipFile(bundle) as archive:
                 members = archive.infolist()
                 if len(members) > 10_000 or sum(item.file_size for item in members) > 8 * 1024**3:
-                    raise ValueError("项目包过大或包含过多文件。")
+                    raise ValueError("The project bundle is too large or contains too many files.")
                 for member in members:
                     relative = Path(member.filename)
                     if relative.is_absolute() or ".." in relative.parts or member.is_dir():
                         if member.is_dir():
                             continue
-                        raise ValueError("项目包包含不安全的文件路径。")
+                        raise ValueError("The project bundle contains an unsafe file path.")
                     if len(relative.parts) > 1:
                         media_file = len(relative.parts) == 2 and relative.parts[0] in {"renders", "exports"}
                         voice_file = (
@@ -841,7 +841,7 @@ class DubProjectStore:
                             and relative.parts[2] in {"profile.json", "reference.wav"}
                         )
                         if not media_file and not voice_file:
-                            raise ValueError("项目包包含未知文件。")
+                            raise ValueError("The project bundle contains an unknown file.")
                     destination = import_root / relative
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     with archive.open(member) as source, destination.open("wb") as target:
@@ -852,10 +852,10 @@ class DubProjectStore:
                 or manifest.get("format") != "timbreloom-project"
                 or manifest.get("version") not in {1, 2}
             ):
-                raise ValueError("不支持该 Timbreloom 项目包版本。")
+                raise ValueError("Unsupported Timbreloom project bundle version.")
             bundled_voice_ids = list(dict.fromkeys(manifest.get("voice_ids", [])))
             if any(not PROJECT_ID_PATTERN.fullmatch(str(item)) for item in bundled_voice_ids):
-                raise ValueError("项目包音色清单无效。")
+                raise ValueError("Invalid project bundle voice manifest.")
             project = json.loads((import_root / "project.json").read_text(encoding="utf-8"))
             _upgrade_project(project)
             allowed_top_level = {
@@ -870,9 +870,9 @@ class DubProjectStore:
                 if item.is_file() and item.name not in allowed_top_level
             }
             if unknown_top_level:
-                raise ValueError("项目包包含未在项目清单中声明的文件。")
+                raise ValueError("The bundle contains files not declared in the project manifest.")
             project["id"] = uuid.uuid4().hex
-            project["title"] = _clean_title(f"{project.get('title', '导入项目')} - 导入", "导入项目")
+            project["title"] = _clean_title(f"{project.get('title', 'Imported project')} - Imported", "Imported project")
             project["last_job_id"] = None
             project["last_export_job_id"] = None
             project["created_at"] = _utc_now()
@@ -894,16 +894,16 @@ class DubProjectStore:
                 if (filename := export.get(key))
             )
             if any(not (import_root / relative).is_file() for relative in required_files):
-                raise ValueError("项目包缺少项目清单引用的媒体或渲染文件。")
+                raise ValueError("The bundle is missing media or render files referenced in its manifest.")
             for voice_id in bundled_voice_ids:
                 voice_dir = import_root / "voices" / voice_id
                 profile_path = voice_dir / "profile.json"
                 reference_path = voice_dir / "reference.wav"
                 if not profile_path.is_file() or not reference_path.is_file():
-                    raise ValueError("项目包缺少音色档案或参考录音。")
+                    raise ValueError("The bundle is missing a voice profile or reference recording.")
                 profile = json.loads(profile_path.read_text(encoding="utf-8"))
                 if profile.get("id") != voice_id or not str(profile.get("reference_text", "")).strip():
-                    raise ValueError("项目包音色档案无效。")
+                    raise ValueError("Invalid voice profile in the project bundle.")
             destination = self.project_dir(project["id"])
             for name in ("renders", "exports", "jobs", "bundles"):
                 (import_root / name).mkdir(exist_ok=True)
@@ -929,7 +929,7 @@ class DubProjectStore:
                                 (target_voice / filename).read_bytes()
                             ).digest()
                             if source_digest != target_digest:
-                                raise ValueError("本机存在同 ID 但内容不同的音色，已停止导入。")
+                                raise ValueError("Import stopped because a local voice has the same ID but different content.")
                         continue
                     source_voice.replace(target_voice)
                     installed_voices.append(target_voice)
@@ -955,17 +955,17 @@ class DubProjectStore:
         project = self.load(project_id)
         path = self.project_dir(project_id) / project["source_audio_filename"]
         if not path.is_file():
-            raise FileNotFoundError("配音项目源音频不存在。")
+            raise FileNotFoundError("Dubbing project source audio not found.")
         return path
 
     def source_media(self, project_id: str) -> Path:
         project = self.load(project_id)
         filename = str(project.get("source_media_filename", ""))
         if not filename or not project.get("source_has_video"):
-            raise FileNotFoundError("该配音项目没有原始视频。")
+            raise FileNotFoundError("This dubbing project has no original video.")
         path = self.project_dir(project_id) / filename
         if not path.is_file():
-            raise FileNotFoundError("配音项目原始视频不存在。")
+            raise FileNotFoundError("Dubbing project original video not found.")
         return path
 
     def render_path(self, project_id: str, filename: str) -> Path:
@@ -974,14 +974,14 @@ class DubProjectStore:
 
     def job_path(self, project_id: str, job_id: str) -> Path:
         if not PROJECT_ID_PATTERN.fullmatch(job_id):
-            raise FileNotFoundError("配音任务不存在。")
+            raise FileNotFoundError("Dubbing job not found.")
         return self.project_dir(project_id) / "jobs" / f"{job_id}.json"
 
     def save_job(self, job: dict[str, Any]) -> dict[str, Any]:
         if job.get("schema_version") != DUB_JOB_SCHEMA_VERSION:
-            raise ValueError("配音任务版本无效。")
+            raise ValueError("Invalid dubbing job version.")
         if job.get("status") not in JOB_STATUSES:
-            raise ValueError("配音任务状态无效。")
+            raise ValueError("Invalid dubbing job state.")
         job["updated_at"] = _utc_now()
         with self._lock:
             _atomic_json(self.job_path(job["project_id"], job["job_id"]), job)
@@ -991,10 +991,10 @@ class DubProjectStore:
         path = self.job_path(project_id, job_id)
         with self._lock:
             if not path.is_file():
-                raise FileNotFoundError("配音任务不存在。")
+                raise FileNotFoundError("Dubbing job not found.")
             job = json.loads(path.read_text(encoding="utf-8"))
         if job.get("schema_version") != DUB_JOB_SCHEMA_VERSION:
-            raise ValueError("不支持该配音任务版本。")
+            raise ValueError("Unsupported dubbing job version.")
         return job
 
     def list_jobs(self, project_id: str) -> list[dict[str, Any]]:
@@ -1047,7 +1047,7 @@ def mix_timeline_wav(
     import numpy as np
 
     if not segments:
-        raise ValueError("没有可导出的配音片段。")
+        raise ValueError("No dubbing segments are available to export.")
 
     sources: list[dict[str, Any]] = []
     total_frames = round(max(0.0, project_duration_seconds) * sample_rate)
@@ -1055,13 +1055,13 @@ def mix_timeline_wav(
         path = Path(segment["path"])
         with wave.open(str(path), "rb") as audio_file:
             if audio_file.getsampwidth() != 2:
-                raise ValueError("配音片段必须是 16-bit PCM WAV。")
+                raise ValueError("Dubbing segments must use 16-bit PCM WAV.")
             if audio_file.getframerate() != sample_rate:
-                raise ValueError("配音片段采样率不一致。")
+                raise ValueError("Dubbing segment sample rates do not match.")
             frames = audio_file.getnframes()
             channels = audio_file.getnchannels()
             if channels not in {1, 2}:
-                raise ValueError("配音片段必须是单声道或双声道 WAV。")
+                raise ValueError("Dubbing segments must be mono or stereo WAV.")
         start_frame = round(max(0.0, _number(segment.get("start"))) * sample_rate)
         total_frames = max(total_frames, start_frame + frames)
         sources.append(
@@ -1146,10 +1146,10 @@ class DubRenderService:
     ) -> dict[str, Any]:
         project = self.store.load(project_id)
         if mode not in {"all", "selected", "failed"}:
-            raise ValueError("不支持该配音任务模式。")
+            raise ValueError("Unsupported dubbing job mode.")
         with self._lock:
             if any(job.get("status") in ACTIVE_JOB_STATUSES for job in self.store.list_jobs(project_id)):
-                raise RuntimeError("该项目已有正在执行的生成或导出任务。")
+                raise RuntimeError("This project already has an active generation or export job.")
             known_ids = {segment["id"] for segment in project["segments"]}
             if mode == "all":
                 selected_ids = [segment["id"] for segment in project["segments"]]
@@ -1158,13 +1158,13 @@ class DubRenderService:
             else:
                 selected_ids = list(dict.fromkeys(segment_ids or []))
                 if not selected_ids:
-                    raise ValueError("请选择至少一个需要生成的片段。")
+                    raise ValueError("Select at least one segment to generate.")
                 if not set(selected_ids).issubset(known_ids):
-                    raise ValueError("选择中包含不存在的配音片段。")
+                    raise ValueError("The selection includes a missing dubbing segment.")
                 order = {segment["id"]: segment["order"] for segment in project["segments"]}
                 selected_ids.sort(key=order.__getitem__)
             if not selected_ids:
-                raise ValueError("当前没有符合条件的配音片段。")
+                raise ValueError("No dubbing segments match the selection.")
 
             job_id = uuid.uuid4().hex
             created_at = _utc_now()
@@ -1185,7 +1185,7 @@ class DubRenderService:
                 "generated": 0,
                 "cached": 0,
                 "failed": 0,
-                "message": "等待生成",
+                "message": "Waiting to generate",
                 "error": None,
                 "cancel_requested": False,
                 "created_at": created_at,
@@ -1223,7 +1223,7 @@ class DubRenderService:
                 if job.get("cancel_requested"):
                     job["status"] = "cancelled"
                     job["phase"] = "cancelled"
-                    job["message"] = "服务重启时确认了此前的停止请求"
+                    job["message"] = "Previous stop request confirmed after service restart"
                     job["error"] = job["message"]
                     self.store.save_job(job)
                     cancelled_project = self.store.load(project["id"])
@@ -1236,7 +1236,7 @@ class DubRenderService:
                         shutil.rmtree(work_dir, ignore_errors=True)
                 job["status"] = "queued"
                 job["phase"] = "queued"
-                job["message"] = "服务重启后继续生成"
+                job["message"] = "Resuming generation after service restart"
                 job["progress"] = 0.0
                 job["processed"] = 0
                 job["generated"] = 0
@@ -1255,7 +1255,7 @@ class DubRenderService:
         job = self.store.load_job(project_id, job_id)
         if job["status"] in ACTIVE_JOB_STATUSES:
             job["cancel_requested"] = True
-            job["message"] = "正在完成当前模型调用后停止"
+            job["message"] = "Stopping after the current model call"
             self.store.save_job(job)
             with self._lock:
                 event = self._cancel_events.get(job_id)
@@ -1299,7 +1299,7 @@ class DubRenderService:
                         expected_duration = chunk.estimated_audio_tokens / AUDIO_TOKENS_PER_SECOND
                         if chunk.estimated_audio_tokens >= 240 and metrics["duration_seconds"] < expected_duration * 0.35:
                             chunk_path.unlink(missing_ok=True)
-                            raise RuntimeError("生成音频明显短于本段文字，可能存在漏读。")
+                            raise RuntimeError("The generated audio is too short for this text and may contain skipped words.")
                         break
                     except Exception as exc:
                         last_error = exc
@@ -1307,7 +1307,7 @@ class DubRenderService:
                         if attempt < self.max_attempts:
                             time.sleep(0.25)
                 if metrics is None:
-                    raise RuntimeError(str(last_error or "模型没有返回音频。"))
+                    raise RuntimeError(str(last_error or "The model did not return audio."))
                 generated_paths.append(chunk_path)
                 total_generation += metrics["generation_seconds"]
                 peak_memory = max(peak_memory, metrics["peak_memory_gb"])
@@ -1337,7 +1337,7 @@ class DubRenderService:
                 job_id,
                 status="running",
                 phase="rendering",
-                message="正在逐段生成配音",
+                message="Generating dubbing segments",
                 error=None,
             )
             segment_ids = list(job["segment_ids"])
@@ -1349,7 +1349,7 @@ class DubRenderService:
             for index, segment_id in enumerate(segment_ids, start=1):
                 current_job = self.store.load_job(project_id, job_id)
                 if cancel_event.is_set() or current_job.get("cancel_requested"):
-                    raise InterruptedError("配音任务已停止。")
+                    raise InterruptedError("Dubbing job stopped.")
                 project = self.store.load(project_id)
                 segment = next(item for item in project["segments"] if item["id"] == segment_id)
                 preview = " ".join(segment["active_text"].split())
@@ -1360,12 +1360,12 @@ class DubRenderService:
                     current_text=preview[:180],
                     processed=index - 1,
                     progress=(index - 1) / total,
-                    message=f"正在处理第 {index} / {total} 段",
+                    message=f"Processing segment {index} of {total}",
                 )
 
                 try:
                     if not segment.get("voice_id"):
-                        raise ValueError("该片段还没有分配音色。")
+                        raise ValueError("This segment has no voice assigned.")
                     voice = self.load_voice(segment["voice_id"])
                     fingerprint = self._fingerprint(segment, project, voice)
                     render = segment["render"]
@@ -1391,7 +1391,7 @@ class DubRenderService:
                         if fresh_fingerprint != fingerprint:
                             self.store.render_path(project_id, str(metrics["filename"])).unlink(missing_ok=True)
                             fresh_render["status"] = "stale"
-                            fresh_render["error"] = "生成期间文字或音色发生变化，请重新生成此片段。"
+                            fresh_render["error"] = "Text or voice changed during generation. Generate this segment again."
                         else:
                             previous_filename = fresh_render.get("filename", "")
                             fresh_render.update(
@@ -1441,7 +1441,7 @@ class DubRenderService:
                 progress=1.0,
                 current_segment_id="",
                 current_text="",
-                message="所选片段已经生成" if not failed else f"已完成，{failed} 个片段需要单独重试",
+                message="Selected segments generated" if not failed else f"Completed. Segments to retry: {failed}",
             )
         except InterruptedError as exc:
             project = self.store.load(project_id)
@@ -1465,7 +1465,7 @@ class DubRenderService:
                     job_id,
                     status="error",
                     phase="error",
-                    message="配音任务异常停止",
+                    message="Dubbing job stopped unexpectedly",
                     error=str(exc),
                 )
             except Exception:
@@ -1483,25 +1483,25 @@ class DubRenderService:
         progress: Callable[[str, float, str], None] | None = None,
     ) -> dict[str, Any]:
         if not 0.0 <= original_audio_gain <= 1.0:
-            raise ValueError("原声音量必须在 0 到 1 之间。")
+            raise ValueError("Original audio volume must be between 0 and 1.")
         project = self.store.load(project_id)
         timeline_segments: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
         validated: list[tuple[dict[str, Any], Path]] = []
         if progress:
-            progress("validating", 0.05, "正在检查片段缓存和时间线")
+            progress("validating", 0.05, "Checking cached segments and timeline")
         for segment in project["segments"]:
             voice_id = segment.get("voice_id")
             if not voice_id:
-                raise ValueError(f"片段 {segment['id']} 还没有分配音色。")
+                raise ValueError(f"Segment {segment['id']} has no voice assigned.")
             voice = self.load_voice(voice_id)
             fingerprint = self._fingerprint(segment, project, voice)
             render = segment["render"]
             if render.get("status") != "ready" or render.get("fingerprint") != fingerprint:
-                raise ValueError(f"片段 {segment['id']} 需要先生成或重新生成。")
+                raise ValueError(f"Generate or regenerate segment {segment['id']} first.")
             path = self.store.render_path(project_id, render["filename"])
             if not path.is_file():
-                raise ValueError(f"片段 {segment['id']} 的渲染文件不存在。")
+                raise ValueError(f"Render file for segment {segment['id']} not found.")
             validated.append((segment, path))
 
         fit_dir = self.store.project_dir(project_id) / "exports" / f".fit-{uuid.uuid4().hex}"
@@ -1545,7 +1545,7 @@ class DubRenderService:
                     progress(
                         "fitting",
                         0.05 + 0.35 * index / len(project["segments"]),
-                        f"正在准备第 {index} / {len(project['segments'])} 段",
+                        f"Preparing segment {index} of {len(project['segments'])}",
                     )
         except Exception:
             shutil.rmtree(fit_dir, ignore_errors=True)
@@ -1567,7 +1567,7 @@ class DubRenderService:
         video_metrics: dict[str, object] = {}
         try:
             if progress:
-                progress("mixing", 0.5, "正在混合完整配音时间线")
+                progress("mixing", 0.5, "Mixing the full dubbing timeline")
             duration = mix_timeline_wav(
                 timeline_segments,
                 wav_path,
@@ -1576,7 +1576,7 @@ class DubRenderService:
             srt_path.write_text(render_project_srt(project), encoding="utf-8")
             if mp4_path is not None:
                 if progress:
-                    progress("muxing", 0.72, "正在封装视频和音轨")
+                    progress("muxing", 0.72, "Combining video and audio")
                 video_metrics = self.mux_video(
                     self.store.source_media(project_id),
                     wav_path,
@@ -1608,7 +1608,7 @@ class DubRenderService:
         project["exports"] = project["exports"][-20:]
         self.store.save(project)
         if progress:
-            progress("complete", 1.0, "导出已经完成")
+            progress("complete", 1.0, "Export complete")
         return export_record
 
 
@@ -1627,10 +1627,10 @@ class DubExportService:
 
     def create_job(self, project_id: str, *, original_audio_gain: float = 0.0) -> dict[str, Any]:
         if not 0.0 <= original_audio_gain <= 1.0:
-            raise ValueError("原声音量必须在 0 到 1 之间。")
+            raise ValueError("Original audio volume must be between 0 and 1.")
         project = self.store.load(project_id)
         if not project_quality(project)["export_ready"]:
-            raise ValueError("请先为所有片段分配音色并完成最新生成。")
+            raise ValueError("Assign voices and generate up-to-date audio for every segment before exporting.")
         with self._lock:
             active = [
                 item
@@ -1638,7 +1638,7 @@ class DubExportService:
                 if item.get("status") in ACTIVE_JOB_STATUSES
             ]
             if active:
-                raise RuntimeError("该项目已有正在执行的生成或导出任务。")
+                raise RuntimeError("This project already has an active generation or export job.")
             job_id = uuid.uuid4().hex
             created_at = _utc_now()
             job = {
@@ -1649,7 +1649,7 @@ class DubExportService:
                 "status": "queued",
                 "phase": "queued",
                 "progress": 0.0,
-                "message": "导出任务已经保存",
+                "message": "Export job saved",
                 "original_audio_gain": round(original_audio_gain, 3),
                 "result": None,
                 "error": None,
@@ -1683,7 +1683,7 @@ class DubExportService:
                 job["status"] = "queued"
                 job["phase"] = "queued"
                 job["progress"] = 0.0
-                job["message"] = "服务重启后重新开始安全导出"
+                job["message"] = "Restarting export safely after service restart"
                 job["error"] = None
                 self.store.save_job(job)
                 self.launch(project["id"], job["job_id"])
@@ -1693,7 +1693,7 @@ class DubExportService:
     def get_job(self, project_id: str, job_id: str) -> dict[str, Any]:
         job = self.store.load_job(project_id, job_id)
         if job.get("kind") != "export":
-            raise FileNotFoundError("导出任务不存在。")
+            raise FileNotFoundError("Export job not found.")
         return job
 
     def _process(self, project_id: str, job_id: str) -> None:
@@ -1711,7 +1711,7 @@ class DubExportService:
 
         try:
             job = self.store.load_job(project_id, job_id)
-            progress("validating", 0.02, "正在检查项目是否可以导出")
+            progress("validating", 0.02, "Checking whether the project is ready to export")
             result = self.render_service.export(
                 project_id,
                 original_audio_gain=float(job.get("original_audio_gain", 0.0)),
@@ -1723,7 +1723,7 @@ class DubExportService:
                     "status": "complete",
                     "phase": "complete",
                     "progress": 1.0,
-                    "message": "导出已经完成",
+                    "message": "Export complete",
                     "result": result,
                     "error": None,
                 }
@@ -1736,7 +1736,7 @@ class DubExportService:
                     {
                         "status": "error",
                         "phase": "error",
-                        "message": "导出任务失败",
+                        "message": "Export failed",
                         "error": str(exc),
                     }
                 )

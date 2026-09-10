@@ -25,22 +25,22 @@ VC_CHUNK_MIN_SECONDS = 90
 VC_CHUNK_MAX_SECONDS = 6 * 60
 VC_PRESETS: dict[str, dict[str, Any]] = {
     "fast": {
-        "label": "快速",
+        "label": "Fast",
         "diffusion_steps": 4,
         "inference_cfg_rate": 0.7,
-        "description": "更快预览，音色相似度略低。",
+        "description": "Faster previews with slightly lower voice similarity.",
     },
     "balanced": {
-        "label": "均衡",
+        "label": "Balanced",
         "diffusion_steps": 8,
         "inference_cfg_rate": 0.7,
-        "description": "推荐，兼顾音色、韵律和速度。",
+        "description": "Recommended balance of voice similarity, rhythm, and speed.",
     },
     "quality": {
-        "label": "高质量",
+        "label": "High quality",
         "diffusion_steps": 12,
         "inference_cfg_rate": 0.7,
-        "description": "更慢，适合最终导出。",
+        "description": "Slower processing for final exports.",
     },
 }
 
@@ -51,7 +51,7 @@ def plan_vc_chunks(
 ) -> list[tuple[float, float]]:
     """Plan bounded, contiguous chunks and prefer cuts inside nearby pauses."""
     if duration_seconds <= 0:
-        raise ValueError("换声音频时长必须大于 0。")
+        raise ValueError("Voice conversion audio duration must be greater than 0.")
     if duration_seconds <= VC_CHUNK_MAX_SECONDS:
         return [(0.0, duration_seconds)]
 
@@ -70,7 +70,7 @@ def plan_vc_chunks(
         candidates = [point for point in safe_silences if earliest <= point <= latest]
         cut = min(candidates, key=lambda point: abs(point - ideal)) if candidates else latest
         if cut <= start:
-            raise ValueError("无法建立安全的换声音频分段。")
+            raise ValueError("Cannot create safe voice conversion audio segments.")
         chunks.append((round(start, 3), round(cut, 3)))
         start = cut
     chunks.append((round(start, 3), round(duration_seconds, 3)))
@@ -90,7 +90,7 @@ class VoiceConversionJob:
     created_at: str
     status: str = "queued"
     phase: str = "queued"
-    message: str = "等待原声换色"
+    message: str = "Waiting for voice conversion"
     progress: float = 0.0
     duration_seconds: float = 0.0
     source_has_video: bool = False
@@ -181,7 +181,7 @@ class VoiceConversionService:
         preset: str,
     ) -> VoiceConversionJob:
         if preset not in VC_PRESETS:
-            raise ValueError("原声换色质量档无效。")
+            raise ValueError("Invalid voice conversion quality preset.")
         job = VoiceConversionJob(
             job_id=job_id,
             job_dir=source_path.parent,
@@ -250,7 +250,7 @@ class VoiceConversionService:
                         "duration_seconds": round(
                             float(entry["end"]) - float(entry["start"]), 3
                         ),
-                        "label": f"第 {index} 段",
+                        "label": f"Segment {index}",
                     }
                 )
             return available
@@ -331,43 +331,43 @@ class VoiceConversionService:
                 job,
                 status="running",
                 phase="probing",
-                message="正在检查原始媒体",
+                message="Checking source media",
                 progress=0.04,
                 result=None,
                 error=None,
             )
             media_info = probe_media(job.source_path)
             if not media_info.has_audio:
-                raise ValueError("媒体文件中没有可用音轨。")
+                raise ValueError("The media file has no usable audio track.")
             if media_info.duration_seconds <= 0:
-                raise ValueError("无法确定媒体时长。")
+                raise ValueError("Cannot determine media duration.")
             if media_info.duration_seconds > MAX_VC_DURATION_SECONDS:
-                raise ValueError("当前单次原声换色最长支持 8 小时。")
+                raise ValueError("Voice conversion supports up to 8 hours per job.")
             self._update(
                 job,
                 source_has_video=media_info.has_video,
             )
             if job.cancel_event.is_set():
-                raise InterruptedError("原声换色已取消。")
+                raise InterruptedError("Voice conversion canceled.")
 
             voice = self.load_voice(job.voice_id)
             reference_path = Path(voice["audio_path"])
             self._update(
                 job,
                 phase="preparing",
-                message="正在提取并标准化原声",
+                message="Extracting and normalizing source audio",
                 progress=0.1,
             )
             prepare_vc_audio(job.source_path, prepared_path)
             prepared_info = probe_media(prepared_path)
             source_duration = prepared_info.duration_seconds
             if not prepared_info.has_audio or source_duration <= 0:
-                raise ValueError("无法确定提取后的音轨时长。")
+                raise ValueError("Cannot determine the extracted audio duration.")
             if source_duration > MAX_VC_DURATION_SECONDS:
-                raise ValueError("当前单次原声换色最长支持 8 小时。")
+                raise ValueError("Voice conversion supports up to 8 hours per job.")
             self._update(job, duration_seconds=source_duration)
             if job.cancel_event.is_set():
-                raise InterruptedError("原声换色已取消。")
+                raise InterruptedError("Voice conversion canceled.")
 
             preset = VC_PRESETS[job.preset]
             manifest = self._load_chunk_manifest(job, source_duration)
@@ -375,7 +375,7 @@ class VoiceConversionService:
                 self._update(
                     job,
                     phase="chunking",
-                    message="正在寻找自然停顿并规划长音频分段",
+                    message="Finding natural pauses and planning long audio segments",
                     progress=0.13,
                 )
                 silence_midpoints = (
@@ -450,18 +450,18 @@ class VoiceConversionService:
                             job,
                             chunks_completed=completed,
                             current_chunk=min(index + 1, chunk_total),
-                            message=f"已复用第 {index}/{chunk_total} 段",
+                            message=f"Reused segment {index}/{chunk_total}",
                         )
                         continue
 
                     if job.cancel_event.is_set():
-                        raise InterruptedError("原声换色已取消。")
+                        raise InterruptedError("Voice conversion canceled.")
                     self._update(
                         job,
                         phase="converting",
                         current_chunk=index,
                         chunks_completed=completed,
-                        message=f"正在处理第 {index}/{chunk_total} 段",
+                        message=f"Processing segment {index}/{chunk_total}",
                     )
                     extract_vc_chunk(
                         prepared_path,
@@ -485,7 +485,7 @@ class VoiceConversionService:
                         progress_callback=lambda progress, message, index=index: self._progress(
                             job,
                             ((index - 1) + progress) / chunk_total,
-                            f"第 {index}/{chunk_total} 段 · {message}",
+                            f"Segment {index}/{chunk_total} · {message}",
                         ),
                     )
                     entry["status"] = "complete"
@@ -503,15 +503,15 @@ class VoiceConversionService:
                         job,
                         chunks_completed=completed,
                         current_chunk=index,
-                        message=f"已完成第 {index}/{chunk_total} 段",
+                        message=f"Completed segment {index}/{chunk_total}",
                     )
 
                 if job.cancel_event.is_set():
-                    raise InterruptedError("原声换色已取消。")
+                    raise InterruptedError("Voice conversion canceled.")
                 self._update(
                     job,
                     phase="stitching",
-                    message=f"正在无额外停顿拼接 {chunk_total} 段音频",
+                    message=f"Joining {chunk_total} audio segments without extra pauses",
                     progress=0.91,
                 )
                 stitched_duration = stitch_wav_files(
@@ -526,7 +526,7 @@ class VoiceConversionService:
                     sample_rate=sample_rate,
                 )
             if job.cancel_event.is_set():
-                raise InterruptedError("原声换色已取消。")
+                raise InterruptedError("Voice conversion canceled.")
 
             result_payload: dict[str, Any] = {
                 "audio_filename": output_path.name,
@@ -542,7 +542,7 @@ class VoiceConversionService:
                 self._update(
                     job,
                     phase="muxing",
-                    message="正在把新音色写回视频",
+                    message="Adding the converted voice to the video",
                     progress=0.93,
                 )
                 video_path = job.job_dir / "converted.mp4"
@@ -565,7 +565,7 @@ class VoiceConversionService:
                 job,
                 status="complete",
                 phase="complete",
-                message="原声换色完成",
+                message="Voice conversion complete",
                 progress=1.0,
                 result=result_payload,
             )
@@ -582,7 +582,7 @@ class VoiceConversionService:
                 job,
                 status="error",
                 phase="error",
-                message="原声换色没有完成",
+                message="Voice conversion did not complete",
                 error=str(exc),
             )
 
@@ -592,15 +592,15 @@ class VoiceConversionService:
 
     def _load_from_disk(self, job_id: str) -> VoiceConversionJob:
         if not self._valid_id(job_id):
-            raise FileNotFoundError("原声换色任务不存在。")
+            raise FileNotFoundError("Voice conversion job not found.")
         job_dir = self.conversion_root / job_id
         metadata_path = job_dir / "conversion.json"
         if not metadata_path.is_file():
-            raise FileNotFoundError("原声换色任务不存在。")
+            raise FileNotFoundError("Voice conversion job not found.")
         data = json.loads(metadata_path.read_text(encoding="utf-8"))
         storage_filename = str(data["source_storage_filename"])
         if Path(storage_filename).name != storage_filename:
-            raise ValueError("原声换色任务的源文件记录无效。")
+            raise ValueError("Invalid source file record for this voice conversion job.")
         source_path = job_dir / storage_filename
         return VoiceConversionJob(
             job_id=job_id,
@@ -609,7 +609,7 @@ class VoiceConversionService:
             source_filename=str(data["source_filename"]),
             source_bytes=int(data.get("source_bytes", 0)),
             voice_id=str(data["voice_id"]),
-            voice_name=str(data.get("voice_name", "已保存音色")),
+            voice_name=str(data.get("voice_name", "Saved voice")),
             preset=str(data.get("preset", "balanced")),
             created_at=str(data["created_at"]),
             status=str(data.get("status", "error")),
@@ -652,19 +652,19 @@ class VoiceConversionService:
         if job.status in {"complete", "error", "cancelled"}:
             return job
         job.cancel_event.set()
-        self._update(job, message="正在停止原声换色")
+        self._update(job, message="Stopping voice conversion")
         return job
 
     def retry(self, job_id: str) -> VoiceConversionJob:
         job = self.get_job(job_id)
         if job.status not in {"error", "cancelled"}:
-            raise ValueError("只有失败或已取消的任务可以重试。")
+            raise ValueError("Only failed or canceled jobs can be retried.")
         job.cancel_event = threading.Event()
         self._update(
             job,
             status="queued",
             phase="queued",
-            message="等待原声换色",
+            message="Waiting for voice conversion",
             progress=0.0,
             error=None,
             result=None,
@@ -686,8 +686,8 @@ class VoiceConversionService:
                     job,
                     status="error",
                     phase="error",
-                    message="应用重启中断了原声换色，可安全重试",
-                    error="应用重启中断了任务。",
+                    message="Voice conversion was interrupted by an app restart. It is safe to retry.",
+                    error="The job was interrupted by an app restart.",
                 )
                 recovered += 1
         return recovered
@@ -695,14 +695,14 @@ class VoiceConversionService:
     def source_media(self, job_id: str) -> Path:
         job = self.get_job(job_id)
         if not job.source_path.is_file():
-            raise FileNotFoundError("原始媒体不存在。")
+            raise FileNotFoundError("Source media not found.")
         return job.source_path
 
     def result_audio(self, job_id: str) -> Path:
         job = self.get_job(job_id)
         path = job.job_dir / "converted.wav"
         if job.status != "complete" or not path.is_file():
-            raise FileNotFoundError("换声结果音频尚未生成。")
+            raise FileNotFoundError("Converted audio has not been generated yet.")
         return path
 
     def stream_chunk(self, job_id: str, chunk_index: int) -> Path:
@@ -712,20 +712,20 @@ class VoiceConversionService:
             for chunk in self._available_stream_chunks_unlocked(job)
         }
         if chunk_index not in available:
-            raise FileNotFoundError("该换声片段尚未完成。")
+            raise FileNotFoundError("This voice conversion segment is not ready yet.")
         if job.chunk_total == 1:
             path = job.job_dir / "converted.wav"
         else:
             path = job.job_dir / "chunks" / f"converted-{chunk_index:05d}.wav"
         if not path.is_file():
-            raise FileNotFoundError("该换声片段不存在。")
+            raise FileNotFoundError("Voice conversion segment not found.")
         return path
 
     def result_video(self, job_id: str) -> Path:
         job = self.get_job(job_id)
         path = job.job_dir / "converted.mp4"
         if job.status != "complete" or not path.is_file():
-            raise FileNotFoundError("换声结果视频尚未生成。")
+            raise FileNotFoundError("Converted video has not been generated yet.")
         return path
 
     def voice_in_use(self, voice_id: str) -> bool:

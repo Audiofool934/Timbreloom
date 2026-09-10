@@ -134,7 +134,7 @@ def _split_oversized_span(
     while estimate_audio_tokens(text[cursor:end]) > token_limit:
         cut = _largest_safe_prefix(text, cursor, end, token_limit)
         if cut <= cursor:
-            raise RuntimeError("无法为长文本找到安全分段位置。")
+            raise RuntimeError("Cannot find a safe split point for the long text.")
         spans.append((cursor, cut))
         cursor = cut
 
@@ -150,9 +150,9 @@ def segment_text(
     """Create lossless, multi-sentence segments below a conservative token budget."""
     source = text.strip()
     if not source:
-        raise ValueError("目标文字不能为空。")
+        raise ValueError("Enter the text to generate.")
     if token_limit <= 0 or token_limit > GENERATION_TOKEN_LIMIT:
-        raise ValueError("分段 token 上限无效。")
+        raise ValueError("Invalid segment token limit.")
 
     atomic_spans: list[tuple[int, int]] = []
     for start, end in _semantic_spans(source):
@@ -189,7 +189,7 @@ def segment_text(
     ]
 
     if "".join(segment.text for segment in segments) != source:
-        raise RuntimeError("分段完整性校验失败，生成已中止。")
+        raise RuntimeError("Segment integrity check failed. Generation stopped.")
     if any(segment.estimated_audio_tokens > token_limit for segment in segments):
-        raise RuntimeError("分段超出安全 token 预算，生成已中止。")
+        raise RuntimeError("A segment exceeds the safe token budget. Generation stopped.")
     return segments

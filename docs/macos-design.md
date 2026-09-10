@@ -1,57 +1,61 @@
-# Mac 界面设计
+# Mac interface design
 
-2026-09-06，本机应用的界面与交互打磨记录。
-保留 Timbreloom 的纸白、墨色与浅绿色身份，用稳定的排版、紧凑的操作和明确的状态支持音频工作。
+Timbreloom uses paper white, dark ink, and soft green to support focused audio work.
+The English interface preserves the existing visual identity, with concise labels and responsive controls.
 
-## 视觉基础
+## Visual system
 
-| 项目 | 规范 |
+| Element | Specification |
 | --- | --- |
-| 工作台底色 | `#f4f5f1` |
-| 主面板 | `#fffefa` |
-| 主文字 / 次要文字 | `#20251f` / `#6b7267` |
-| 选中背景 / 焦点边框 | `#eef5de` / `#6e854a` |
-| 字体 | macOS 系统字体，正文 13pt，文稿 15pt，页面标题 28pt |
-| 控件 | 输入与主要操作 40pt，次要按钮 32pt |
-| 圆角 | 两侧工作区外壳 16pt 连续圆角，面板 12pt，输入 8pt，次要按钮 7pt |
-| 窗口边距 | 工具栏下方与窗口四周留出 12pt，两侧工作区间隔 12pt，顶部对齐 |
-| 图标 | 原生与工作区共同使用 Apple SF Symbols |
-| 动效 | 状态颜色 120ms；尊重减少动态效果与提高对比度偏好 |
+| Workspace background | `#f4f5f1` |
+| Main panel | `#fffefa` |
+| Primary and secondary text | `#20251f` and `#6b7267` |
+| Selection and focus | `#eef5de` and `#6e854a` |
+| Typography | macOS system font; 13pt body, 15pt script, 28pt page title |
+| Controls | 40pt inputs and primary actions; 32pt secondary buttons |
+| Corners | 16pt workspace shells, 12pt panels, 8pt inputs, 7pt secondary buttons |
+| Window spacing | 12pt outer inset and space between the two top-aligned workspace shells |
+| Icons | Apple SF Symbols in the native shell and workspace |
+| Motion | 120ms state transitions; respect reduced motion and increased contrast |
 
-## 组件与交互
+## Components and behavior
 
-| 组件 | 设计与行为 |
+| Component | Design and interaction |
 | --- | --- |
-| 侧栏 | 工作区标题、用途、快捷键；独立的选中、悬停与键盘焦点状态 |
-| 工具栏与菜单 | 当前工作区标题，随工作区变化的导入名称，菜单选中标记 |
-| 启动与连接 | 延迟加载模型，保留连接说明、重试与日志入口 |
-| 导入面板 | 参考录音、音视频、项目包分别限制类型并说明用途 |
-| 拖入区域 | 默认、拖放、已选文件与键盘焦点；长文件名可以换行 |
-| 录音区域 | 请求权限、录音计时、停止、取消与权限失败反馈 |
-| 音色选择 | 保存音色信息；取消导入不会清空当前音色 |
-| 文稿 | 清晰的编辑字号，独立字数行，标点与停顿说明 |
-| 质量与语言 | 一致的选择控件，单选质量与清晰的焦点状态 |
-| 资料库 | 紧凑记录行、选中与悬停；空状态包含下一步操作 |
-| 处理进度 | 标题、当前说明、进度与取消；完成换色后隐藏重复进度卡 |
-| 结果试听 | 播放、暂停、定位、倍速、加载失败与重试；原视频使用系统控件 |
-| 结果指标 | 换色耗时比例由显示的转换耗时与音频时长计算，避免旧记录的比例字段与时间不一致 |
-| 转录编辑 | 时间定位、片段选择、文字编辑、保存、字幕导出与可选文字工具 |
-| 配音编辑 | 源文与台词分层，角色音色、时间线、时间字段、生成与导出状态 |
-| 配音待生成 | 使用待准备状态；实际生成错误保留错误提示 |
-| 吸顶工具栏 | 窄窗口仍横向排列并换行；片段定位为工具栏预留空间 |
-| 错误与保存 | 错误可以关闭；普通草稿保存有状态反馈 |
-| 工作区切换 | 保存各自的阅读位置与可恢复的输入焦点 |
+| Sidebar | Workspace titles, purpose, and shortcuts with distinct selected, hover, and focus states |
+| Toolbar and menus | Current workspace, context-sensitive import action, and selected menu markers |
+| Startup | Deferred model loading, connection explanation, retry, and log access |
+| Import dialogs | Separate allowed types and descriptions for references, media, and project bundles |
+| Drop area | Empty, dragging, selected-file, and keyboard-focus states; long filenames can wrap |
+| Recording | Permission request, timer, stop, cancel, and permission-error feedback |
+| Saved voice | Reference details remain intact when an import is canceled |
+| Script | Readable text, a separate character count, and punctuation guidance |
+| Quality and language | Consistent selectors, radio presets, and visible focus |
+| Library | Compact records, selection and hover states, and actionable empty states |
+| Progress | Task title, current detail, progress, and cancel; completed conversion hides duplicate progress |
+| Audio preview | Play, pause, seek, speed, loading errors, and retry; video uses system controls |
+| Metrics | Conversion time divided by displayed audio duration, avoiding stale historical ratio fields |
+| Transcript editor | Timestamp seeking, selection, text edits, save, subtitles, and optional text tools |
+| Dubbing editor | Original text and dialogue, roles, voices, timeline, timing inputs, generation, and export state |
+| Pending renders | Neutral preparation states; actual generation failures retain error feedback |
+| Sticky toolbar | Horizontal controls that wrap at narrow widths; segment scrolling reserves toolbar space |
+| Errors and drafts | Dismissible errors and draft-save status |
+| Workspace switching | Independent scroll positions and restorable input focus |
 
-## 验收
+## Verification
 
-真实 WebKit 检查覆盖 1020、760、640pt 三种内容宽度的四个工作区，以及有内容的转录与配音编辑器。
-检查包含可见元素横向溢出、取消导入后的音色保留、临时文件选择控件释放、工作区与原生导入类型同步、滚动恢复、配音创建快捷键、字幕内容与覆盖导出。
-音频组件使用实际 HTMLAudioElement 验证播放、暂停、定位与倍速。
-原生 AppKit 构建、系统导入面板和实际安装窗口另行查看。
+The WebKit harness checks all four workspaces at 1020, 760, and 640pt content widths, including populated transcript and dubbing editors.
+It detects visible horizontal overflow and verifies saved-voice preservation after canceled imports, temporary file-input cleanup, native import types, scroll restoration, project-creation shortcuts, subtitle content, and overwrite exports.
+Real HTMLAudioElement checks cover playback, pause, seeking, and speed.
 
-模型推理使用模拟 ASR，录音状态使用合成麦克风，未请求或更改真实麦克风权限。
-本轮未重新评估 Qwen、Whisper 或 Seed-VC 的生成质量与长音频性能。
-实际用户资料库不用于创建测试素材。
-最近一次完整 WebKit 检查通过，截图保留在 `build/macos-design-review/`。
+The harness uses simulated ASR and synthetic microphone states in an isolated library.
+It does not request real microphone permission or measure model quality.
+Full AppKit layout, system dialogs, and the installed app are inspected separately.
 
-执行 `.venv/bin/python scripts/e2e_macos.py` 可重新生成当前实现的隔离验证与截图。
+```bash
+.venv/bin/python scripts/e2e_macos.py
+.venv/bin/python scripts/e2e_macos.py --models
+```
+
+Each run saves current screenshots in its temporary evidence directory.
+Public screenshots under `docs/assets/` use a separate demonstration library.

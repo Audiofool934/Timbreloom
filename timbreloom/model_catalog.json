@@ -4,8 +4,8 @@
     {
       "id": "qwen",
       "name": "Qwen3-TTS",
-      "purpose": "声音克隆与配音",
-      "description": "让文字使用参考音色朗读，也用于生成配音项目中的台词。",
+      "purpose": "Voice cloning and dubbing",
+      "description": "Read text in a reference voice and generate dialogue for dubbing projects.",
       "directory": "Qwen3-TTS-12Hz-0.6B-Base-bf16",
       "files": [
         {
@@ -117,8 +117,8 @@
     {
       "id": "whisper",
       "name": "Whisper",
-      "purpose": "本地转录",
-      "description": "把音频和视频转成带时间戳的文字，支持多种语言。",
+      "purpose": "Local transcription",
+      "description": "Turn audio and video into timestamped text in multiple languages.",
       "directory": "Whisper-large-v3-turbo-q4",
       "files": [
         {
@@ -150,8 +150,8 @@
     {
       "id": "seed-vc",
       "name": "Seed-VC",
-      "purpose": "原声换色",
-      "description": "保留原表演的节奏与停顿，转换为另一种音色。包含所需的辅助模型。",
+      "purpose": "Voice conversion",
+      "description": "Convert a voice while preserving the original rhythm and pauses. Includes supporting models.",
       "directory": "Seed-VC",
       "files": [
         {

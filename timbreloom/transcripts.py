@@ -105,14 +105,14 @@ def build_transcript(
             }
         )
     if not segments:
-        raise ValueError("转录结果为空。")
+        raise ValueError("The transcript is empty.")
 
     created_at = _utc_now()
     detected_language = str(raw_result.get("language", "")).strip() or requested_language or "unknown"
     return {
         "schema_version": TRANSCRIPT_SCHEMA_VERSION,
         "id": transcript_id,
-        "title": Path(source_filename).stem or "未命名转录",
+        "title": Path(source_filename).stem or "Untitled transcript",
         "source_filename": source_filename,
         "source_bytes": source_bytes,
         "duration_seconds": round(duration_seconds, 3),
@@ -130,24 +130,24 @@ def build_transcript(
 
 def validate_transcript(transcript: dict[str, Any]) -> None:
     if transcript.get("schema_version") != TRANSCRIPT_SCHEMA_VERSION:
-        raise ValueError("不支持该转录数据版本。")
+        raise ValueError("Unsupported transcript version.")
     if not transcript.get("id"):
-        raise ValueError("转录缺少 ID。")
+        raise ValueError("The transcript is missing an ID.")
     segments = transcript.get("segments")
     if not isinstance(segments, list) or not segments:
-        raise ValueError("转录没有有效分段。")
+        raise ValueError("The transcript has no valid segments.")
 
     previous_start = -1.0
     for segment in segments:
         if not isinstance(segment, dict) or not segment.get("id"):
-            raise ValueError("转录分段格式无效。")
+            raise ValueError("Invalid transcript segment format.")
         start = _number(segment.get("start"), -1.0)
         end = _number(segment.get("end"), -1.0)
         text = str(segment.get("text", "")).strip()
         if start < 0 or end < start or start < previous_start:
-            raise ValueError("转录时间戳顺序无效。")
+            raise ValueError("Invalid transcript timestamp order.")
         if not text:
-            raise ValueError("转录分段文字不能为空。")
+            raise ValueError("Transcript segment text cannot be empty.")
         previous_start = start
 
 
@@ -167,7 +167,7 @@ def save_transcript(transcript_dir: Path, transcript: dict[str, Any]) -> Path:
 def load_transcript(transcript_dir: Path) -> dict[str, Any]:
     path = transcript_dir / "transcript.json"
     if not path.is_file():
-        raise FileNotFoundError("转录不存在。")
+        raise FileNotFoundError("Transcript not found.")
     transcript = json.loads(path.read_text(encoding="utf-8"))
     validate_transcript(transcript)
     return transcript
@@ -196,20 +196,20 @@ def update_segment_texts(
     updates: dict[str, str],
 ) -> dict[str, Any]:
     if not updates:
-        raise ValueError("没有需要保存的转录修改。")
+        raise ValueError("No transcript changes to save.")
     known_ids = {segment["id"] for segment in transcript["segments"]}
     unknown_ids = set(updates) - known_ids
     if unknown_ids:
-        raise ValueError("包含不存在的转录分段。")
+        raise ValueError("Includes a missing transcript segment.")
 
     for segment in transcript["segments"]:
         if segment["id"] not in updates:
             continue
         text = " ".join(str(updates[segment["id"]]).strip().split())
         if not text:
-            raise ValueError("转录分段文字不能为空。")
+            raise ValueError("Transcript segment text cannot be empty.")
         if len(text) > 10_000:
-            raise ValueError("单个转录分段不能超过 10,000 个字符。")
+            raise ValueError("Each transcript segment is limited to 10,000 characters.")
         segment["text"] = text
     transcript["text"] = join_segment_texts(transcript["segments"])
     transcript["updated_at"] = _utc_now()
@@ -221,15 +221,15 @@ def selected_segment_range(
     segment_ids: list[str],
 ) -> tuple[float, float, str]:
     if not segment_ids:
-        raise ValueError("请选择至少一个转录片段。")
+        raise ValueError("Select at least one transcript segment.")
     all_segments = transcript["segments"]
     index_by_id = {segment["id"]: index for index, segment in enumerate(all_segments)}
     try:
         indices = sorted({index_by_id[segment_id] for segment_id in segment_ids})
     except KeyError as exc:
-        raise ValueError("选择中包含不存在的转录片段。") from exc
+        raise ValueError("The selection includes a missing transcript segment.") from exc
     if indices != list(range(indices[0], indices[-1] + 1)):
-        raise ValueError("创建音色时只能选择连续的转录片段。")
+        raise ValueError("Select consecutive transcript segments to create a voice.")
 
     selected = all_segments[indices[0] : indices[-1] + 1]
     start = float(selected[0]["start"])
@@ -252,7 +252,7 @@ def _timestamp(seconds: float, decimal_marker: str) -> str:
 def render_export(transcript: dict[str, Any], export_format: str) -> str:
     export_format = export_format.lower()
     if export_format not in SUPPORTED_EXPORT_FORMATS:
-        raise ValueError("仅支持 TXT、SRT 和 VTT 导出。")
+        raise ValueError("Only TXT, SRT, and VTT exports are supported.")
     segments = transcript["segments"]
     if export_format == "txt":
         return "\n".join(segment["text"].strip() for segment in segments) + "\n"

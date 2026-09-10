@@ -72,12 +72,13 @@ def main() -> None:
         info = {
             "CFBundleName": "Timbreloom", "CFBundleDisplayName": "Timbreloom",
             "CFBundleIdentifier": BUNDLE_ID, "CFBundleExecutable": "Timbreloom",
+            "CFBundleDevelopmentRegion": "en", "CFBundleLocalizations": ["en"],
             "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "1.1.0",
             "CFBundleVersion": args.build_number, "CFBundleIconFile": "Timbreloom",
             "LSMinimumSystemVersion": "14.0", "LSMultipleInstancesProhibited": True,
             "LSApplicationCategoryType": "public.app-category.music",
             "NSHighResolutionCapable": True,
-            "NSMicrophoneUsageDescription": "Timbreloom 使用麦克风在本机录制参考音色、原声和转录素材。",
+            "NSMicrophoneUsageDescription": "Timbreloom uses the microphone to record voice references and media for conversion and transcription locally.",
             "NSAppTransportSecurity": {"NSAllowsLocalNetworking": True},
         }
         if args.release:

@@ -21,8 +21,8 @@ class MediaInfo:
 def _tool(name: str) -> str:
     executable = shutil.which(name)
     if executable is None:
-        instruction = "请重新安装 Timbreloom。" if os.getenv("TIMBRELOOM_EMBEDDED") == "1" else "请先运行 brew install ffmpeg。"
-        raise RuntimeError(f"没有找到 {name}。{instruction}")
+        instruction = "Reinstall Timbreloom." if os.getenv("TIMBRELOOM_EMBEDDED") == "1" else "Run brew install ffmpeg first."
+        raise RuntimeError(f"{name} was not found. {instruction}")
     return executable
 
 
@@ -44,8 +44,8 @@ def probe_media(source: Path) -> MediaInfo:
         check=False,
     )
     if result.returncode != 0:
-        detail = result.stderr.strip() or "无法读取媒体文件。"
-        raise ValueError(f"媒体检查失败：{detail}")
+        detail = result.stderr.strip() or "Cannot read the media file."
+        raise ValueError(f"Media inspection failed: {detail}")
 
     payload = json.loads(result.stdout)
     streams = payload.get("streams", [])
@@ -91,8 +91,8 @@ def prepare_asr_audio(source: Path, destination: Path) -> None:
         check=False,
     )
     if result.returncode != 0:
-        detail = result.stderr.strip() or "无法提取音频。"
-        raise ValueError(f"音频准备失败：{detail}")
+        detail = result.stderr.strip() or "Cannot extract audio."
+        raise ValueError(f"Audio preparation failed: {detail}")
 
 
 def prepare_vc_audio(source: Path, destination: Path) -> None:
@@ -125,8 +125,8 @@ def prepare_vc_audio(source: Path, destination: Path) -> None:
         check=False,
     )
     if result.returncode != 0:
-        detail = result.stderr.strip() or "无法提取换声所需的音频。"
-        raise ValueError(f"换声音频准备失败：{detail}")
+        detail = result.stderr.strip() or "Cannot extract audio for voice conversion."
+        raise ValueError(f"Voice conversion audio preparation failed: {detail}")
 
 
 def detect_silence_midpoints(source: Path) -> list[float]:
@@ -178,7 +178,7 @@ def extract_vc_chunk(
 ) -> None:
     """Extract one non-overlapping 22.05 kHz PCM chunk for Seed-VC."""
     if start_seconds < 0 or end_seconds <= start_seconds:
-        raise ValueError("换声音频分段时间范围无效。")
+        raise ValueError("Invalid voice conversion segment time range.")
     destination.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         [
@@ -210,8 +210,8 @@ def extract_vc_chunk(
     )
     if result.returncode != 0:
         destination.unlink(missing_ok=True)
-        detail = result.stderr.strip() or "无法截取换声音频分段。"
-        raise ValueError(f"换声音频分段失败：{detail}")
+        detail = result.stderr.strip() or "Cannot extract the voice conversion audio segment."
+        raise ValueError(f"Voice conversion audio segmentation failed: {detail}")
 
 
 def normalize_vc_audio(source: Path, destination: Path) -> None:
@@ -243,8 +243,8 @@ def normalize_vc_audio(source: Path, destination: Path) -> None:
     )
     if result.returncode != 0:
         destination.unlink(missing_ok=True)
-        detail = result.stderr.strip() or "无法标准化换声结果。"
-        raise ValueError(f"换声结果处理失败：{detail}")
+        detail = result.stderr.strip() or "Cannot normalize the converted audio."
+        raise ValueError(f"Converted audio processing failed: {detail}")
 
 
 def extract_voice_clip(
@@ -254,7 +254,7 @@ def extract_voice_clip(
     end_seconds: float,
 ) -> None:
     if start_seconds < 0 or end_seconds <= start_seconds:
-        raise ValueError("音色片段时间范围无效。")
+        raise ValueError("Invalid voice reference time range.")
     duration = end_seconds - start_seconds
     destination.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
@@ -286,8 +286,8 @@ def extract_voice_clip(
         check=False,
     )
     if result.returncode != 0:
-        detail = result.stderr.strip() or "无法截取音色片段。"
-        raise ValueError(f"音色片段提取失败：{detail}")
+        detail = result.stderr.strip() or "Cannot extract the voice reference clip."
+        raise ValueError(f"Voice reference extraction failed: {detail}")
 
 
 def tempo_fit_wav(
@@ -305,15 +305,15 @@ def tempo_fit_wav(
     inaudible quality failure. The caller can surface ``limited`` to the user.
     """
     if not source.is_file():
-        raise FileNotFoundError("需要适配时长的配音片段不存在。")
+        raise FileNotFoundError("The dubbing segment to fit was not found.")
     if target_duration_seconds <= 0:
-        raise ValueError("目标时间槽长度必须大于 0。")
+        raise ValueError("The target slot duration must be greater than 0.")
     if min_speed <= 0 or max_speed < min_speed:
-        raise ValueError("安全语速范围无效。")
+        raise ValueError("Invalid safe playback speed range.")
 
     info = probe_media(source)
     if not info.has_audio or info.duration_seconds <= 0:
-        raise ValueError("配音片段没有可用音频。")
+        raise ValueError("The dubbing segment has no usable audio.")
     requested_speed = info.duration_seconds / target_duration_seconds
     applied_speed = min(max_speed, max(min_speed, requested_speed))
     limited = not math.isclose(requested_speed, applied_speed, rel_tol=0.0, abs_tol=0.001)
@@ -347,8 +347,8 @@ def tempo_fit_wav(
     )
     if result.returncode != 0:
         destination.unlink(missing_ok=True)
-        detail = result.stderr.strip() or "无法安全适配配音时长。"
-        raise ValueError(f"配音时长适配失败：{detail}")
+        detail = result.stderr.strip() or "Cannot safely fit the dubbing duration."
+        raise ValueError(f"Dubbing duration fit failed: {detail}")
     fitted = probe_media(destination)
     return {
         "source_duration_seconds": round(info.duration_seconds, 3),
@@ -368,15 +368,15 @@ def mux_dubbed_video(
     original_audio_gain: float = 0.0,
 ) -> dict[str, object]:
     if not source_video.is_file():
-        raise FileNotFoundError("配音项目的原始视频不存在。")
+        raise FileNotFoundError("The original dubbing project video was not found.")
     if not dubbed_audio.is_file():
-        raise FileNotFoundError("配音时间线音频不存在。")
+        raise FileNotFoundError("Dubbing timeline audio not found.")
     if not 0.0 <= original_audio_gain <= 1.0:
-        raise ValueError("原声音量必须在 0 到 1 之间。")
+        raise ValueError("Original audio volume must be between 0 and 1.")
 
     media_info = probe_media(source_video)
     if not media_info.has_video:
-        raise ValueError("配音项目的源媒体不包含视频轨。")
+        raise ValueError("The dubbing source media has no video track.")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     audio_options: list[str]
@@ -427,7 +427,7 @@ def mux_dubbed_video(
 
     encoder = os.getenv("TIMBRELOOM_H264_ENCODER", "libx264")
     if encoder not in {"libx264", "h264_videotoolbox"}:
-        raise ValueError("不支持的视频编码器配置。")
+        raise ValueError("Unsupported video encoder configuration.")
     quality = ["-q:v", "75"] if encoder == "h264_videotoolbox" else ["-preset", "medium", "-crf", "18"]
     attempts = [
         ("copy", [*common, "-c:v", "copy", str(destination)]),
@@ -458,15 +458,15 @@ def mux_dubbed_video(
         if result.returncode == 0 and destination.is_file():
             codec_mode = mode
             break
-        errors.append(result.stderr.strip() or f"{mode} 视频封装失败")
+        errors.append(result.stderr.strip() or f"{mode} video mux failed")
     else:
-        detail = "；".join(errors)
-        raise ValueError(f"视频配音导出失败：{detail}")
+        detail = "; ".join(errors)
+        raise ValueError(f"Video dubbing export failed: {detail}")
 
     output_info = probe_media(destination)
     if not output_info.has_video or not output_info.has_audio:
         destination.unlink(missing_ok=True)
-        raise ValueError("视频配音导出缺少视频轨或音频轨。")
+        raise ValueError("The dubbed video export is missing a video or audio track.")
     return {
         "duration_seconds": round(output_info.duration_seconds, 3),
         "original_audio_gain": round(original_audio_gain, 3),

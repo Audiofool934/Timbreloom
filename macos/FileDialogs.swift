@@ -15,17 +15,17 @@ struct NativeFileDialogs: FileDialogs {
         let panel = NSOpenPanel()
         switch kind {
         case .reference:
-            panel.title = "导入参考录音"
-            panel.message = "选择一段清晰的人声录音，建议 5 至 15 秒。"
-            panel.prompt = "使用录音"
+            panel.title = "Import Reference Audio"
+            panel.message = "Choose a clear voice recording, ideally 5 to 15 seconds long."
+            panel.prompt = "Use Recording"
         case .media:
-            panel.title = "导入媒体"
-            panel.message = "选择要在这台 Mac 上处理的音频或视频。"
-            panel.prompt = "导入"
+            panel.title = "Import Media"
+            panel.message = "Choose audio or video to process on this Mac."
+            panel.prompt = "Import"
         case .project:
-            panel.title = "导入配音项目"
-            panel.message = "选择包含台词、音色与媒体的 Timbreloom 项目包。"
-            panel.prompt = "打开项目"
+            panel.title = "Import Dubbing Project"
+            panel.message = "Choose a Timbreloom project bundle containing dialogue, voices, and media."
+            panel.prompt = "Open Project"
         }
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = multiple
@@ -39,8 +39,8 @@ struct NativeFileDialogs: FileDialogs {
 
     func save(in window: NSWindow, filename: String, completion: @escaping (URL?) -> Void) {
         let panel = NSSavePanel()
-        panel.title = "导出文件"
-        panel.prompt = "保存"
+        panel.title = "Export File"
+        panel.prompt = "Save"
         panel.nameFieldStringValue = (filename as NSString).lastPathComponent
         if let type = UTType(filenameExtension: (filename as NSString).pathExtension) {
             panel.allowedContentTypes = [type]

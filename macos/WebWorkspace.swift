@@ -20,11 +20,11 @@ final class WebWorkspace: NSViewController, WKNavigationDelegate, WKUIDelegate, 
     private var loaded = false
     private let surface = NSView()
     private let overlay = NSView()
-    private let loadingTitle = NSTextField(labelWithString: "正在打开你的工作台")
-    private let loadingDetail = NSTextField(wrappingLabelWithString: "连接本地音频引擎，模型将在需要时加载。")
+    private let loadingTitle = NSTextField(labelWithString: "Opening your studio")
+    private let loadingDetail = NSTextField(wrappingLabelWithString: "Connecting to the local audio engine. Models load when needed.")
     private let spinner = NSProgressIndicator()
-    private let retryButton = NSButton(title: "重试", target: nil, action: nil)
-    private let logButton = NSButton(title: "查看连接详情", target: nil, action: nil)
+    private let retryButton = NSButton(title: "Retry", target: nil, action: nil)
+    private let logButton = NSButton(title: "View Connection Details", target: nil, action: nil)
     private var transfers: [ObjectIdentifier: DownloadTransfer] = [:]
     private var downloads: [ObjectIdentifier: WKDownload] = [:]
     var downloading: Bool { !downloads.isEmpty }
@@ -156,15 +156,15 @@ final class WebWorkspace: NSViewController, WKNavigationDelegate, WKUIDelegate, 
         guard !ready else { return }
         overlay.isHidden = false
         spinner.stopAnimation(nil)
-        loadingTitle.stringValue = "暂时无法打开工作台"
+        loadingTitle.stringValue = "Cannot open the studio yet"
         loadingDetail.stringValue = message
         retryButton.isHidden = false
         logButton.isHidden = false
     }
     @objc private func retry() {
         loaded = false
-        loadingTitle.stringValue = "正在重新连接"
-        loadingDetail.stringValue = "你的音色和项目仍然保存在本机。"
+        loadingTitle.stringValue = "Reconnecting"
+        loadingDetail.stringValue = "Your voices and projects are still saved on this Mac."
         spinner.startAnimation(nil)
         retryButton.isHidden = true
         logButton.isHidden = true
@@ -257,17 +257,17 @@ final class WebWorkspace: NSViewController, WKNavigationDelegate, WKUIDelegate, 
         let alert = NSAlert()
         alert.messageText = "Timbreloom"
         alert.informativeText = message
-        alert.addButton(withTitle: "好")
+        alert.addButton(withTitle: "OK")
         alert.beginSheetModal(for: window) { _ in completionHandler() }
     }
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
         guard let window = view.window else { completionHandler(false); return }
         let alert = NSAlert()
-        alert.messageText = "确认操作"
+        alert.messageText = "Confirm Action"
         alert.informativeText = message
-        alert.addButton(withTitle: "取消")
-        alert.addButton(withTitle: "继续")
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Continue")
         alert.beginSheetModal(for: window) { response in completionHandler(response == .alertSecondButtonReturn) }
     }
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -328,7 +328,7 @@ final class WebWorkspace: NSViewController, WKNavigationDelegate, WKUIDelegate, 
     private func showDownloadError(_ error: Error) {
         guard let window = view.window else { return }
         let alert = NSAlert()
-        alert.messageText = "文件未能导出"
+        alert.messageText = "Could Not Export File"
         alert.informativeText = error.localizedDescription
         alert.beginSheetModal(for: window)
     }

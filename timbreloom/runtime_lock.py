@@ -16,7 +16,7 @@ class DataDirectoryLock:
         except BlockingIOError:
             self.handle.close()
             self.handle = None
-            raise RuntimeError("这个资料库已有 Timbreloom 服务在运行，请连接现有服务。") from None
+            raise RuntimeError("A Timbreloom service is already using this library. Connect to the existing service.") from None
         return self
 
     def __exit__(self, *_):

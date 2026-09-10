@@ -1,3 +1,5 @@
+import { countLabel } from "./text-format.js?v=1";
+
 export function createProgressiveAudioPlayer({ card, audio, status, toggle, waitingLabel }) {
   let chunks = [];
   let total = 0;
@@ -12,12 +14,12 @@ export function createProgressiveAudioPlayer({ card, audio, status, toggle, wait
   function statusText() {
     if (!chunks.length) return waitingLabel;
     if (streamKind === "source") {
-      return audio.paused ? "原始音轨已准备，可以边转录边听。" : "正在播放原始音轨，转录在后台继续。";
+      return audio.paused ? "Original audio is ready. Listen while transcription continues." : "Playing original audio. Transcription continues in the background.";
     }
-    if (awaitingNext) return `已听到当前进度，等待第 ${cursor + 1} 段生成。`;
+    if (awaitingNext) return `Playback is up to date. Waiting for segment ${cursor + 1}.`;
     const current = Math.min(cursor + 1, chunks.length);
-    const state = audio.paused ? "可播放" : "正在连续播放";
-    return `已生成 ${chunks.length} / ${total || chunks.length} 段 · ${state}第 ${current} 段。`;
+    const state = audio.paused ? "Ready to play" : "Playing";
+    return `${chunks.length} / ${countLabel(total || chunks.length, "segment")} generated · ${state} segment ${current}.`;
   }
 
   function updateUi() {
@@ -26,13 +28,13 @@ export function createProgressiveAudioPlayer({ card, audio, status, toggle, wait
     if (!chunks.length) {
       toggle.textContent = waitingLabel;
     } else if (!audio.paused && follow) {
-      toggle.textContent = "暂停连续播放";
+      toggle.textContent = "Pause playback";
     } else if (streamKind === "source") {
-      toggle.textContent = audio.ended ? "重新播放原声" : "播放原声";
+      toggle.textContent = audio.ended ? "Replay original audio" : "Play original audio";
     } else if (audio.ended && complete) {
-      toggle.textContent = "从头连续播放";
+      toggle.textContent = "Play from the beginning";
     } else {
-      toggle.textContent = "连续播放已完成部分";
+      toggle.textContent = "Play completed segments";
     }
   }
 
@@ -87,8 +89,8 @@ export function createProgressiveAudioPlayer({ card, audio, status, toggle, wait
   audio.addEventListener("error", () => {
     if (!audio.getAttribute("src")) return;
     follow = false;
-    status.textContent = "这一段暂时无法播放，可以等待下一次进度刷新后重试。";
-    toggle.textContent = "重试播放";
+    status.textContent = "This segment cannot play yet. Try again after the next progress update.";
+    toggle.textContent = "Retry playback";
   });
 
   toggle.addEventListener("click", async () => {

@@ -101,7 +101,7 @@ def test_pause_preserves_bytes_releases_lease_and_requires_manual_resume(tmp_pat
         store.start("qwen")
         assert first_read.wait(2)
         assert not store.ready("qwen")
-        with pytest.raises(RuntimeError, match="另一个"):
+        with pytest.raises(RuntimeError, match="Another"):
             second.start("qwen")
         store.pause("qwen")
         release.set()
@@ -177,7 +177,7 @@ def test_api_missing_models_is_reachable_and_inference_does_not_start_downloads(
     assert client.get("/api/health").json()["model_status"] == "missing"
     assert all(not model["ready"] for model in client.get("/api/models").json()["models"])
     response = client.post("/api/asr/jobs", files={"media": ("test.wav", b"unused", "audio/wav")})
-    assert response.status_code == 409 and "下载" in response.json()["detail"]
+    assert response.status_code == 409 and "Download" in response.json()["detail"]
     assert client.post("/api/models/unknown/download").status_code == 404
     assert not requests and not store.root.exists()
     store.close()

@@ -1,90 +1,97 @@
 # Timbreloom for Mac
 
-Timbreloom 提供原生 Apple Silicon 窗口、侧栏、菜单、文件面板和四个声音工作区。
-独立安装包包含 Python、FFmpeg 和推理依赖，不需要源码目录或 Homebrew。
-模型权重与 App 分开，由用户按需选择下载，首次启动不会获取模型。
-当前安装包要求 macOS 26.2 或更新版本，系统要求由实际随包二进制推导，验收系统为 macOS 26.6.2。
-发行验收、签名状态和实际验证结果见项目中的 `docs/release-readiness.md`。
+Timbreloom provides a native Apple Silicon window, sidebar, menus, file dialogs, and four voice workspaces.
+The standalone app bundles Python, FFmpeg, and inference dependencies, so it does not need a source checkout or Homebrew.
+Model weights are separate and download only when you choose them.
+The current standalone build requires macOS 26.2 or later, based on the bundled binaries; validation has used macOS 26.6.2.
+See [release validation](release-readiness.md) for signing status and tested builds.
 
-## 日常使用
+## Everyday controls
 
-| 操作 | 快捷键 / 行为 |
+| Action | Shortcut or behavior |
 | --- | --- |
-| 切换工作区 | `⌘1` 声音克隆，`⌘2` 原声换色，`⌘3` 本地转录，`⌘4` 配音项目 |
-| 导入文件 | `⌘O`，或工具栏的导入按钮；配音工作区导入 `.timbreloom` 项目包 |
-| 开始处理 | `⌘Return`，执行当前工作区可用的生成、转录或新建配音项目操作 |
-| 保存编辑 | `⌘S`，保存当前转录或配音项目的修改 |
-| 显示 / 隐藏侧栏 | `⌃⌘S` |
-| 管理模型 | `⌘,`，或侧栏底部的“模型管理” |
-| 重新显示工作台 | 点击 Dock 图标，或使用 `⌘0` |
-| 查看本地资料 | 工具栏的文件夹按钮，在 Finder 中打开资料库 |
-| 导出文件 | 下载链接会打开系统保存面板，完成后在 Finder 中显示文件 |
-| 关闭窗口 | `⌘W`，App 与任务继续运行，录音也不会因关闭窗口而自动结束 |
-| 退出 App | `⌘Q`，存在任务、未保存的编辑、已选文件或导出时会提醒 |
+| Switch workspace | `⌘1` Voice cloning, `⌘2` Voice conversion, `⌘3` Transcription, `⌘4` Dubbing studio |
+| Import a file | `⌘O` or the toolbar; Dubbing studio imports `.timbreloom` bundles |
+| Start processing | `⌘Return` starts the available generation, transcription, or project-creation action |
+| Save edits | `⌘S` saves the current transcript or dubbing project |
+| Show or hide sidebar | `⌃⌘S` |
+| Manage models | `⌘,` or **Models** in the sidebar |
+| Reopen the studio | Select the Dock icon or press `⌘0` |
+| Open the library | The toolbar folder button opens it in Finder |
+| Export a file | Download links open the system save dialog and reveal the finished file in Finder |
+| Close the window | `⌘W` keeps the app and active work running, including an active recording |
+| Quit the app | `⌘Q` warns about active jobs, unsaved edits, selected files, or exports |
 
-克隆输入文字、参考录音文字、音色名称和转录词汇提示会保存为本机草稿。
-音频文件本身不会复制进浏览器草稿存储，退出后可能需要重新选择。
-转录与配音编辑仍需点击保存或使用 `⌘S`。
-工作区分别记住当前阅读位置；切回来可以继续编辑。
-选择了已保存音色时，取消导入录音会保留当前音色。
-音频试听提供播放 / 暂停、可用方向键调整的播放位置，以及 0.75× 至 2× 倍速。
-原始视频继续使用系统视频控件。
-界面规范与组件验收记录见 [Mac 界面设计](macos-design.md)。
-首次使用录音时，macOS / WebKit 会请求麦克风权限，需要你自行允许。
+Script text, reference transcripts, voice names, and vocabulary hints are saved as local drafts.
+Audio files are not copied into browser draft storage and may need to be selected again after quitting.
+Transcript and dubbing edits still require **Save** or `⌘S`.
+Each workspace remembers its scroll position and restores an available input focus.
+Canceling an audio import preserves the currently selected saved voice.
+Audio previews provide playback, pause, keyboard seeking, and 0.75x to 2x speed; original video uses system controls.
+macOS and WebKit request microphone access when you first start recording, and you must allow it yourself.
+See the [user guide](user-guide.md) for workflows and [Mac design](macos-design.md) for the visual system.
 
-## 启动与退出
+## Startup, storage, and shutdown
 
-将应用复制到 Applications 后再打开。
-独立包将资料保存在 `~/Library/Application Support/Timbreloom/data`，替换应用不会删除资料库。
-从旧本机版升级时，先退出旧 App，再使用下方的迁移命令复制资料；源目录保留原样，已有目标资料库不会被覆盖。
-App 只连接 `127.0.0.1`，并核对运行目录和资料库路径，避免连到其他项目的服务。
-来自其他网站的 Origin 和非本机 Host 请求会被拒绝。
-资料库的进程锁阻止新版网页服务与 App 服务同时写入同一套文件。
-遇到启动错误时，窗口保留重试入口；帮助菜单也可以打开运行日志。
-日志位于 `~/Library/Logs/Timbreloom/desktop.log`，超过 2 MB 会轮转保留上一份。
-原生启动阶段记录在同目录的 `startup-latest.json`，区分程序入口、窗口显示、WebKit 创建和工作区就绪。
+Copy the standalone app into Applications before opening it.
+Its library lives in `~/Library/Application Support/Timbreloom/data`; replacing the app preserves that directory.
+To migrate from a checkout-backed development app, quit the old app first and use the migration command below.
+The migration preserves the source and refuses to overwrite an existing destination library.
 
-App 启动时不预加载语音模型，首次推理才导入并加载对应依赖与权重。
-窗口先显示，再初始化 WebKit；网页图标在构建时生成，首次打开工作区从页面顶部开始。
-启动和检测到处理任务期间使用 macOS 活动声明，防止 App Nap 和自动系统休眠打断工作；空闲后释放声明。
-关闭窗口后，已开始的任务会继续运行；重新点击 Dock 图标可以返回原来的状态。
-确认退出时，只会终止 App 自己启动的服务和子进程，终端启动的服务继续由终端管理。
-App 意外退出时，进程监护器会清理属于它的 Python、FFmpeg、ASR 与换色子进程。
-再次启动时，TTS、ASR、配音渲染与导出按现有持久化规则恢复；中断的换色任务从记录中重试并复用有效分段。
+The app connects only to `127.0.0.1` and verifies the backend root and library path before attaching.
+Requests with an external Origin or non-local Host are rejected.
+A library process lock prevents the browser service and app service from writing to the same files simultaneously.
+The startup screen retains retry and log controls if the connection fails.
 
-## 版本与可选功能
+Runtime logs are stored in `~/Library/Logs/Timbreloom/desktop.log` and rotate after 2 MB, retaining the previous log.
+`startup-latest.json` in the same directory records process entry, window display, WebKit creation, and workspace readiness separately.
+Slow worker imports are recorded after 15 seconds.
 
-独立包的推理运行时、媒体工具、依赖许可和必要的对应源码都位于应用内部。
-模型管理提供三个独立下载项：Qwen 声音克隆与配音约 2.52 GB，Whisper 本地转录约 464 MB，Seed-VC 原声换色及其依赖约 1.88 GB。
-仅点击下载后才连接 Hugging Face，下载固定版本并检查每个文件的 SHA-256，全部完成后才启用该模型。
-模型位于 `~/Library/Application Support/Timbreloom/models`，可以通过 `TIMBRELOOM_MODELS_DIR` 覆盖。
-网络中断、暂停或退出时保留部分文件，用户点击继续或重试后才恢复下载。
-关闭模型面板不会停止下载，退出 App 会暂停下载。
-缺少模型时仍可浏览与编辑已有资料，处理前会提示下载所需模型。
-已下载的模型支持离线推理，更新 App 会复用独立模型目录。
-第三方许可可以从帮助菜单打开。
-数据和可重建缓存写入用户目录，应用目录只读时仍可使用本地功能。
-使用默认构建命令生成的开发外壳仍依赖当前项目的 `.venv`、模型、FFmpeg 和固定路径，移动项目后需要重新构建。
-开发外壳与完整包核对各自的运行根目录，不会交叉连接同一端口上的另一版本。
-开发签名只用于本机验收，面向其他用户的最终版本需要 Developer ID 签名与 Apple 公证。
+Models load only when needed for inference.
+The window appears before WebKit is initialized, and workspace icons are prepared at build time.
+The app requests a macOS activity assertion during startup and processing to prevent App Nap and automatic sleep from interrupting work, then releases it when idle.
 
-从 Finder 启动的 App 通常不继承终端的 `GEMINI_API_KEY`。
-本地声音功能不需要这个密钥。
-如需可选的 Gemini 文字工具，可退出 App 后，从已经导出该环境变量的终端直接运行应用内的 `Contents/MacOS/Timbreloom`。
-App 不读取整个 shell 配置，不复制密钥到 App 包或草稿，也不会自动发起云端请求。
+Closing the window leaves active work running; the Dock icon restores it.
+Quitting terminates only the service and subprocesses started by the app.
+A service started in Terminal remains owned by that terminal.
+A process supervisor cleans up app-owned Python, FFmpeg, ASR, and conversion subprocesses if the app exits unexpectedly.
+On restart, TTS, ASR, dubbing generation, and export recover according to their persisted state; interrupted voice conversions can be retried and reuse valid completed segments.
 
-## 构建
+## Models and optional tools
 
-需要已安装的 Xcode / Command Line Tools 与项目 Python 环境。
+Open **Models** to manage three independent downloads: Qwen for cloning and dubbing, Whisper for transcription, and Seed-VC with its supporting models for conversion.
+Approximate sizes are 2.52 GB, 464 MB, and 1.88 GB respectively.
+Downloads use fixed Hugging Face revisions and verify each file's SHA-256 before enabling the model.
+
+The default model folder is `~/Library/Application Support/Timbreloom/models`.
+Set `TIMBRELOOM_MODELS_DIR` to choose another location.
+Partial files survive network failures, pauses, and app exits; choose **Resume download** or **Retry download** to continue.
+Closing the model panel leaves downloads running, while quitting the app pauses them.
+Existing library items remain available for viewing and editing without models.
+Once downloaded, models support offline inference and are reused across app updates.
+
+The app includes runtime dependencies, their licenses, and required corresponding source material.
+Open third-party notices from the Help menu.
+Data and rebuildable caches are written outside the bundle, so local workflows also work from a read-only application directory.
+A development shell built without `--release` still depends on the checkout's environment, models, FFmpeg, and fixed path; rebuild it after moving the checkout.
+
+Gemini text tools are optional and do not affect local audio features.
+An app started from Finder usually does not inherit a terminal's `GEMINI_API_KEY`.
+To supply it, quit the app and launch its `Contents/MacOS/Timbreloom` executable from a terminal that already has the variable exported.
+The app does not read your full shell configuration, copy the key into its bundle or drafts, or send automatic cloud requests.
+
+## Build
+
+Install Xcode or Command Line Tools and prepare the project environment first.
+From the repository root, build a development app with:
 
 ```bash
-cd ~/Projects/Timbreloom
 .venv/bin/python scripts/build_macos_app.py --install
 open ~/Applications/Timbreloom.app
 ```
 
-以上命令构建开发外壳，产物位于 `build/Timbreloom.app`，`--install` 同时安装到 `~/Applications`。
-完整包的本机验收构建如下。
+The output is `build/Timbreloom.app`; `--install` also copies it to `~/Applications`.
+To build a standalone candidate and optionally migrate existing data and models:
 
 ```bash
 .venv/bin/python scripts/build_ffmpeg.py
@@ -93,46 +100,54 @@ open ~/Applications/Timbreloom.app
 .venv/bin/python scripts/migrate_macos_models.py --source models
 ```
 
-完整包位于 `build/release/Timbreloom.app`。
-发行构建会创建独立临时环境，主服务仅安装 `uv.lock` 中的运行依赖，Seed-VC 使用 `packaging/seed-vc-runtime.lock` 的固定版本与下载哈希。
-构建不会复制开发环境的已安装包，也不会改动开发环境。
-临时环境由构建脚本在结束或失败时清理，首次构建可能需要下载已锁定的依赖包。
-运行包排除 pytest、pip 等开发测试工具、依赖库测试集和 Python 的开发工具，打包前检查这些内容没有混入。
-上游声明为运行依赖的库仍然保留，包括 Torch 所需的 setuptools，以及音频库所需的部分交互和绘图组件。
-构建与测试流程留在项目中，不随 App 安装为开发工具。
-没有 Apple Development 证书时，省略 `--development-signing` 可得到本机 ad-hoc 版本，但它不能验证 Hardened Runtime。
-构建包含三项可选模型的固定版本、大小和校验值清单，不复制模型权重，并检查 Mach-O 依赖是否指向应用外的非系统库。
-模型迁移命令校验并复制已有权重，保留源目录和已完整安装的目标模型，无需重新下载。
-替换同名 Timbreloom App 前，构建脚本会将旧包移动保存到 `build/previous-apps/`。
-移动备份保留旧包，并避免反复压缩大型模型。
-App 包不包含个人音色、录音、转录、项目或密钥。
-修改完整包的 Swift、Python 或静态界面后都需要重新构建和签名。
+The standalone output is `build/release/Timbreloom.app`.
+`--development-signing` requires an Apple Development certificate and is intended for local validation.
+Omit it to produce an ad-hoc local build without Hardened Runtime validation.
+Public distribution requires an appropriate Developer ID signature and Apple notarization; see [release validation](release-readiness.md).
 
-## 实现与验证
+Each release build creates temporary production environments rather than copying installed development packages.
+The main service installs runtime dependencies from `uv.lock`; Seed-VC uses pinned versions and distribution hashes in `packaging/seed-vc-runtime.lock`.
+The build leaves development environments unchanged and removes its temporary environments on completion or failure.
+A first build may need to download locked dependencies.
 
-窗口、侧栏、菜单、文件选择和保存面板使用 AppKit，工作区使用系统 WebKit。
-原生与网页之间只传递工作区、状态和固定命令，网页不能通过桥接任意读取本地路径。
-外部导航不会取代工作台；用户主动点击的普通外链交给默认浏览器。
-导出使用 WebKit 的下载代理，在临时文件完整下载后再移动或替换目标文件。
-实现依据 [Apple WKDownloadDelegate](https://developer.apple.com/documentation/webkit/wkdownloaddelegate) 和 [WKUIDelegate](https://developer.apple.com/documentation/webkit/wkuidelegate) 的公开接口。
+Release pruning excludes development tools such as pytest and pip, dependency test suites, and Python development utilities.
+Upstream runtime requirements remain, including setuptools for Torch and interactive or plotting components required by audio dependencies.
+Licenses, necessary headers, runtime helpers, and required corresponding source are preserved.
+The build verifies the production environment markers and checks Mach-O dependencies for non-system paths outside the app.
+Model catalog metadata is included; weights are not copied into the app.
+See [packaging](../packaging/README.md) for dependency maintenance.
+
+Model migration verifies and copies existing weights, preserving the source and complete destination models.
+Before replacing an app, the builder moves the old bundle into `build/previous-apps/` for recovery.
+Personal voices, recordings, transcripts, projects, and credentials are excluded from the bundle.
+Changes to Swift, Python, or static UI in a standalone app require rebuilding and signing again.
+
+## Implementation and validation
+
+AppKit owns the window, sidebar, menus, open dialogs, and save dialogs.
+System WebKit hosts the workspace.
+The bridge exposes fixed workspace, status, and command messages; web content cannot use it to read arbitrary local paths.
+External navigation does not replace the workspace, and ordinary links opened by the user go to the default browser.
+WebKit downloads finish in a temporary file before replacing or moving the selected destination.
+The integration uses Apple's [WKDownloadDelegate](https://developer.apple.com/documentation/webkit/wkdownloaddelegate) and [WKUIDelegate](https://developer.apple.com/documentation/webkit/wkuidelegate) APIs.
 
 ```bash
-TIMBRELOOM_PRELOAD=0 TIMBRELOOM_DATA_DIR=/tmp/timbreloom-tests uv run pytest -q
+TIMBRELOOM_DATA_DIR="$(mktemp -d -t timbreloom-tests)" TIMBRELOOM_PRELOAD=0 uv run pytest -q
 node --test tests/test_browser_helpers.mjs
 .venv/bin/python scripts/e2e_macos.py
 .venv/bin/python scripts/e2e_macos.py --models
 ```
 
-Python 检查涵盖资料库互斥、无需扫描媒体的状态接口、排队任务退出保护、延迟导入和服务进程组退出。
-WebKit 集成检查在独立临时资料库内运行，使用合成音频与模拟 ASR，覆盖四个工作区在 1020、760、640pt 内容宽度下的布局、导入取消与替换、空状态跳转、上传转录、保存文字、SRT 下载与覆盖、草稿恢复和导航限制。
-同一检查还验证配音创建快捷键、工作区滚动恢复、音频播放 / 暂停 / 定位 / 倍速，以及窄窗口下吸顶工具栏的高度。
-每次检查会在隔离的临时资料库内保存当前 WebKit 界面截图。
-权限拒绝、录音中和取消使用合成麦克风实现验证，处理进度与错误使用模拟 ASR 验证。
-文件选择结果由测试实现注入，因此该检查不能证明系统文件面板的外观、真实麦克风录音或模型生成质量。
+Python checks cover library locking, status endpoints, queued-job shutdown, deferred imports, and process-group cleanup.
+WebKit checks use a separate temporary library, synthetic audio, and simulated ASR.
+They cover all four workspaces at 1020, 760, and 640pt content widths, including overflow, import cancellation, recording states, transcript editing, dubbing creation, saves, SRT export and overwrite, draft recovery, navigation limits, and scrolling.
+Playback checks use a real HTMLAudioElement for play, pause, seeking, and speed.
+The `--models` run also checks download errors, retry, pause, resume, readiness, and narrow layouts using a synthetic download source.
+Each run saves screenshots in its temporary evidence directory.
+Injected file selections and synthetic microphone states do not validate OS dialog appearance or real microphone consent.
 
-`scripts/benchmark_startup.py` 使用独立资料库和全新服务进程测量服务就绪及页面送达，并检查模型未被加载。
-它不清除系统文件缓存，也不把页面送达时间当成原生窗口绘制时间。
-工作进程在可选依赖导入前启动诊断，慢导入超过 15 秒时会把栈记录在本机日志中。
-`scripts/verify_release.py` 从指定应用包运行真实 Whisper、Qwen、Seed-VC、配音导出、项目包回读和生成语音回转录。
-它使用空白 HOME、独立资料库、离线模型标志和包内 FFmpeg，并验证输出音频、字错率及原生 H.264 回退路径。
-详细测量与限制记录在发布验收文档中，单台 Mac 的数据不能作为跨机器性能或主观音色质量保证。
+`scripts/benchmark_startup.py` measures service readiness and page delivery with a fresh service and isolated library, while checking that models were not loaded.
+It does not clear system file caches or treat page delivery as native window paint.
+`scripts/verify_release.py` runs real Whisper, Qwen, Seed-VC, dubbing export, project reimport, and generated-speech transcription from a chosen app bundle.
+It uses an empty HOME, isolated library, offline flags, external downloaded models, and bundled FFmpeg, then checks audio validity and character error rate.
+Single-machine measurements are evidence for that build, not a cross-machine performance or subjective voice-quality guarantee.

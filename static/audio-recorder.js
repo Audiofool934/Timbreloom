@@ -28,15 +28,15 @@ function recordingFilename(extension) {
 
 function recordingErrorMessage(error) {
   if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
-    return window.timbreloomDesktop ? "未获得麦克风权限，请允许 Timbreloom 使用麦克风后重试。" : "没有获得麦克风权限，请在浏览器中允许后重试。";
+    return window.timbreloomDesktop ? "Microphone permission is required. Allow Timbreloom to use the microphone and try again." : "Microphone permission is required. Allow access in your browser and try again.";
   }
   if (error?.name === "NotFoundError" || error?.name === "DevicesNotFoundError") {
-    return "没有找到可用麦克风。";
+    return "No microphone is available.";
   }
   if (error?.name === "NotReadableError" || error?.name === "TrackStartError") {
-    return "麦克风正被其他应用占用，请关闭占用后重试。";
+    return "Another app is using the microphone. Close it and try again.";
   }
-  return `无法开始录音：${error?.message || "未知错误"}`;
+  return `Cannot start recording: ${error?.message || "Unknown error"}`;
 }
 
 export function createAudioRecorder({
@@ -92,12 +92,12 @@ export function createAudioRecorder({
     preview.removeAttribute("src");
     preview.hidden = true;
     preview.load();
-    startButton.textContent = "开始录音";
+    startButton.textContent = "Record";
     status.textContent = idleMessage;
     timer.textContent = "00:00";
   }
 
-  function cancel(message = "录音已取消，原有文件没有改变。") {
+  function cancel(message = "Recording canceled. The previous file is unchanged.") {
     permissionRequest++;
     startButton.disabled = false;
     clearTimer();
@@ -131,7 +131,7 @@ export function createAudioRecorder({
     if (activeRecordingController === controller) activeRecordingController = null;
 
     if (!blob.size || elapsedSeconds < 0.25) {
-      status.textContent = "录音太短，没有替换原有文件，请重新录制。";
+      status.textContent = "The recording is too short. The previous file is unchanged. Record again.";
       return;
     }
 
@@ -147,32 +147,32 @@ export function createAudioRecorder({
     preview.src = previewUrl;
     preview.hidden = false;
     timer.textContent = formatRecordingTime(elapsedSeconds);
-    status.textContent = `已录制 ${elapsedSeconds.toFixed(1)} 秒 · 可试听或直接继续`;
-    startButton.textContent = "重新录音";
+    status.textContent = `Recorded ${elapsedSeconds.toFixed(1)} sec · Preview or continue`;
+    startButton.textContent = "Record again";
   }
 
   function stop() {
     if (!recorder || recorder.state === "inactive") return;
     stopButton.disabled = true;
-    status.textContent = "正在整理录音...";
+    status.textContent = "Preparing recording...";
     recorder.stop();
   }
 
   async function start() {
     if (!recordingSupported) {
-      status.textContent = "当前浏览器不支持麦克风录音，请继续选择文件。";
+      status.textContent = "This browser does not support microphone recording. Choose a file instead.";
       return;
     }
     if (startButton.disabled || recorder?.state === "recording") return;
     if (activeRecordingController && activeRecordingController !== controller) {
-      activeRecordingController.cancel("已在另一个入口开始录音。上一次录音已取消。");
+      activeRecordingController.cancel("Recording started elsewhere. The previous recording was canceled.");
     }
 
     const request = ++permissionRequest;
     activeRecordingController = controller;
     startButton.disabled = true;
     panel.dataset.state = "requesting";
-    status.textContent = "正在请求麦克风权限...";
+    status.textContent = "Requesting microphone permission...";
     try {
       const acquiredStream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -206,13 +206,13 @@ export function createAudioRecorder({
       startedAt = performance.now();
       activeRecordingController = controller;
       setRecordingControls(true);
-      status.textContent = "正在录音 · 说完后点击停止并使用";
+      status.textContent = "Recording · Select Stop and use when finished";
       timer.textContent = "00:00";
       timerId = window.setInterval(() => {
         const elapsedSeconds = (performance.now() - startedAt) / 1000;
         timer.textContent = formatRecordingTime(elapsedSeconds);
         if (elapsedSeconds >= maxSeconds) {
-          status.textContent = "已到最长录音时间，正在自动停止...";
+          status.textContent = "Maximum recording time reached. Stopping automatically...";
           stop();
         }
       }, 250);
@@ -232,7 +232,7 @@ export function createAudioRecorder({
   if (!recordingSupported) {
     startButton.disabled = true;
     panel.dataset.state = "unavailable";
-    status.textContent = "当前浏览器不支持麦克风录音，请继续选择文件。";
+    status.textContent = "This browser does not support microphone recording. Choose a file instead.";
   }
   startButton.addEventListener("click", start);
   stopButton.addEventListener("click", stop);
@@ -242,7 +242,7 @@ export function createAudioRecorder({
 
 export function cancelRecordingOutside(view) {
   if (activeRecordingController && activeRecordingController.view !== view) {
-    activeRecordingController.cancel("切换页面，录音已取消。");
+    activeRecordingController.cancel("Recording canceled after switching workspaces.");
   }
 }
 

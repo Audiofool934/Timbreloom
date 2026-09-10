@@ -47,13 +47,13 @@ test("playback waits for the next immutable chunk and follows when it arrives", 
   await flush();
   await audio.play();
   audio.finish();
-  assert.match(status.textContent, /等待第 2 段/);
+  assert.match(status.textContent, /Waiting for segment 2/);
   player.update({chunks: [chunk(1), chunk(2)], total: 2, complete: true}, "job-a");
   await flush();
   assert.match(audio.src, /^\/chunk-2.wav/);
   assert.equal(audio.paused, false);
   audio.finish();
-  assert.equal(toggle.textContent, "从头连续播放");
+  assert.equal(toggle.textContent, "Play from the beginning");
 });
 
 test("paused playback stays paused when more chunks arrive", async () => {
@@ -115,7 +115,7 @@ test("switching workflows cancels recording and releases microphone tracks", asy
     assert.equal(stopped, 0);
     cancelRecordingOutside("asr");
     assert.equal(stopped, 1);
-    assert.match(status.textContent, /录音已取消/);
+    assert.match(status.textContent, /Recording canceled/);
   } finally {
     if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor);
     else delete globalThis.navigator;
@@ -156,7 +156,7 @@ test("leaving a workflow during microphone permission never starts a late record
     assert.equal(started, 0);
     assert.equal(stopped, 1);
     assert.equal(startButton.disabled, false);
-    assert.match(status.textContent, /录音已取消/);
+    assert.match(status.textContent, /Recording canceled/);
   } finally {
     controller?.cancel();
     if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor);

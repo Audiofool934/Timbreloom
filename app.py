@@ -215,13 +215,13 @@ async def local_workspace_only(request: Request, call_next):
     try:
         target = request.url
         if target.hostname not in {"127.0.0.1", "localhost", "::1"}:
-            return JSONResponse({"detail": "仅允许从本机 Timbreloom 地址访问。"}, status_code=403)
+            return JSONResponse({"detail": "Access is restricted to the local Timbreloom address."}, status_code=403)
         if origin := request.headers.get("origin"):
             source = urlsplit(origin)
             if (source.scheme, source.hostname, source.port or 80) != (target.scheme, target.hostname, target.port or 80):
-                return JSONResponse({"detail": "其他网站不能访问本机资料库。"}, status_code=403)
+                return JSONResponse({"detail": "Other websites cannot access the local library."}, status_code=403)
     except ValueError:
-        return JSONResponse({"detail": "无效的本机请求地址。"}, status_code=400)
+        return JSONResponse({"detail": "Invalid local request address."}, status_code=400)
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -298,11 +298,11 @@ def download_model(model_id: str) -> dict[str, Any]:
     try:
         return _model_store.start(model_id)
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="没有这个可下载模型。") from exc
+        raise HTTPException(status_code=404, detail="This model is not available for download.") from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except OSError as exc:
-        raise HTTPException(status_code=503, detail="无法写入模型目录，请检查磁盘空间和访问权限。") from exc
+        raise HTTPException(status_code=503, detail="Cannot write to the models folder. Check disk space and permissions.") from exc
 
 
 @app.post("/api/models/{model_id}/pause")
@@ -310,7 +310,7 @@ def pause_model_download(model_id: str) -> dict[str, Any]:
     try:
         return _model_store.pause(model_id)
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="没有这个可下载模型。") from exc
+        raise HTTPException(status_code=404, detail="This model is not available for download.") from exc
 
 
 @app.post("/api/preload")
@@ -319,7 +319,7 @@ def preload() -> dict[str, Any]:
         _tts_provider.preload()
         model = get_model()
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"模型加载失败：{exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Model loading failed: {exc}") from exc
     return {
         "ok": True,
         "version": app.version,
@@ -331,42 +331,42 @@ def preload() -> dict[str, Any]:
 def _normalize_text(value: str, field_name: str, limit: int) -> str:
     value = " ".join(value.strip().split())
     if not value:
-        raise ValueError(f"{field_name}不能为空。")
+        raise ValueError(f"{field_name} cannot be empty.")
     if len(value) > limit:
-        raise ValueError(f"{field_name}不能超过 {limit} 个字符。")
+        raise ValueError(f"{field_name} cannot exceed {limit} characters.")
     return value
 
 
 def _normalize_target_text(value: str) -> str:
     value = value.replace("\r\n", "\n").replace("\r", "\n").strip()
     if not value:
-        raise ValueError("目标文字不能为空。")
+        raise ValueError("Enter the text to generate.")
     if len(value) > MAX_TARGET_TEXT_CHARS:
-        raise ValueError(f"目标文字不能超过 {MAX_TARGET_TEXT_CHARS:,} 个字符。")
+        raise ValueError(f"Target text cannot exceed {MAX_TARGET_TEXT_CHARS:,} characters.")
     return value
 
 
 def _normalize_voice_name(value: str) -> str:
     value = " ".join(value.strip().split())
     if not value:
-        raise ValueError("音色名称不能为空。")
+        raise ValueError("Enter a voice name.")
     if len(value) > MAX_VOICE_NAME_CHARS:
-        raise ValueError(f"音色名称不能超过 {MAX_VOICE_NAME_CHARS} 个字符。")
+        raise ValueError(f"Voice names cannot exceed {MAX_VOICE_NAME_CHARS} characters.")
     return value
 
 
 def _validate_language(language: str) -> str:
     language = language.strip().lower()
     if language not in LANGUAGES:
-        raise ValueError("不支持该语言选项。")
+        raise ValueError("This language is not supported.")
     return language
 
 
 def _validate_suffix(filename: str | None) -> str:
     suffix = Path(filename or "").suffix.lower()
     if suffix not in ALLOWED_SUFFIXES:
-        allowed = "、".join(sorted(ALLOWED_SUFFIXES))
-        raise ValueError(f"不支持该文件格式。可用格式：{allowed}")
+        allowed = ", ".join(sorted(ALLOWED_SUFFIXES))
+        raise ValueError(f"Unsupported file format. Supported formats: {allowed}")
     return suffix
 
 
@@ -376,9 +376,9 @@ async def _read_upload(upload: UploadFile) -> bytes:
     finally:
         await upload.close()
     if len(payload) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="参考录音不能超过 40 MB。")
+        raise HTTPException(status_code=413, detail="Reference recordings cannot exceed 40 MB.")
     if not payload:
-        raise ValueError("参考录音为空。")
+        raise ValueError("The reference recording is empty.")
     return payload
 
 
@@ -386,7 +386,7 @@ async def _save_upload_stream(
     upload: UploadFile,
     destination: Path,
     max_bytes: int,
-    oversize_detail: str = "转录媒体不能超过 2 GB。",
+    oversize_detail: str = "Transcription media cannot exceed 2 GB.",
 ) -> int:
     total = 0
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -410,29 +410,29 @@ async def _save_upload_stream(
         await upload.close()
     if total == 0:
         destination.unlink(missing_ok=True)
-        raise ValueError("转录媒体为空。")
+        raise ValueError("The transcription media file is empty.")
     return total
 
 
 def _validate_asr_suffix(filename: str | None) -> str:
     suffix = Path(filename or "").suffix.lower()
     if suffix not in ALLOWED_ASR_SUFFIXES:
-        allowed = "、".join(sorted(ALLOWED_ASR_SUFFIXES))
-        raise ValueError(f"不支持该媒体格式。可用格式：{allowed}")
+        allowed = ", ".join(sorted(ALLOWED_ASR_SUFFIXES))
+        raise ValueError(f"Unsupported media format. Supported formats: {allowed}")
     return suffix
 
 
 def _validate_asr_language(language: str) -> str:
     normalized = language.strip().lower()
     if normalized not in ASR_LANGUAGES:
-        raise ValueError("不支持该 ASR 语言选项。")
+        raise ValueError("This transcription language is not supported.")
     return normalized
 
 
 def _normalize_audio(source: Path, destination: Path) -> float:
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None:
-        raise RuntimeError("没有找到 ffmpeg。请先运行 brew install ffmpeg。")
+        raise RuntimeError("ffmpeg was not found. Run brew install ffmpeg first.")
 
     result = subprocess.run(
         [
@@ -459,17 +459,17 @@ def _normalize_audio(source: Path, destination: Path) -> float:
         check=False,
     )
     if result.returncode != 0:
-        detail = result.stderr.strip() or "无法读取该音频文件。"
-        raise ValueError(f"音频转换失败：{detail}")
+        detail = result.stderr.strip() or "Cannot read this audio file."
+        raise ValueError(f"Audio conversion failed: {detail}")
 
     duration = wav_duration(destination)
     if duration < MIN_REFERENCE_SECONDS:
         raise ValueError(
-            f"参考录音只有 {duration:.1f} 秒，至少需要 {MIN_REFERENCE_SECONDS:.0f} 秒。"
+            f"The reference recording is {duration:.1f} seconds long. At least {MIN_REFERENCE_SECONDS:.0f} seconds are required."
         )
     if duration > MAX_REFERENCE_SECONDS:
         raise ValueError(
-            f"参考录音有 {duration:.1f} 秒，当前版本最多接受 {MAX_REFERENCE_SECONDS:.0f} 秒。"
+            f"The reference recording is {duration:.1f} seconds long. The limit is {MAX_REFERENCE_SECONDS:.0f} seconds."
         )
     return duration
 
@@ -480,31 +480,34 @@ def _valid_identifier(value: str) -> bool:
 
 def _voice_profile_path(voice_id: str) -> Path:
     if not _valid_identifier(voice_id):
-        raise FileNotFoundError("音色不存在。")
+        raise FileNotFoundError("Voice not found.")
     return VOICE_DIR / voice_id / "profile.json"
 
 
 def _load_voice_profile(voice_id: str) -> dict[str, Any]:
     profile_path = _voice_profile_path(voice_id)
     if not profile_path.is_file():
-        raise FileNotFoundError("音色不存在。")
+        raise FileNotFoundError("Voice not found.")
     profile = json.loads(profile_path.read_text(encoding="utf-8"))
     audio_path = profile_path.parent / "reference.wav"
     if not audio_path.is_file():
-        raise FileNotFoundError("音色参考录音不存在。")
+        raise FileNotFoundError("The voice reference recording was not found.")
     profile["audio_path"] = audio_path
     return profile
 
 
 def _public_voice_profile(profile: dict[str, Any]) -> dict[str, Any]:
     transcript = str(profile.get("reference_text", ""))
+    preview = transcript
+    if len(transcript) > 120:
+        preview = re.sub(r"\s+\S*$", "", transcript[:120]).rstrip() + "…"
     return {
         "id": profile["id"],
         "name": profile["name"],
         "original_filename": profile.get("original_filename", ""),
         "duration_seconds": profile["duration_seconds"],
         "created_at": profile["created_at"],
-        "transcript_preview": transcript[:120],
+        "transcript_preview": preview,
     }
 
 
@@ -544,7 +547,7 @@ def _persist_voice_profile(
             profile.get("name", "").casefold() == name.casefold()
             for profile in _list_voice_profiles()
         ):
-            raise FileExistsError("已经存在同名音色。")
+            raise FileExistsError("A voice with this name already exists.")
 
         voice_id = uuid.uuid4().hex
         profile_dir = VOICE_DIR / voice_id
@@ -588,7 +591,7 @@ async def create_voice(
         name = _normalize_voice_name(name)
         reference_text = _normalize_text(
             reference_text,
-            "参考录音文字",
+            "Reference transcript",
             MAX_REFERENCE_TEXT_CHARS,
         )
         suffix = _validate_suffix(reference_audio.filename)
@@ -618,7 +621,7 @@ async def create_voice(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"保存音色失败：{exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Could not save voice: {exc}") from exc
     finally:
         shutil.rmtree(temporary_dir, ignore_errors=True)
 
@@ -631,9 +634,9 @@ def delete_voice(voice_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     if _tts_jobs.voice_in_use(voice_id):
-        raise HTTPException(status_code=409, detail="该音色正在用于生成，暂时不能删除。")
+        raise HTTPException(status_code=409, detail="This voice is being used for generation and cannot be deleted yet.")
     if _vc_service.voice_in_use(voice_id):
-        raise HTTPException(status_code=409, detail="该音色正在用于原声换色，暂时不能删除。")
+        raise HTTPException(status_code=409, detail="This voice is being used for voice conversion and cannot be deleted yet.")
 
     for project_summary in _dub_store.list():
         try:
@@ -645,7 +648,7 @@ def delete_voice(voice_id: str) -> dict[str, Any]:
         ):
             raise HTTPException(
                 status_code=409,
-                detail=f"该音色仍被配音项目「{project['title']}」使用。",
+                detail=f"This voice is still used by the dubbing project {project['title']}.",
             )
 
     shutil.rmtree(Path(profile["audio_path"]).parent)
@@ -668,11 +671,11 @@ def list_providers() -> dict[str, Any]:
 @app.post("/api/providers/gemini/check")
 async def check_gemini_provider() -> dict[str, Any]:
     if not _gemini_provider.configured:
-        raise HTTPException(status_code=503, detail="没有配置 GEMINI_API_KEY。")
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not configured.")
     try:
         return await asyncio.to_thread(_gemini_provider.check_connection)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Gemini 连接检查失败：{exc}") from exc
+        raise HTTPException(status_code=502, detail=f"Gemini connection check failed: {exc}") from exc
 
 
 def _public_voice_conversion(job: Any) -> dict[str, Any]:
@@ -722,19 +725,19 @@ async def create_voice_conversion(
         await media.close()
         raise HTTPException(
             status_code=400,
-            detail="请确认你有权使用原始媒体和目标音色。",
+            detail="Confirm that you have permission to use the source media and target voice.",
         )
     if not _vc_provider.descriptor.configured:
         await media.close()
         raise HTTPException(
             status_code=503,
-            detail="请先在“模型管理”中下载 Seed-VC，再开始换色。",
+            detail="Download Seed-VC from Models before starting voice conversion.",
         )
     try:
         voice = _load_voice_profile(voice_id.strip())
         suffix = _validate_asr_suffix(media.filename)
         if preset not in VC_PRESETS:
-            raise ValueError("原声换色质量档无效。")
+            raise ValueError("Invalid voice conversion quality preset.")
     except FileNotFoundError as exc:
         await media.close()
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -752,7 +755,7 @@ async def create_voice_conversion(
             media,
             source_path,
             MAX_ASR_UPLOAD_BYTES,
-            oversize_detail="原声换色媒体不能超过 2 GB。",
+            oversize_detail="Voice conversion media cannot exceed 2 GB.",
         )
         job = _vc_service.create_job(
             job_id=job_id,
@@ -773,7 +776,7 @@ async def create_voice_conversion(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         shutil.rmtree(job_dir, ignore_errors=True)
-        raise HTTPException(status_code=500, detail=f"建立原声换色任务失败：{exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Could not create voice conversion job: {exc}") from exc
 
 
 @app.get("/api/voice-conversions")
@@ -858,13 +861,13 @@ async def create_asr_job(
 ) -> dict[str, Any]:
     if not _asr_provider.descriptor.configured:
         await media.close()
-        raise HTTPException(status_code=409, detail="请先在“模型管理”中下载 Whisper，再开始转录。")
+        raise HTTPException(status_code=409, detail="Download Whisper from Models before starting transcription.")
     try:
         language = _validate_asr_language(language)
         suffix = _validate_asr_suffix(media.filename)
         initial_prompt = " ".join(initial_prompt.strip().split())
         if len(initial_prompt) > 1_000:
-            raise ValueError("词汇提示不能超过 1,000 个字符。")
+            raise ValueError("Vocabulary hints cannot exceed 1,000 characters.")
     except ValueError as exc:
         await media.close()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -899,7 +902,7 @@ async def create_asr_job(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         shutil.rmtree(transcript_dir, ignore_errors=True)
-        raise HTTPException(status_code=500, detail=f"建立转录任务失败：{exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Could not create transcription job: {exc}") from exc
 
 
 @app.get("/api/asr/jobs/{job_id}")
@@ -929,7 +932,7 @@ def _public_asr_job(job: Any) -> dict[str, Any]:
             {
                 "index": 1,
                 "duration_seconds": payload.get("duration_seconds", 0),
-                "label": "原始音轨",
+                "label": "Original audio",
                 "audio_url": f"/api/asr/jobs/{job.job_id}/audio",
             }
         )
@@ -951,7 +954,7 @@ def get_asr_job_audio(job_id: str) -> FileResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     audio_path = job.transcript_dir / "audio.wav"
     if not getattr(job, "audio_ready", False) or not audio_path.is_file():
-        raise HTTPException(status_code=404, detail="转录音频仍在准备中。")
+        raise HTTPException(status_code=404, detail="Transcription audio is still being prepared.")
     return FileResponse(audio_path, media_type="audio/wav")
 
 
@@ -998,7 +1001,7 @@ def get_transcript_audio(transcript_id: str) -> FileResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     audio_path = transcript_dir / "audio.wav"
     if not audio_path.is_file():
-        raise HTTPException(status_code=404, detail="转录音频不存在。")
+        raise HTTPException(status_code=404, detail="Transcription audio not found.")
     return FileResponse(audio_path, media_type="audio/wav")
 
 
@@ -1034,22 +1037,22 @@ async def create_voice_from_transcript(
         if not isinstance(parsed_ids, list) or not all(
             isinstance(segment_id, str) for segment_id in parsed_ids
         ):
-            raise ValueError("转录片段选择格式无效。")
+            raise ValueError("Invalid transcript segment selection.")
         transcript = _asr_service.get_transcript(transcript_id)
         start, end, reference_text = selected_segment_range(transcript, parsed_ids)
         reference_text = _normalize_text(
             reference_text,
-            "参考录音文字",
+            "Reference transcript",
             MAX_REFERENCE_TEXT_CHARS,
         )
         duration = end - start
         if duration < MIN_REFERENCE_SECONDS:
             raise ValueError(
-                f"所选片段只有 {duration:.1f} 秒，至少需要 {MIN_REFERENCE_SECONDS:.0f} 秒。"
+                f"The selection is {duration:.1f} seconds long. At least {MIN_REFERENCE_SECONDS:.0f} seconds are required."
             )
         if duration > MAX_REFERENCE_SECONDS:
             raise ValueError(
-                f"所选片段有 {duration:.1f} 秒，最多选择 {MAX_REFERENCE_SECONDS:.0f} 秒。"
+                f"The selection is {duration:.1f} seconds long. Select at most {MAX_REFERENCE_SECONDS:.0f} seconds."
             )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -1090,7 +1093,7 @@ async def create_voice_from_transcript(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"从转录创建音色失败：{exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Could not create voice from transcript: {exc}") from exc
     finally:
         shutil.rmtree(temporary_dir, ignore_errors=True)
 
@@ -1103,10 +1106,10 @@ async def transform_transcript_with_gemini(
     if not request.confirm_cloud:
         raise HTTPException(
             status_code=400,
-            detail="必须明确确认后才能把所选文字发送到 Gemini。",
+            detail="Explicit confirmation is required before sending selected text to Gemini.",
         )
     if not _gemini_provider.configured:
-        raise HTTPException(status_code=503, detail="没有配置 GEMINI_API_KEY。")
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not configured.")
     try:
         transcript = _asr_service.get_transcript(transcript_id)
         segment = next(
@@ -1115,7 +1118,7 @@ async def transform_transcript_with_gemini(
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StopIteration as exc:
-        raise HTTPException(status_code=404, detail="转录片段不存在。") from exc
+        raise HTTPException(status_code=404, detail="Transcript segment not found.") from exc
 
     try:
         result = await asyncio.to_thread(
@@ -1127,7 +1130,7 @@ async def transform_transcript_with_gemini(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Gemini 处理失败：{exc}") from exc
+        raise HTTPException(status_code=502, detail=f"Gemini processing failed: {exc}") from exc
     result["segment_id"] = request.segment_id
     result["cloud_request"] = True
     return result
@@ -1227,7 +1230,7 @@ async def create_generation_job(
     if not _tts_provider.descriptor.configured:
         if reference_audio is not None:
             await reference_audio.close()
-        raise HTTPException(status_code=409, detail="请先在“模型管理”中下载 Qwen3-TTS，再开始生成。")
+        raise HTTPException(status_code=409, detail="Download Qwen3-TTS from Models before generating speech.")
     try:
         target_text = _normalize_target_text(target_text)
         language = _validate_language(language)
@@ -1254,11 +1257,11 @@ async def create_generation_job(
             normalized = True
         else:
             if reference_audio is None:
-                raise HTTPException(status_code=400, detail="请选择参考录音或已保存音色。")
+                raise HTTPException(status_code=400, detail="Choose a reference recording or a saved voice.")
             try:
                 reference_text = _normalize_text(
                     reference_text,
-                    "参考录音文字",
+                    "Reference transcript",
                     MAX_REFERENCE_TEXT_CHARS,
                 )
                 suffix = _validate_suffix(reference_audio.filename)
@@ -1267,7 +1270,7 @@ async def create_generation_job(
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
             reference_source = job_dir / f"source{suffix}"
             reference_source.write_bytes(payload)
-            voice_name = reference_audio.filename or "本次上传"
+            voice_name = reference_audio.filename or "Uploaded reference"
 
         job = GenerationJob(
             job_id=job_id,
@@ -1281,7 +1284,7 @@ async def create_generation_job(
             segments=segments,
             job_dir=job_dir,
             created_at=datetime.now(timezone.utc).isoformat(),
-            message=f"已完成无丢字分段，共 {len(segments)} 段",
+            message=f"Text ready with every word preserved. Segments: {len(segments)}",
         )
         _tts_jobs.add(job)
         _tts_jobs.launch(job)
@@ -1308,7 +1311,7 @@ def get_generation_stream_chunk(job_id: str, segment_index: int) -> FileResponse
     available = {chunk["index"] for chunk in _tts_jobs.snapshot(job)["stream"]["chunks"]}
     path = job.job_dir / f"segment-{segment_index:05d}.wav"
     if segment_index not in available or not path.is_file():
-        raise HTTPException(status_code=404, detail="该生成片段尚未完成。")
+        raise HTTPException(status_code=404, detail="This generated segment is not ready yet.")
     return FileResponse(path, media_type="audio/wav")
 
 
@@ -1339,7 +1342,7 @@ def _run_generation(
         segments = segment_text(_normalize_target_text(target_text))
         normalized_reference_text = _normalize_text(
             reference_text,
-            "参考录音文字",
+            "Reference transcript",
             MAX_REFERENCE_TEXT_CHARS,
         )
         normalized_language = _validate_language(language)
@@ -1385,7 +1388,7 @@ async def generate_legacy(
         suffix = _validate_suffix(reference_audio.filename)
         reference_text = _normalize_text(
             reference_text,
-            "参考录音文字",
+            "Reference transcript",
             MAX_REFERENCE_TEXT_CHARS,
         )
         target_text = _normalize_target_text(target_text)
@@ -1407,6 +1410,6 @@ async def generate_legacy(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"生成失败：{exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Generation failed: {exc}") from exc
     finally:
         upload_path.unlink(missing_ok=True)

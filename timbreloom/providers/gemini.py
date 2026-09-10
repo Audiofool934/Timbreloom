@@ -35,7 +35,7 @@ class GeminiTextProvider(TextModelProvider):
 
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
-            raise RuntimeError("没有配置 GEMINI_API_KEY。")
+            raise RuntimeError("GEMINI_API_KEY is not configured.")
         return genai.Client(api_key=api_key)
 
     def check_connection(self) -> dict[str, Any]:
@@ -58,35 +58,35 @@ class GeminiTextProvider(TextModelProvider):
     ) -> dict[str, Any]:
         source = text.strip()
         if not source:
-            raise ValueError("需要处理的转录文字不能为空。")
+            raise ValueError("Enter transcript text to process.")
         if len(source) > MAX_GEMINI_TEXT_CHARS:
             raise ValueError(
-                f"单次 Gemini 处理不能超过 {MAX_GEMINI_TEXT_CHARS:,} 个字符。"
+                f"Each Gemini request is limited to {MAX_GEMINI_TEXT_CHARS:,} characters."
             )
 
         if task == "punctuation":
             instruction = (
-                "为下面的语音转录补充准确标点和自然分段。"
-                "必须保留全部原词、重复、语气词、数字和专有名词，不能总结、改写、增删或解释。"
-                "只返回处理后的转录纯文本，不要使用 Markdown。"
+                "Add accurate punctuation and natural paragraph breaks to the following transcript. "
+                "Preserve every original word, repetition, filler, number, and proper noun. Do not summarize, rewrite, add, remove, or explain content. "
+                "Return only the processed transcript as plain text, without Markdown."
             )
         elif task == "cleanup":
             instruction = (
-                "整理下面的语音转录，使标点、段落和明显的 ASR 断句更易读。"
-                "不要总结，不要增加原文没有的信息。"
-                "如果无法确定某个词，保留原词。只返回处理后的纯文本。"
+                "Clean up the following transcript for readable punctuation, paragraphs, and obvious ASR sentence breaks. "
+                "Do not summarize or add information absent from the original. "
+                "Keep the original word when uncertain. Return only the processed plain text."
             )
         elif task == "translate":
             language = target_language.strip()
             if not language:
-                raise ValueError("翻译任务需要目标语言。")
+                raise ValueError("Choose a target language for translation.")
             instruction = (
-                f"将下面的语音转录完整翻译为{language}。"
-                "保留语气、段落、数字、名称和重复，不要总结或解释。"
-                "只返回翻译后的纯文本，不要使用 Markdown。"
+                f"Translate the entire following transcript into {language}. "
+                "Preserve tone, paragraphs, numbers, names, and repetitions. Do not summarize or explain. "
+                "Return only the translation as plain text, without Markdown."
             )
         else:
-            raise ValueError("不支持该 Gemini 文本任务。")
+            raise ValueError("Unsupported Gemini text task.")
 
         client = self._client()
         try:
@@ -102,7 +102,7 @@ class GeminiTextProvider(TextModelProvider):
             client.close()
         result_text = (response.text or "").strip()
         if not result_text:
-            raise RuntimeError("Gemini 没有返回文本。")
+            raise RuntimeError("Gemini did not return text.")
         return {
             "ok": True,
             "provider": "gemini-text",

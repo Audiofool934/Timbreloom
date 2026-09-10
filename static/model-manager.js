@@ -29,8 +29,8 @@ export function installModelManager() {
     banner.hidden = true;
     const copy = element("div");
     const title = element("strong");
-    const description = element("p", "", "模型单独下载，准备好后即可离线使用。现有资料仍可查看与编辑。");
-    const button = element("button", "quiet-button", "选择下载");
+    const description = element("p", "", "Download the model to use this feature offline. You can still view and edit your library.");
+    const button = element("button", "quiet-button", "Choose models");
     button.type = "button";
     button.addEventListener("click", () => open(modelId));
     copy.append(title, description);
@@ -50,7 +50,7 @@ export function installModelManager() {
     const description = element("p", "model-download-description", model.description);
     const progress = element("progress");
     progress.max = model.bytes;
-    progress.setAttribute("aria-label", `${model.name} 下载进度`);
+    progress.setAttribute("aria-label", `${model.name} download progress`);
     const bottom = element("div", "model-download-bottom");
     const status = element("div", "model-download-status");
     const message = element("p");
@@ -62,14 +62,14 @@ export function installModelManager() {
     button.addEventListener("click", () => transfer(model.id));
     bottom.append(status, button);
     const sources = element("details", "model-download-sources");
-    sources.append(element("summary", "", "来源与许可"));
+    sources.append(element("summary", "", "Sources and licenses"));
     for (const source of model.sources) {
       const line = element("p");
       const link = element("a", "", source.repository);
       link.href = `https://huggingface.co/${source.repository}/tree/${source.revision}`;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      line.append(link, document.createTextNode(` · ${source.license || "详见模型说明"}`));
+      line.append(link, document.createTextNode(` · ${source.license || "See the model documentation"}`));
       sources.append(line);
     }
     card.append(heading, description, progress, bottom, sources);
@@ -87,17 +87,17 @@ export function installModelManager() {
       progress.value = model.downloaded_bytes;
       progress.hidden = !active.has(model.state) && !["paused", "error"].includes(model.state);
       message.textContent = model.message;
-      amount.textContent = model.ready ? "已保存在本机" : `${formatModelBytes(model.downloaded_bytes)} / ${formatModelBytes(model.bytes)}`;
+      amount.textContent = model.ready ? "Saved on this Mac" : `${formatModelBytes(model.downloaded_bytes)} / ${formatModelBytes(model.bytes)}`;
       button.disabled = model.ready || pending.has(model.id) || model.state === "installing";
-      button.textContent = model.ready ? "已下载" : active.has(model.state) ? "暂停" : model.state === "paused" ? "继续下载" : model.state === "error" ? "重试下载" : `下载 ${formatModelBytes(model.bytes)}`;
+      button.textContent = model.ready ? "Downloaded" : active.has(model.state) ? "Pause" : model.state === "paused" ? "Resume download" : model.state === "error" ? "Retry download" : `Download ${formatModelBytes(model.bytes)}`;
       button.setAttribute("aria-label", `${button.textContent} ${model.name}`);
     }
     for (const { banner, title, button, modelId } of banners.values()) {
       const model = models.get(modelId);
       if (!model) continue;
       banner.hidden = model.ready;
-      title.textContent = active.has(model.state) ? `${model.name} 正在下载` : `${model.purpose}需要 ${model.name}`;
-      button.textContent = active.has(model.state) ? "查看下载" : "选择下载";
+      title.textContent = active.has(model.state) ? `Downloading ${model.name}` : `${model.purpose} requires ${model.name}`;
+      button.textContent = active.has(model.state) ? "View download" : "Choose models";
     }
     const ready = payload.models.map(model => `${model.id}:${model.ready}`).join(",");
     if (ready !== previousReady) {
@@ -115,12 +115,12 @@ export function installModelManager() {
     refreshing = (async () => {
       try {
         const response = await fetch("/api/models", { cache: "no-store" });
-        if (!response.ok) throw new Error("无法读取模型状态，请重试连接。");
+        if (!response.ok) throw new Error("Cannot read model status. Retry the connection.");
         render(await response.json());
         error.hidden = true;
         return true;
       } catch (failure) {
-        error.textContent = failure.message || "无法连接本地服务，请稍后重试。";
+        error.textContent = failure.message || "Cannot connect to the local service. Try again shortly.";
         error.hidden = false;
         clearTimeout(timer);
         if (dialog.open) timer = window.setTimeout(refresh, 3000);
@@ -138,7 +138,7 @@ export function installModelManager() {
       const action = active.has(models.get(modelId).state) ? "pause" : "download";
       const response = await fetch(`/api/models/${modelId}/${action}`, { method: "POST" });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.detail || "暂时无法下载，请重试。");
+      if (!response.ok) throw new Error(payload.detail || "Cannot download right now. Try again.");
       render(payload);
       error.hidden = true;
     } catch (failure) {

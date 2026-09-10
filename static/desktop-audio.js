@@ -2,10 +2,10 @@
 // Source ownership, streaming queues, and recording lifecycle stay with their controllers.
 export function installDesktopAudio({ icon }) {
   const names = {
-    audioPlayer: "生成语音", transcriptAudio: "转录原声", vcSourceAudio: "原始表演", vcOutputAudio: "换色结果",
-    dubSourceAudio: "配音源音频", cloneStreamAudio: "生成中的语音", vcStreamAudio: "换色中的语音",
-    asrStreamAudio: "转录原声", dubStreamAudio: "生成中的配音", cloneRecordPreview: "参考录音",
-    asrRecordPreview: "转录录音", vcRecordPreview: "原声录音",
+    audioPlayer: "Generated speech", transcriptAudio: "Transcription source", vcSourceAudio: "Original performance", vcOutputAudio: "Converted voice",
+    dubSourceAudio: "Dubbing source audio", cloneStreamAudio: "Speech in progress", vcStreamAudio: "Conversion in progress",
+    asrStreamAudio: "Transcription source", dubStreamAudio: "Dubbing in progress", cloneRecordPreview: "Reference recording",
+    asrRecordPreview: "Transcription recording", vcRecordPreview: "Source recording",
   };
   const formatTime = (seconds) => {
     if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
@@ -16,19 +16,19 @@ export function installDesktopAudio({ icon }) {
     return hours ? `${hours}:${minutes}:${remainder}` : `${minutes}:${remainder}`;
   };
   for (const audio of document.querySelectorAll("audio[controls]")) {
-    const name = names[audio.id] || "音频";
+    const name = names[audio.id] || "Audio";
     const player = document.createElement("div"); player.className = "desktop-player";
-    player.setAttribute("role", "group"); player.setAttribute("aria-label", `${name}播放器`);
+    player.setAttribute("role", "group"); player.setAttribute("aria-label", `${name} player`);
     const play = document.createElement("button"); play.type = "button"; play.id = `${audio.id}-play`; play.className = "desktop-play";
     const elapsed = document.createElement("span"); elapsed.className = "desktop-time";
     elapsed.setAttribute("aria-hidden", "true");
     const seek = document.createElement("input"); seek.type = "range"; seek.id = `${audio.id}-seek`; seek.className = "desktop-seek";
     seek.min = "0"; seek.max = "0"; seek.step = "0.01"; seek.value = "0";
-    seek.setAttribute("aria-label", `${name}播放位置`);
+    seek.setAttribute("aria-label", `${name} position`);
     const duration = document.createElement("span"); duration.className = "desktop-time";
     duration.setAttribute("aria-hidden", "true");
     const speed = document.createElement("select"); speed.className = "desktop-speed"; speed.id = `${audio.id}-speed`;
-    speed.setAttribute("aria-label", `${name}播放速度`);
+    speed.setAttribute("aria-label", `${name} speed`);
     for (const value of [.75, 1, 1.25, 1.5, 2]) speed.add(new Option(`${value}×`, String(value), value === 1, value === 1));
     const error = document.createElement("span"); error.className = "desktop-player-error";
     error.setAttribute("role", "status"); error.hidden = true;
@@ -41,8 +41,8 @@ export function installDesktopAudio({ icon }) {
       if (renderedState !== playing) {
         play.replaceChildren(icon(playing ? "pause.fill" : "play.fill")); renderedState = playing;
       }
-      play.setAttribute("aria-label", `${playing ? "暂停" : "播放"}${name}`);
-      play.title = `${playing ? "暂停" : "播放"}${name}`;
+      play.setAttribute("aria-label", `${playing ? "Pause" : "Play"} ${name}`);
+      play.title = `${playing ? "Pause" : "Play"} ${name}`;
       elapsed.textContent = formatTime(audio.currentTime);
       duration.textContent = formatTime(audio.duration);
       seek.disabled = !Number.isFinite(audio.duration) || audio.duration <= 0;
@@ -60,14 +60,14 @@ export function installDesktopAudio({ icon }) {
         await audio.play();
       } catch (failure) {
         if (failure.name !== "AbortError") {
-          error.textContent = "暂时无法播放，点击播放按钮重试。"; error.hidden = false;
+          error.textContent = "Cannot play right now. Select Play to try again."; error.hidden = false;
         }
       }
     });
     seek.addEventListener("input", () => { audio.currentTime = Number(seek.value); update(); });
     speed.addEventListener("change", () => { audio.playbackRate = Number(speed.value); });
     for (const event of ["timeupdate", "loadedmetadata", "durationchange", "play", "pause", "ended", "emptied", "ratechange"]) audio.addEventListener(event, update);
-    audio.addEventListener("error", () => { error.textContent = "音频暂时无法读取，点击播放按钮重试。"; error.hidden = false; });
+    audio.addEventListener("error", () => { error.textContent = "Cannot read this audio yet. Select Play to try again."; error.hidden = false; });
     audio.addEventListener("loadstart", () => { error.hidden = true; update(); });
     new MutationObserver(update).observe(audio, { attributes: true, attributeFilter: ["src", "hidden"] });
     update();

@@ -35,15 +35,15 @@ def main() -> None:
         stage = Path(temporary)
         shutil.copytree(app, stage / "Timbreloom.app", symlinks=True, copy_function=clone_file)
         (stage / "Applications").symlink_to("/Applications")
-        (stage / "安装说明.txt").write_text(
+        (stage / "Installation.txt").write_text(
             f"Timbreloom {info['CFBundleShortVersionString']}\n\n"
-            f"需要 Apple Silicon 和 macOS {info['LSMinimumSystemVersion']} 或更新版本。\n"
-            "将 Timbreloom 拖入 Applications，再从应用程序目录打开。\n"
-            "本地运行时已包含在应用中，无需 Python 或 Homebrew。\n"
-            "模型单独保存，请在应用的模型管理中按需下载。未选择下载前不会获取模型。\n"
-            "模型保存在 ~/Library/Application Support/Timbreloom/models，下载后可离线使用。\n"
-            "音色、转录和项目保存在 ~/Library/Application Support/Timbreloom/data。\n"
-            "替换应用不会删除资料库。\n")
+            f"Requires Apple Silicon and macOS {info['LSMinimumSystemVersion']} or later.\n"
+            "Drag Timbreloom into Applications, then open it from there.\n"
+            "The local runtime is included. Python and Homebrew are not required.\n"
+            "Models are stored separately. Choose which to download in Models; nothing downloads automatically.\n"
+            "Models are saved in ~/Library/Application Support/Timbreloom/models and can be used offline after download.\n"
+            "Voices, transcripts, and projects are saved in ~/Library/Application Support/Timbreloom/data.\n"
+            "Replacing the app does not delete your library.\n")
         subprocess.run(["hdiutil", "create", "-format", "ULFO", "-nospotlight",
             "-volname", "Timbreloom", "-srcfolder", str(stage), str(output)], check=True)
     subprocess.run(["hdiutil", "verify", str(output)], check=True)
