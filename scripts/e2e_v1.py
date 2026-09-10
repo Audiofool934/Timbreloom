@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -22,6 +24,38 @@ SOURCE_TEXT = (
     "第二段台词会测试角色、声音缓存以及安全时长适配。"
     "最后，我们会导出一段带有新声音的视频。"
 )
+
+
+def check_service(client: httpx.Client) -> dict[str, Any]:
+    """Validate the supported API before creating media or starting model work."""
+    response = client.get("/api/health")
+    response.raise_for_status()
+    health = response.json()
+    version = str(health.get("version", ""))
+    if not health.get("ok") or not re.fullmatch(r"1\.\d+\.\d+(?:[-+][\w.-]+)?", version):
+        raise RuntimeError(f"Expected a healthy Timbreloom 1.x service; received {version!r}")
+    response = client.get("/openapi.json")
+    response.raise_for_status()
+    schema = response.json()
+    required = {
+        ("/api/voices", "post"),
+        ("/api/asr/jobs", "post"),
+        ("/api/dub/projects", "post"),
+        ("/api/dub/projects/{project_id}/jobs", "post"),
+        ("/api/dub/projects/{project_id}/roles", "post"),
+        ("/api/dub/projects/{project_id}/export-jobs", "post"),
+        ("/api/dub/projects/{project_id}/bundle", "get"),
+        ("/api/dub/projects/import", "post"),
+    }
+    missing = sorted(f"{method.upper()} {path}" for path, method in required
+                     if method not in schema.get("paths", {}).get(path, {}))
+    if schema.get("info", {}).get("title") != "Timbreloom" or missing:
+        raise RuntimeError(f"The target does not provide the required Timbreloom API: {missing}")
+    providers = {item["id"]: item for item in health.get("providers", [])}
+    for provider_id in ("local-qwen-tts", "local-whisper-asr"):
+        if not providers.get(provider_id, {}).get("configured"):
+            raise RuntimeError(f"The local provider is not configured: {provider_id}")
+    return health
 
 
 def _tool(name: str) -> str:
@@ -53,6 +87,8 @@ def _poll(client: httpx.Client, path: str, *, timeout: float) -> dict[str, Any]:
 
 
 def run(base_url: str, output_dir: Path) -> dict[str, Any]:
+    with httpx.Client(base_url=base_url, timeout=15.0) as client:
+        health = check_service(client)
     output_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="timbreloom-e2e-") as temporary:
         work = Path(temporary)
@@ -62,7 +98,7 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
         source_audio = work / "source.wav"
         source_video = work / "source.mp4"
         _run([_tool("say"), "-v", "Tingting", "-r", "165", "-o", str(reference_say), REFERENCE_TEXT])
-        _run([_tool("say"), "-v", "Tingting", "-r", "175", "-o", str(source_say), SOURCE_TEXT])
+        _run([_tool("say"), "-v", "Eddy (Chinese (China mainland))", "-r", "175", "-o", str(source_say), SOURCE_TEXT])
         for raw, wav in ((reference_say, reference), (source_say, source_audio)):
             _run(
                 [
@@ -99,7 +135,7 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
                 str(source_audio),
                 "-shortest",
                 "-c:v",
-                "libx264",
+                os.getenv("TIMBRELOOM_H264_ENCODER", "libx264"),
                 "-pix_fmt",
                 "yuv420p",
                 "-c:a",
@@ -110,11 +146,6 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
         )
 
         with httpx.Client(base_url=base_url, timeout=120.0) as client:
-            health = client.get("/api/health")
-            health.raise_for_status()
-            if health.json().get("version") != "1.0.0":
-                raise RuntimeError("The target service is not Timbreloom 1.0.0")
-
             with reference.open("rb") as audio:
                 voice_response = client.post(
                     "/api/voices",
@@ -145,7 +176,7 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
                 "/api/dub/projects",
                 json={
                     "transcript_id": transcript_id,
-                    "title": "Timbreloom 1.0 E2E",
+                    "title": f"Timbreloom {health['version']} E2E",
                     "target_language": "chinese",
                     "default_voice_id": voice["id"],
                 },
@@ -250,7 +281,7 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
             imported = imported_response.json()["project"]
 
             return {
-                "version": health.json()["version"],
+                "version": health["version"],
                 "voice_id": voice["id"],
                 "transcript_id": transcript_id,
                 "project_id": project_id,
@@ -264,10 +295,18 @@ def run(base_url: str, output_dir: Path) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run Timbreloom 1.0 real local end-to-end validation")
+    parser = argparse.ArgumentParser(description="Run Timbreloom 1.x real local end-to-end validation")
     parser.add_argument("--base-url", default="http://127.0.0.1:7865")
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--check-only", action="store_true", help="Check API compatibility without generating media")
     arguments = parser.parse_args()
+    if arguments.check_only:
+        with httpx.Client(base_url=arguments.base_url, timeout=15.0) as client:
+            health = check_service(client)
+        print(json.dumps({"ok": True, "version": health["version"], "check_only": True}))
+        return
+    if arguments.output_dir is None:
+        parser.error("--output-dir is required unless --check-only is used")
     print(json.dumps(run(arguments.base_url, arguments.output_dir), ensure_ascii=False, indent=2))
 
 

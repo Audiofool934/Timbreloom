@@ -3,6 +3,7 @@ import os
 import wave
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 os.environ["TIMBRELOOM_PRELOAD"] = "0"
 
@@ -10,11 +11,22 @@ from fastapi.testclient import TestClient
 
 import app
 from timbreloom.dub_projects import DubProjectStore, DubRenderService
+from timbreloom.dubbing_api import _public_dub_job
 from timbreloom.providers import TTSResult
 from timbreloom.segmentation import SEGMENT_ESTIMATED_TOKEN_LIMIT, segment_text
 
 
-client = TestClient(app.app)
+client = TestClient(app.app, base_url="http://127.0.0.1")
+
+
+def test_local_api_rejects_other_websites_and_rebound_hostnames() -> None:
+    assert client.get("/api/voices", headers={"Host": "attacker.example"}).status_code == 403
+    assert client.post("/api/voices", headers={"Origin": "https://attacker.example"}).status_code == 403
+    assert client.get("/api/voices", headers={"Origin": "null"}).status_code == 403
+    assert client.get("/api/voices", headers={"Origin": "http://127.0.0.1:9999"}).status_code == 403
+    response = client.get("/api/runtime", headers={"Origin": "http://127.0.0.1"})
+    assert response.status_code == 200
+    assert response.headers["X-Frame-Options"] == "DENY"
 
 
 def test_home_renders_local_privacy_copy() -> None:
@@ -23,6 +35,18 @@ def test_home_renders_local_privacy_copy() -> None:
     assert "参考录音仅在这台 Mac 上处理" in response.text
     assert "TEMPERATURE 1.0" in response.text
     assert "当前 Base 克隆模型没有隐藏的情绪标签" in response.text
+    assert response.text.count('class="recorder-panel"') == 3
+    assert response.text.count("开始录音") == 3
+    assert response.text.count('<section id="cloneStreamCard"') == 1
+    assert response.text.count('class="stream-card"') == 3
+    assert response.text.count('class="stream-card compact-stream-card"') == 1
+    assert "边生成边听" in response.text
+
+
+def test_transport_stream_media_suffixes_are_supported() -> None:
+    assert app._validate_asr_suffix("audiobook.ts") == ".ts"
+    assert app._validate_asr_suffix("chapter.m2ts") == ".m2ts"
+    assert app._validate_asr_suffix("recording.MTS") == ".mts"
 
 
 def test_health_does_not_load_model() -> None:
@@ -30,11 +54,38 @@ def test_health_does_not_load_model() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["privacy"] == "localhost-only"
-    assert payload["version"] == "1.0.0"
+    assert payload["version"] == "1.1.0"
     assert payload["model"] == app.MODEL_ID
     assert payload["sampling_temperature"] == 1.0
     provider_ids = {provider["id"] for provider in payload["providers"]}
-    assert provider_ids == {"local-qwen-tts", "local-whisper-asr", "gemini-text"}
+    assert provider_ids == {
+        "local-qwen-tts",
+        "local-seed-vc",
+        "local-whisper-asr",
+        "gemini-text",
+    }
+
+
+def test_voice_conversion_requires_rights_confirmation() -> None:
+    response = client.post(
+        "/api/voice-conversions",
+        data={"voice_id": "a" * 32, "preset": "balanced", "confirm_rights": "false"},
+        files={"media": ("source.wav", _wav_bytes(), "audio/wav")},
+    )
+    assert response.status_code == 400
+    assert "有权使用" in response.json()["detail"]
+
+
+def test_voice_conversion_presets_expose_balanced_default() -> None:
+    response = client.get("/api/voice-conversions/presets")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["default"] == "balanced"
+    assert {preset["id"] for preset in payload["presets"]} == {
+        "fast",
+        "balanced",
+        "quality",
+    }
 
 
 def test_provider_response_never_exposes_gemini_key(monkeypatch) -> None:
@@ -220,14 +271,126 @@ def test_background_job_generates_every_segment_and_stitches(
         created_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    app._process_job(job)
+    service = app.TTSService(
+        job_dir.parent, output_dir, generate_segment=app._generate_segment,
+        normalize_audio=app._normalize_audio, model_id=app.MODEL_ID,
+        settings={"temperature": 1.0}, max_attempts=app.MAX_GENERATION_ATTEMPTS,
+    )
+    service.add(job)
+    service.process(job)
 
     assert job.status == "complete"
     assert job.segments_completed == len(segments)
     assert job.result is not None
     assert job.result["segment_count"] == len(segments)
     assert (output_dir / job.result["filename"]).is_file()
-    assert not job_dir.exists()
+    assert job_dir.is_dir()
+    assert len(list(job_dir.glob("segment-*.wav"))) == len(segments)
+    stream = service.snapshot(job)["stream"]
+    assert stream["available"] == len(segments)
+    assert stream["complete"] is True
+    assert stream["chunks"][0]["audio_url"].endswith("/segments/1/audio")
+    monkeypatch.setattr(app, "_tts_jobs", service)
+    response = client.get(f"/api/jobs/{job.job_id}/segments/1/audio")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/wav"
+
+
+def test_asr_job_exposes_prepared_audio_while_transcribing(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    transcript_dir = tmp_path / "transcript"
+    transcript_dir.mkdir()
+    _write_wav(transcript_dir / "audio.wav", 7.0)
+    job = SimpleNamespace(
+        job_id="f" * 32,
+        transcript_dir=transcript_dir,
+        audio_ready=True,
+    )
+
+    class FakeASRService:
+        @staticmethod
+        def snapshot(current_job) -> dict:
+            return {
+                "job_id": job.job_id,
+                "status": "running",
+                "duration_seconds": 7.0,
+                "audio_ready": current_job.audio_ready,
+            }
+
+        @staticmethod
+        def get_job(job_id: str):
+            if job_id != job.job_id:
+                raise FileNotFoundError
+            return job
+
+    monkeypatch.setattr(app, "_asr_service", FakeASRService())
+
+    payload = app._public_asr_job(job)
+    assert payload["stream"]["kind"] == "source"
+    assert payload["stream"]["available"] == 1
+    assert payload["stream"]["chunks"][0]["audio_url"].endswith("/audio")
+    assert client.get(f"/api/asr/jobs/{job.job_id}/audio").status_code == 200
+    job.audio_ready = False
+    assert app._public_asr_job(job)["stream"]["available"] == 0
+    assert client.get(f"/api/asr/jobs/{job.job_id}/audio").status_code == 404
+
+
+def test_dub_job_stream_contains_only_processed_ready_segments(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_id = "d" * 32
+    ready_path = tmp_path / "ready.wav"
+    _write_wav(ready_path, 1.0)
+    project = {
+        "id": project_id,
+        "segments": [
+            {
+                "id": "seg-1",
+                "active_text": "第一段已经完成。",
+                "render": {
+                    "status": "ready",
+                    "filename": ready_path.name,
+                    "duration_seconds": 1.0,
+                },
+            },
+            {
+                "id": "seg-2",
+                "active_text": "第二段还在生成。",
+                "render": {"status": "rendering", "filename": ""},
+            },
+        ],
+    }
+
+    class FakeStore:
+        @staticmethod
+        def load(_project_id: str) -> dict:
+            return project
+
+        @staticmethod
+        def render_path(_project_id: str, filename: str) -> Path:
+            return tmp_path / filename
+
+    monkeypatch.setattr(app, "_dub_store", FakeStore())
+    payload = _public_dub_job(
+        app._dubbing_context(),
+        project_id,
+        {
+            "kind": "render",
+            "job_id": "e" * 32,
+            "project_id": project_id,
+            "segment_ids": ["seg-1", "seg-2"],
+            "processed": 1,
+            "total": 2,
+            "status": "running",
+        },
+    )
+
+    assert payload["stream"]["available"] == 1
+    assert payload["stream"]["total"] == 2
+    assert payload["stream"]["chunks"][0]["label"] == "第一段已经完成。"
 
 
 def test_background_job_stops_instead_of_skipping_suspicious_audio(
@@ -275,7 +438,13 @@ def test_background_job_stops_instead_of_skipping_suspicious_audio(
         created_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    app._process_job(job)
+    service = app.TTSService(
+        job_dir.parent, output_dir, generate_segment=app._generate_segment,
+        normalize_audio=app._normalize_audio, model_id=app.MODEL_ID,
+        settings={"temperature": 1.0}, max_attempts=app.MAX_GENERATION_ATTEMPTS,
+    )
+    service.add(job)
+    service.process(job)
 
     assert attempts == app.MAX_GENERATION_ATTEMPTS
     assert job.status == "error"

@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import gc
+import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any
-
-import mlx.core as mx
-from mlx_audio.audio_io import write as audio_write
-from mlx_audio.tts.utils import load_model
+from typing import Any, Callable
 
 from .base import ProviderDescriptor, TTSProvider, TTSRequest, TTSResult
 from .runtime import AcceleratorCoordinator
@@ -20,10 +17,12 @@ class LocalQwenTTSProvider(TTSProvider):
         model_id: str,
         model_source: str,
         coordinator: AcceleratorCoordinator,
+        model_available: Callable[[], bool] | None = None,
     ) -> None:
         self.model_id = model_id
         self.model_source = model_source
         self.coordinator = coordinator
+        self.model_available = model_available
         self._model: Any | None = None
         self._status = "idle"
         self._error: str | None = None
@@ -32,7 +31,7 @@ class LocalQwenTTSProvider(TTSProvider):
     @property
     def descriptor(self) -> ProviderDescriptor:
         model_path = Path(self.model_source)
-        configured = model_path.is_dir() if model_path.is_absolute() else True
+        configured = self.model_available() if self.model_available else (model_path.is_dir() if model_path.is_absolute() else True)
         detail = self._error or self._status
         return ProviderDescriptor(
             provider_id="local-qwen-tts",
@@ -58,6 +57,8 @@ class LocalQwenTTSProvider(TTSProvider):
         return self._model is not None
 
     def get_model(self) -> Any:
+        if not self.descriptor.configured:
+            raise RuntimeError("请先在“模型管理”中下载 Qwen3-TTS，再开始生成。")
         if self._model is not None:
             return self._model
 
@@ -67,6 +68,8 @@ class LocalQwenTTSProvider(TTSProvider):
             self._status = "loading"
             self._error = None
             try:
+                from mlx_audio.tts.utils import load_model
+
                 self._model = load_model(self.model_source)
                 self._status = "ready"
                 return self._model
@@ -81,6 +84,10 @@ class LocalQwenTTSProvider(TTSProvider):
 
     def unload(self) -> None:
         with self._model_lock:
+            if self._model is None and "mlx.core" not in sys.modules:
+                return
+            import mlx.core as mx
+
             self._model = None
             if self._status != "error":
                 self._status = "idle"
@@ -88,6 +95,11 @@ class LocalQwenTTSProvider(TTSProvider):
             mx.clear_cache()
 
     def synthesize(self, request: TTSRequest) -> TTSResult:
+        if not self.descriptor.configured:
+            raise RuntimeError("请先在“模型管理”中下载 Qwen3-TTS，再开始生成。")
+        import mlx.core as mx
+        from mlx_audio.audio_io import write as audio_write
+
         started = time.perf_counter()
         with self.coordinator.session("tts"):
             model = self.get_model()

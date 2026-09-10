@@ -6,7 +6,10 @@
     <meta name="color-scheme" content="light" />
     <title>Timbreloom</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/styles.css?v=10" />
+    <link rel="stylesheet" href="/static/styles.css?v=14" />
+    <link rel="stylesheet" href="/static/desktop.css?v=3" />
+    <link rel="stylesheet" href="/static/model-manager.css?v=1" />
+    <script>if (window.timbreloomDesktop) document.documentElement.classList.add("desktop");</script>
   </head>
   <body>
     <main class="shell">
@@ -15,9 +18,12 @@
           <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
           <span>TIMBRELOOM</span>
         </a>
+        <div class="model-management-entry">
+        <button id="manageModelsButton" type="button" class="quiet-button">模型管理</button>
         <div class="model-state" id="modelState" data-state="loading">
           <span class="state-dot"></span>
           <span id="modelStateText">正在检查模型</span>
+        </div>
         </div>
       </header>
 
@@ -26,12 +32,16 @@
           <span>01</span>
           声音克隆
         </button>
-        <button class="mode-button" type="button" data-view="asr" aria-pressed="false">
+        <button class="mode-button" type="button" data-view="vc" aria-pressed="false">
           <span>02</span>
+          原声换色
+        </button>
+        <button class="mode-button" type="button" data-view="asr" aria-pressed="false">
+          <span>03</span>
           本地转录
         </button>
         <button class="mode-button" type="button" data-view="dub" aria-pressed="false">
-          <span>03</span>
+          <span>04</span>
           配音项目
         </button>
       </nav>
@@ -82,6 +92,23 @@
               <strong id="fileTitle">拖入录音，或点击选择</strong>
               <span id="fileMeta">WAV、M4A、MP3、FLAC · 最大 40 MB</span>
             </label>
+
+            <section class="recorder-panel" id="cloneRecorder" aria-label="参考声音录音">
+              <div class="recorder-copy">
+                <span class="record-dot" aria-hidden="true"></span>
+                <div>
+                  <strong>直接录音</strong>
+                  <p id="cloneRecordStatus" role="status" aria-live="polite">最长 30 秒 · 录音只会留在本机</p>
+                </div>
+              </div>
+              <div class="recorder-actions">
+                <span id="cloneRecordTimer" class="recorder-timer" aria-live="off">00:00</span>
+                <button id="cloneRecordStart" class="quiet-button record-start" type="button">开始录音</button>
+                <button id="cloneRecordStop" class="quiet-button record-stop" type="button" hidden>停止并使用</button>
+                <button id="cloneRecordCancel" class="quiet-button record-cancel" type="button" hidden>取消</button>
+              </div>
+              <audio id="cloneRecordPreview" class="record-preview" controls preload="metadata" hidden></audio>
+            </section>
 
             <label class="field">
               <span>录音对应文字</span>
@@ -181,6 +208,18 @@
         <p id="currentSegmentText" class="current-segment"></p>
       </section>
 
+      <section id="cloneStreamCard" class="stream-card" hidden aria-live="polite">
+        <div class="stream-card-heading">
+          <div>
+            <span class="stream-kicker"><i aria-hidden="true"></i> LIVE PLAYBACK</span>
+            <strong>边生成边听</strong>
+            <p id="cloneStreamStatus">首段完成后即可开始，后续片段会自动续播。</p>
+          </div>
+          <button id="cloneStreamToggle" class="quiet-button" type="button" disabled>等待首段</button>
+        </div>
+        <audio id="cloneStreamAudio" controls preload="metadata"></audio>
+      </section>
+
       <section id="resultCard" class="result-card" hidden>
         <div class="result-heading">
           <div>
@@ -197,6 +236,166 @@
           <div><dt>峰值内存</dt><dd id="memoryMetric">-</dd></div>
         </dl>
       </section>
+      </section>
+
+      <section id="vcView" class="app-view" hidden>
+        <section class="asr-hero vc-hero">
+          <div>
+            <p class="eyebrow">原表演 · 新音色 · 本地处理</p>
+            <h1>说法不变，<br />换一种声音。</h1>
+          </div>
+          <p class="lede">直接把原录音的节奏、停顿和情绪迁移到已保存音色，不经过 ASR，也不重新朗读文字。音频和视频都在本机由 Seed-VC 处理。</p>
+        </section>
+
+        <div class="vc-workspace">
+          <form id="vcForm" class="panel-card vc-intake">
+            <div class="panel-heading compact-heading">
+              <span class="step">01</span>
+              <div>
+                <h2>导入原表演</h2>
+                <p>支持有声书等长音频，最长 8 小时，自动按自然停顿分段。</p>
+              </div>
+            </div>
+
+            <label class="dropzone vc-dropzone" id="vcDropzone" for="vcMedia">
+              <input
+                id="vcMedia"
+                type="file"
+                accept="audio/*,video/*,video/mp2t,.wav,.mp3,.m4a,.aac,.flac,.caf,.ogg,.webm,.mp4,.mov,.mkv,.avi,.m4v,.ts,.m2ts,.mts"
+                required
+              />
+              <span class="upload-icon" aria-hidden="true">＋</span>
+              <strong id="vcFileTitle">拖入带表演的音频或视频</strong>
+              <span id="vcFileMeta">含 TS、M2TS、MTS · 原节奏、停顿和情绪会被保留</span>
+            </label>
+
+            <section class="recorder-panel" id="vcRecorder" aria-label="原表演录音">
+              <div class="recorder-copy">
+                <span class="record-dot" aria-hidden="true"></span>
+                <div>
+                  <strong>直接录音</strong>
+                  <p id="vcRecordStatus" role="status" aria-live="polite">最长 30 分钟 · 停止后可先试听</p>
+                </div>
+              </div>
+              <div class="recorder-actions">
+                <span id="vcRecordTimer" class="recorder-timer" aria-live="off">00:00</span>
+                <button id="vcRecordStart" class="quiet-button record-start" type="button">开始录音</button>
+                <button id="vcRecordStop" class="quiet-button record-stop" type="button" hidden>停止并使用</button>
+                <button id="vcRecordCancel" class="quiet-button record-cancel" type="button" hidden>取消</button>
+              </div>
+              <audio id="vcRecordPreview" class="record-preview" controls preload="metadata" hidden></audio>
+            </section>
+
+            <label class="select-field">
+              <span>目标音色</span>
+              <select id="vcVoiceSelect" required>
+                <option value="">选择已保存音色</option>
+              </select>
+            </label>
+
+            <fieldset class="vc-preset-field">
+              <legend>转换质量</legend>
+              <label><input type="radio" name="vcPreset" value="fast" /><span><strong>快速</strong><small>4 步 · 预览</small></span></label>
+              <label><input type="radio" name="vcPreset" value="balanced" checked /><span><strong>均衡</strong><small>8 步 · 推荐</small></span></label>
+              <label><input type="radio" name="vcPreset" value="quality" /><span><strong>高质量</strong><small>12 步 · 更慢</small></span></label>
+            </fieldset>
+
+            <label class="rights-check">
+              <input id="vcRights" type="checkbox" required />
+              <span>我有权使用这段原始媒体和目标音色，并会在对外内容中如实标注 AI 处理。</span>
+            </label>
+
+            <div class="local-engine-note">
+              <span class="state-dot"></span>
+              <div>
+                <strong>Seed-VC 1.0</strong>
+                <p id="vcEngineState">项目内隔离运行 · 离线转换</p>
+              </div>
+            </div>
+
+            <button id="vcStartButton" class="generate-button wide-button" type="submit">
+              <span id="vcButtonText">开始原声换色</span>
+              <span class="button-arrow" aria-hidden="true">↗</span>
+            </button>
+          </form>
+
+          <aside class="panel-card vc-library">
+            <div class="library-heading">
+              <div>
+                <span class="result-kicker">LOCAL CONVERSION ARCHIVE</span>
+                <h2>换色记录</h2>
+              </div>
+              <button id="refreshVcJobs" class="icon-button" type="button" aria-label="刷新换色记录">↻</button>
+            </div>
+            <div id="vcJobList" class="transcript-list">
+              <p class="empty-copy">还没有原声换色记录。</p>
+            </div>
+          </aside>
+        </div>
+
+        <section id="vcProgressCard" class="result-card progress-card" hidden aria-live="polite">
+          <div class="progress-header">
+            <div class="progress-visual" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="progress-copy">
+              <span class="result-kicker">NATIVE SPEECH-TO-SPEECH</span>
+              <strong id="vcProgressTitle">正在准备</strong>
+              <p id="vcProgressText">正在建立本地换声任务。</p>
+            </div>
+            <button id="vcCancelButton" class="quiet-button" type="button">停止任务</button>
+            <button id="vcRetryButton" class="quiet-button" type="button" hidden>重试</button>
+          </div>
+          <div id="vcProgressTrack" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span id="vcProgressFill"></span>
+          </div>
+          <div class="progress-meta">
+            <strong id="vcProgressPercent">0%</strong>
+            <span id="vcProgressMeta">等待媒体检查</span>
+          </div>
+        </section>
+
+        <section id="vcStreamCard" class="stream-card" hidden aria-live="polite">
+          <div class="stream-card-heading">
+            <div>
+              <span class="stream-kicker"><i aria-hidden="true"></i> LIVE PLAYBACK</span>
+              <strong>边换色边听</strong>
+              <p id="vcStreamStatus">第一段完成后即可开始，后续片段会自动续播。</p>
+            </div>
+            <button id="vcStreamToggle" class="quiet-button" type="button" disabled>等待第一段</button>
+          </div>
+          <audio id="vcStreamAudio" controls preload="metadata"></audio>
+        </section>
+
+        <section id="vcResultCard" class="result-card vc-result" hidden>
+          <div class="result-heading">
+            <div>
+              <span class="result-kicker">PERFORMANCE PRESERVED</span>
+              <h2>原声换色完成</h2>
+            </div>
+            <div class="export-actions">
+              <a id="vcDownloadVideo" class="download-link secondary-link" href="#" download hidden>下载 MP4</a>
+              <a id="vcDownloadAudio" class="download-link" href="#" download>下载 WAV</a>
+            </div>
+          </div>
+          <div class="vc-compare">
+            <article>
+              <span class="action-label">A · 原表演</span>
+              <strong id="vcSourceLabel">原始媒体</strong>
+              <audio id="vcSourceAudio" controls preload="metadata"></audio>
+              <video id="vcSourceVideo" controls preload="metadata" playsinline hidden></video>
+            </article>
+            <article>
+              <span class="action-label">B · 新音色</span>
+              <strong id="vcOutputLabel">转换结果</strong>
+              <audio id="vcOutputAudio" controls preload="metadata"></audio>
+            </article>
+          </div>
+          <dl class="metrics metrics-four">
+            <div><dt>音频长度</dt><dd id="vcDurationMetric">-</dd></div>
+            <div><dt>目标音色</dt><dd id="vcVoiceMetric">-</dd></div>
+            <div><dt>转换耗时</dt><dd id="vcTimeMetric">-</dd></div>
+            <div><dt>实时系数</dt><dd id="vcRtfMetric">-</dd></div>
+          </dl>
+        </section>
       </section>
 
       <section id="asrView" class="app-view" hidden>
@@ -222,13 +421,30 @@
               <input
                 id="asrMedia"
                 type="file"
-                accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.flac,.caf,.ogg,.webm,.mp4,.mov,.mkv,.avi,.m4v"
+                accept="audio/*,video/*,video/mp2t,.wav,.mp3,.m4a,.aac,.flac,.caf,.ogg,.webm,.mp4,.mov,.mkv,.avi,.m4v,.ts,.m2ts,.mts"
                 required
               />
               <span class="upload-icon" aria-hidden="true">＋</span>
               <strong id="asrFileTitle">拖入音频或视频</strong>
               <span id="asrFileMeta">本地处理 · 不上传云端</span>
             </label>
+
+            <section class="recorder-panel" id="asrRecorder" aria-label="转录内容录音">
+              <div class="recorder-copy">
+                <span class="record-dot" aria-hidden="true"></span>
+                <div>
+                  <strong>直接录音</strong>
+                  <p id="asrRecordStatus" role="status" aria-live="polite">最长 8 小时 · 停止后直接进入本地转录</p>
+                </div>
+              </div>
+              <div class="recorder-actions">
+                <span id="asrRecordTimer" class="recorder-timer" aria-live="off">00:00</span>
+                <button id="asrRecordStart" class="quiet-button record-start" type="button">开始录音</button>
+                <button id="asrRecordStop" class="quiet-button record-stop" type="button" hidden>停止并使用</button>
+                <button id="asrRecordCancel" class="quiet-button record-cancel" type="button" hidden>取消</button>
+              </div>
+              <audio id="asrRecordPreview" class="record-preview" controls preload="metadata" hidden></audio>
+            </section>
 
             <div class="asr-options">
               <label class="select-field">
@@ -295,6 +511,18 @@
             <strong id="asrProgressPercent">0%</strong>
             <span id="asrProgressMeta">等待媒体检查</span>
           </div>
+        </section>
+
+        <section id="asrStreamCard" class="stream-card" hidden aria-live="polite">
+          <div class="stream-card-heading">
+            <div>
+              <span class="stream-kicker"><i aria-hidden="true"></i> LIVE PLAYBACK</span>
+              <strong>边转录边听原声</strong>
+              <p id="asrStreamStatus">标准化音轨准备完成后即可播放，不必等待转录结束。</p>
+            </div>
+            <button id="asrStreamToggle" class="quiet-button" type="button" disabled>正在准备音轨</button>
+          </div>
+          <audio id="asrStreamAudio" controls preload="metadata"></audio>
         </section>
 
         <section id="transcriptEditor" class="transcript-editor" hidden>
@@ -559,6 +787,18 @@
             <p id="dubCurrentText" class="current-segment"></p>
           </section>
 
+          <section id="dubStreamCard" class="stream-card compact-stream-card" hidden aria-live="polite">
+            <div class="stream-card-heading">
+              <div>
+                <span class="stream-kicker"><i aria-hidden="true"></i> LIVE PLAYBACK</span>
+                <strong>边生成边听配音</strong>
+                <p id="dubStreamStatus">首个片段完成后即可开始，生成到哪里就听到哪里。</p>
+              </div>
+              <button id="dubStreamToggle" class="quiet-button" type="button" disabled>等待首段</button>
+            </div>
+            <audio id="dubStreamAudio" controls preload="metadata"></audio>
+          </section>
+
           <section id="dubExportResult" class="dub-export-result" hidden>
             <div>
               <span class="action-label">TIMELINE EXPORT READY</span>
@@ -612,10 +852,25 @@
       </section>
 
       <footer>
-        <p>TIMBRELOOM 1.0 · QWEN3-TTS · WHISPER LARGE V3 TURBO · GEMINI OPTIONAL</p>
+        <p>TIMBRELOOM 1.1 · QWEN3-TTS · SEED-VC · WHISPER LARGE V3 TURBO · GEMINI OPTIONAL</p>
         <p>请只克隆本人或已获得明确授权的声音。</p>
       </footer>
     </main>
-    <script src="/static/app.js?v=10" defer></script>
+    <dialog id="modelManager" aria-labelledby="modelManagerTitle">
+      <div class="model-manager-heading">
+        <span>本地模型</span>
+        <button id="closeModelManager" class="quiet-button" type="button" autofocus>完成</button>
+      </div>
+      <h2 id="modelManagerTitle">需要什么，再下载什么。</h2>
+      <p class="model-manager-intro">模型与 App 分开保存。选择你需要的功能，再从 Hugging Face 下载对应模型；下载完成后，声音处理都在本机完成。</p>
+      <p id="modelDownloadError" role="alert" hidden></p>
+      <div id="modelCatalog"></div>
+      <div class="model-manager-storage">
+        <span>保存在这台 Mac</span>
+        <code id="modelDirectory"></code>
+        <span>关闭此面板会继续下载。退出 App 会暂停并保留进度，下次可以继续下载。</span>
+      </div>
+    </dialog>
+    <script type="module" src="/static/app.js?v=21" defer></script>
   </body>
 </html>

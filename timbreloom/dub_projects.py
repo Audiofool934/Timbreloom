@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-import numpy as np
 
 from .audio import stitch_wav_files, wav_duration
 from .media import mux_dubbed_video, tempo_fit_wav
@@ -718,6 +717,8 @@ class DubProjectStore:
                     return payload
             except (OSError, ValueError, json.JSONDecodeError):
                 pass
+        import numpy as np
+
         with wave.open(str(source), "rb") as audio_file:
             frames = audio_file.getnframes()
             sample_rate = audio_file.getframerate()
@@ -725,15 +726,14 @@ class DubProjectStore:
             sample_width = audio_file.getsampwidth()
             if sample_width != 2 or channels not in {1, 2}:
                 raise ValueError("项目源音频不是可分析的 PCM WAV。")
-            raw = audio_file.readframes(frames)
-        samples = np.frombuffer(raw, dtype="<i2")
-        if channels == 2:
-            samples = samples.reshape(-1, 2).mean(axis=1)
-        bucket = max(1, int(np.ceil(samples.size / points)))
-        peaks = []
-        for start in range(0, samples.size, bucket):
-            chunk = samples[start:start + bucket]
-            peaks.append(round(float(np.max(np.abs(chunk.astype(np.int32)))) / 32768.0, 4))
+            bucket = max(1, (frames + points - 1) // points)
+            peaks = []
+            for start in range(0, frames, bucket):
+                raw = audio_file.readframes(min(bucket, frames - start))
+                chunk = np.frombuffer(raw, dtype="<i2")
+                if channels == 2:
+                    chunk = chunk.reshape(-1, 2).mean(axis=1)
+                peaks.append(round(float(np.max(np.abs(chunk.astype(np.int32)))) / 32768.0, 4))
         payload = {
             "points": len(peaks),
             "sample_rate": sample_rate,
@@ -1044,6 +1044,8 @@ def mix_timeline_wav(
     sample_rate: int = 24_000,
     block_seconds: float = 10.0,
 ) -> float:
+    import numpy as np
+
     if not segments:
         raise ValueError("没有可导出的配音片段。")
 
@@ -1130,6 +1132,10 @@ class DubRenderService:
 
     def _fingerprint(self, segment: dict[str, Any], project: dict[str, Any], voice: dict[str, Any]) -> str:
         return content_fingerprint(segment, project, voice, self.model_id, self.settings)
+
+    def has_active_jobs(self) -> bool:
+        with self._lock:
+            return bool(self._running_jobs)
 
     def create_job(
         self,
@@ -1614,6 +1620,10 @@ class DubExportService:
         self.render_service = render_service
         self._lock = threading.RLock()
         self._running_jobs: set[str] = set()
+
+    def has_active_jobs(self) -> bool:
+        with self._lock:
+            return bool(self._running_jobs)
 
     def create_job(self, project_id: str, *, original_audio_gain: float = 0.0) -> dict[str, Any]:
         if not 0.0 <= original_audio_gain <= 1.0:

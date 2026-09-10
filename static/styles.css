@@ -261,6 +261,116 @@ input {
   font-size: 11px;
 }
 
+.recorder-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 18px;
+  align-items: center;
+  margin: -10px 0 22px;
+  padding: 14px;
+  border: 1px solid var(--soft-line);
+  background: rgba(255, 255, 255, 0.72);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.recorder-panel.is-recording {
+  border-color: rgba(179, 38, 30, 0.58);
+  background: rgba(179, 38, 30, 0.04);
+}
+
+.recorder-copy {
+  display: flex;
+  min-width: 0;
+  gap: 10px;
+  align-items: center;
+}
+
+.recorder-copy > div {
+  min-width: 0;
+}
+
+.recorder-copy strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.recorder-copy p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.record-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border: 1px solid #6c716e;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.recorder-panel.is-recording .record-dot {
+  border-color: var(--error);
+  background: var(--error);
+  animation: record-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes record-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(179, 38, 30, 0.28);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(179, 38, 30, 0);
+  }
+}
+
+.recorder-actions {
+  display: flex;
+  min-width: 0;
+  gap: 7px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.recorder-actions .quiet-button {
+  min-height: 38px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.recorder-timer {
+  min-width: 44px;
+  color: var(--muted);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.recorder-panel.is-recording .recorder-timer {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.record-stop {
+  background: var(--ink);
+  color: white;
+}
+
+.record-stop:hover:not(:disabled) {
+  background: #343735;
+}
+
+.record-preview {
+  grid-column: 1 / -1;
+  height: 38px;
+}
+
 .field,
 .select-field {
   display: flex;
@@ -528,6 +638,79 @@ audio {
   height: 46px;
 }
 
+.stream-card {
+  min-width: 0;
+  margin-top: 18px;
+  padding: 18px 20px;
+  border: 1px solid #8ba329;
+  background: rgba(217, 255, 87, 0.1);
+}
+
+.compact-stream-card {
+  margin: 18px 0;
+}
+
+.stream-card-heading {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.stream-card-heading > div {
+  min-width: 0;
+}
+
+.stream-card-heading strong,
+.stream-kicker {
+  display: block;
+}
+
+.stream-card-heading strong {
+  margin: 4px 0 3px;
+  font-size: 14px;
+}
+
+.stream-card-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.stream-kicker {
+  color: #66751f;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+}
+
+.stream-kicker i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #8ba329;
+  box-shadow: 0 0 0 4px rgba(139, 163, 41, 0.14);
+  animation: stream-live 1.4s ease-in-out infinite;
+}
+
+@keyframes stream-live {
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
+.stream-card-heading .quiet-button {
+  flex: 0 0 auto;
+}
+
+.stream-card audio:not([src]) {
+  opacity: 0.42;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -753,6 +936,26 @@ audio {
   cursor: pointer;
   font-size: 12px;
   font-weight: 680;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .mode-switch {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .mode-button {
+    justify-content: center;
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 3px;
+  }
+
+  .mode-button span {
+    display: none;
+  }
 }
 
 .mode-button span {
@@ -799,6 +1002,123 @@ audio {
   grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.7fr);
   gap: 18px;
   align-items: start;
+}
+
+.vc-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.7fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.vc-dropzone {
+  min-height: 168px;
+}
+
+.vc-intake > .select-field {
+  margin-top: 4px;
+}
+
+.vc-preset-field {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.vc-preset-field legend {
+  width: 100%;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: 0.04em;
+}
+
+.vc-preset-field label {
+  position: relative;
+  cursor: pointer;
+}
+
+.vc-preset-field input {
+  position: absolute;
+  opacity: 0;
+}
+
+.vc-preset-field span {
+  display: grid;
+  gap: 5px;
+  min-height: 68px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.vc-preset-field input:checked + span {
+  border-color: #7c931e;
+  background: rgba(217, 255, 87, 0.18);
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+
+.vc-preset-field strong {
+  font-size: 12px;
+}
+
+.vc-preset-field small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.rights-check {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 9px;
+  align-items: start;
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.rights-check input {
+  width: 15px;
+  height: 15px;
+  margin: 1px 0 0;
+  accent-color: var(--ink);
+}
+
+.vc-result {
+  margin-top: 18px;
+}
+
+.vc-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vc-compare article {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: #f8f9f6;
+}
+
+.vc-compare article > strong {
+  display: block;
+  min-height: 36px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.vc-compare video {
+  width: 100%;
+  max-height: 280px;
+  background: #111;
 }
 
 .panel-card,
@@ -1788,8 +2108,14 @@ footer p {
   }
 
   .asr-workspace,
+  .vc-workspace,
   .transcript-actions-grid,
   .dub-intake-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vc-preset-field,
+  .vc-compare {
     grid-template-columns: 1fr;
   }
 
@@ -1930,6 +2256,20 @@ footer p {
     grid-template-columns: 1fr;
   }
 
+  .recorder-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .recorder-actions {
+    display: grid;
+    grid-template-columns: auto repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .recorder-actions .quiet-button {
+    width: 100%;
+  }
+
   .progress-header {
     grid-template-columns: 48px 1fr;
     gap: 13px;
@@ -1941,6 +2281,15 @@ footer p {
 
   .progress-visual {
     width: 48px;
+  }
+
+  .stream-card-heading {
+    display: block;
+  }
+
+  .stream-card-heading .quiet-button {
+    width: 100%;
+    margin-top: 12px;
   }
 
   .target-field textarea {

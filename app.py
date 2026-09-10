@@ -11,29 +11,33 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
 
 from timbreloom.asr_service import ASRService
+from timbreloom.dubbing_api import DubbingContext, create_router as create_dubbing_router
+from timbreloom.tts_service import GenerationJob, TTSService
+from timbreloom.api_models import (
+    TranscriptPatch, GeminiTransformRequest,
+)
 from timbreloom.audio import stitch_wav_files, wav_duration
 from timbreloom.dub_projects import (
     DubExportService,
     DubProjectStore,
     DubRenderService,
-    project_quality,
 )
-from timbreloom.media import extract_voice_clip, probe_media
+from timbreloom.media import extract_voice_clip
 from timbreloom.providers import (
     AcceleratorCoordinator,
     GeminiTextProvider,
     LocalQwenTTSProvider,
+    LocalSeedVCProvider,
     LocalWhisperASRProvider,
     TTSRequest,
 )
@@ -41,10 +45,12 @@ from timbreloom.segmentation import (
     AUDIO_TOKENS_PER_SECOND,
     GENERATION_TOKEN_LIMIT,
     SEGMENT_ESTIMATED_TOKEN_LIMIT,
-    TextSegment,
     segment_text,
 )
 from timbreloom.transcripts import selected_segment_range
+from timbreloom.voice_conversion import VC_PRESETS, VoiceConversionService
+from timbreloom.runtime_lock import DataDirectoryLock
+from timbreloom.model_store import ModelStore, default_model_root
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -58,19 +64,28 @@ VOICE_DIR = DATA_DIR / "voices"
 JOB_DIR = DATA_DIR / "jobs"
 TRANSCRIPT_DIR = DATA_DIR / "transcripts"
 PROJECT_DIR = DATA_DIR / "projects"
+CONVERSION_DIR = DATA_DIR / "conversions"
 
+MODEL_DIR = default_model_root(APP_ROOT, DATA_DIR)
+_model_store = ModelStore(MODEL_DIR)
 MODEL_ID = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16"
-DEFAULT_MODEL_DIR = APP_ROOT / "models" / "Qwen3-TTS-12Hz-0.6B-Base-bf16"
+DEFAULT_MODEL_DIR = MODEL_DIR / "Qwen3-TTS-12Hz-0.6B-Base-bf16"
 MODEL_SOURCE = os.getenv(
     "TIMBRELOOM_MODEL",
     str(DEFAULT_MODEL_DIR),
 )
 ASR_MODEL_ID = "mlx-community/whisper-large-v3-turbo-q4"
 ASR_MODEL_REVISION = "660c343bbf4e52ac257f0b7d952e5388e6f93bef"
-DEFAULT_ASR_MODEL_DIR = APP_ROOT / "models" / "Whisper-large-v3-turbo-q4"
+DEFAULT_ASR_MODEL_DIR = MODEL_DIR / "Whisper-large-v3-turbo-q4"
 ASR_MODEL_SOURCE = Path(
     os.getenv("TIMBRELOOM_ASR_MODEL", str(DEFAULT_ASR_MODEL_DIR))
 )
+SEED_VC_RUNTIME_DIR = Path(
+    os.getenv("TIMBRELOOM_SEED_VC_RUNTIME", str(APP_ROOT / "runtime" / "seed-vc"))
+).expanduser().resolve()
+SEED_VC_MODEL_DIR = Path(
+    os.getenv("TIMBRELOOM_SEED_VC_MODEL", str(MODEL_DIR / "Seed-VC"))
+).expanduser().resolve()
 MAX_UPLOAD_BYTES = 40 * 1024 * 1024
 MAX_ASR_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024
 MIN_REFERENCE_SECONDS = 2.0
@@ -88,6 +103,9 @@ ALLOWED_ASR_SUFFIXES = ALLOWED_SUFFIXES | {
     ".mkv",
     ".avi",
     ".m4v",
+    ".ts",
+    ".m2ts",
+    ".mts",
 }
 ASR_LANGUAGES = {
     "auto": None,
@@ -116,120 +134,44 @@ LANGUAGES = {
     "italian",
 }
 
-for directory in (UPLOAD_DIR, OUTPUT_DIR, VOICE_DIR, JOB_DIR, TRANSCRIPT_DIR, PROJECT_DIR):
+for directory in (
+    UPLOAD_DIR,
+    OUTPUT_DIR,
+    VOICE_DIR,
+    JOB_DIR,
+    TRANSCRIPT_DIR,
+    PROJECT_DIR,
+    CONVERSION_DIR,
+):
     directory.mkdir(parents=True, exist_ok=True)
 
 _accelerator = AcceleratorCoordinator()
-_tts_provider = LocalQwenTTSProvider(MODEL_ID, MODEL_SOURCE, _accelerator)
+_tts_provider = LocalQwenTTSProvider(MODEL_ID, MODEL_SOURCE, _accelerator,
+    model_available=(lambda: _model_store.ready("qwen")) if MODEL_SOURCE == str(DEFAULT_MODEL_DIR) else None)
 _asr_provider = LocalWhisperASRProvider(
     ASR_MODEL_ID,
     ASR_MODEL_SOURCE,
     _accelerator,
     before_load=_tts_provider.unload,
+    model_available=(lambda: _model_store.ready("whisper")) if ASR_MODEL_SOURCE == DEFAULT_ASR_MODEL_DIR else None,
+)
+_vc_provider = LocalSeedVCProvider(
+    runtime_python=SEED_VC_RUNTIME_DIR / ".venv" / "bin" / "python",
+    source_dir=SEED_VC_RUNTIME_DIR / "source",
+    checkpoint=(
+        SEED_VC_MODEL_DIR
+        / "v1-offline"
+        / "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth"
+    ),
+    config=SEED_VC_MODEL_DIR / "v1-offline" / "config_dit_mel_seed_uvit_whisper_small_wavenet.yml",
+    coordinator=_accelerator,
+    before_load=_tts_provider.unload,
+    model_available=(lambda: _model_store.ready("seed-vc")) if SEED_VC_MODEL_DIR == MODEL_DIR / "Seed-VC" else None,
 )
 _gemini_provider = GeminiTextProvider()
 _asr_service = ASRService(TRANSCRIPT_DIR, _asr_provider)
 _dub_store = DubProjectStore(PROJECT_DIR)
 _voice_storage_lock = threading.Lock()
-_jobs_lock = threading.Lock()
-
-
-@dataclass(slots=True)
-class GenerationJob:
-    job_id: str
-    voice_id: str | None
-    voice_name: str
-    reference_source: Path
-    reference_is_normalized: bool
-    reference_text: str
-    reference_duration_seconds: float | None
-    language: str
-    segments: list[TextSegment]
-    job_dir: Path
-    created_at: str
-    status: str = "queued"
-    phase: str = "queued"
-    message: str = "等待生成"
-    progress: float = 0.0
-    segments_completed: int = 0
-    current_segment: int = 0
-    current_text: str = ""
-    result: dict[str, Any] | None = None
-    error: str | None = None
-    cancel_event: threading.Event = field(default_factory=threading.Event)
-
-
-class TranscriptSegmentPatch(BaseModel):
-    id: str = Field(min_length=1, max_length=64)
-    text: str = Field(min_length=1, max_length=10_000)
-
-
-class TranscriptPatch(BaseModel):
-    segments: list[TranscriptSegmentPatch] = Field(min_length=1, max_length=2_000)
-
-
-class GeminiTransformRequest(BaseModel):
-    segment_id: str = Field(min_length=1, max_length=64)
-    task: str = Field(min_length=1, max_length=32)
-    target_language: str = Field(default="", max_length=80)
-    confirm_cloud: bool = False
-
-
-class DubProjectCreateRequest(BaseModel):
-    transcript_id: str = Field(min_length=1, max_length=64)
-    title: str = Field(default="", max_length=160)
-    target_language: str = Field(default="auto", max_length=32)
-    default_voice_id: str | None = Field(default=None, max_length=64)
-
-
-class DubSegmentPatch(BaseModel):
-    id: str = Field(min_length=1, max_length=64)
-    active_text: str | None = Field(default=None, max_length=200_000)
-    voice_id: str | None = Field(default=None, max_length=64)
-    role_id: str | None = Field(default=None, max_length=64)
-    gain: float | None = Field(default=None, ge=0.0, le=2.0)
-    start: float | None = Field(default=None, ge=0.0)
-    end: float | None = Field(default=None, ge=0.0)
-    fit_mode: str | None = Field(default=None, max_length=16)
-
-
-class DubProjectPatch(BaseModel):
-    title: str | None = Field(default=None, max_length=160)
-    target_language: str | None = Field(default=None, max_length=32)
-    segments: list[DubSegmentPatch] = Field(default_factory=list, max_length=2_000)
-
-
-class DubJobCreateRequest(BaseModel):
-    mode: str = Field(default="all", max_length=16)
-    segment_ids: list[str] = Field(default_factory=list, max_length=2_000)
-
-
-class DubExportRequest(BaseModel):
-    original_audio_gain: float = Field(default=0.0, ge=0.0, le=1.0)
-
-
-class DubRoleRequest(BaseModel):
-    id: str | None = Field(default=None, max_length=64)
-    name: str = Field(min_length=1, max_length=160)
-    voice_id: str | None = Field(default=None, max_length=64)
-
-
-class DubSplitRequest(BaseModel):
-    split_at: float = Field(ge=0.0)
-
-
-class DubMergeRequest(BaseModel):
-    segment_ids: list[str] = Field(min_length=2, max_length=2_000)
-
-
-class GeminiBatchRequest(BaseModel):
-    segment_ids: list[str] = Field(min_length=1, max_length=50)
-    task: str = Field(min_length=1, max_length=32)
-    target_language: str = Field(default="", max_length=80)
-    confirm_cloud: bool = False
-
-
-_jobs: dict[str, GenerationJob] = {}
 
 
 def get_model() -> Any:
@@ -246,18 +188,47 @@ def _preload_safely() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    recovered_jobs = _dub_render_service.recover()
-    recovered_exports = _dub_export_service.recover()
-    if os.getenv("TIMBRELOOM_PRELOAD", "1") == "1" and recovered_jobs == 0 and recovered_exports == 0:
-        threading.Thread(target=_preload_safely, daemon=True).start()
-    yield
+    with DataDirectoryLock(DATA_DIR):
+        recovered_tts = _tts_jobs.recover()
+        recovered_asr = _asr_service.recover()
+        _vc_service.recover()
+        recovered_jobs = _dub_render_service.recover()
+        recovered_exports = _dub_export_service.recover()
+        if os.getenv("TIMBRELOOM_PRELOAD", "1") == "1" and not (recovered_tts or recovered_asr or recovered_jobs or recovered_exports):
+            threading.Thread(target=_preload_safely, daemon=True).start()
+        try:
+            yield
+        finally:
+            _model_store.close()
 
 
 app = FastAPI(
     title="Timbreloom",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def local_workspace_only(request: Request, call_next):
+    """Reject browser requests from other sites and DNS rebinding onto the local API."""
+    try:
+        target = request.url
+        if target.hostname not in {"127.0.0.1", "localhost", "::1"}:
+            return JSONResponse({"detail": "仅允许从本机 Timbreloom 地址访问。"}, status_code=403)
+        if origin := request.headers.get("origin"):
+            source = urlsplit(origin)
+            if (source.scheme, source.hostname, source.port or 80) != (target.scheme, target.hostname, target.port or 80):
+                return JSONResponse({"detail": "其他网站不能访问本机资料库。"}, status_code=403)
+    except ValueError:
+        return JSONResponse({"detail": "无效的本机请求地址。"}, status_code=400)
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
 
@@ -268,31 +239,78 @@ def index() -> FileResponse:
 
 
 @app.get("/api/health")
-def health() -> dict[str, Any]:
+def health(library: bool = True) -> dict[str, Any]:
     tts_descriptor = _tts_provider.descriptor
     asr_descriptor = _asr_provider.descriptor
     gemini_descriptor = _gemini_provider.descriptor
-    return {
-        "ok": _tts_provider.status != "error" and asr_descriptor.configured,
+    vc_descriptor = _vc_provider.descriptor
+    snapshot = {
+        "ok": True,
         "version": app.version,
         "model": MODEL_ID,
-        "model_source": "project-local" if Path(MODEL_SOURCE).is_dir() else MODEL_SOURCE,
-        "model_status": _tts_provider.status,
+        "model_source": "local" if Path(MODEL_SOURCE).is_dir() else "not-downloaded",
+        "model_status": _tts_provider.status if tts_descriptor.configured else "missing",
         "model_loaded": _tts_provider.loaded,
         "error": _tts_provider.error,
         "privacy": "localhost-only",
-        "saved_voices": len(_list_voice_profiles()),
-        "saved_transcripts": len(_asr_service.list_transcripts()),
-        "saved_dub_projects": len(_dub_store.list()),
         "generation_token_limit": GENERATION_TOKEN_LIMIT,
         "sampling_temperature": SAMPLING_TEMPERATURE,
         "active_local_workload": _accelerator.active,
         "providers": [
             tts_descriptor.public(),
             asr_descriptor.public(),
+            vc_descriptor.public(),
             gemini_descriptor.public(),
         ],
     }
+    if library:
+        snapshot.update(
+            saved_voices=len(_list_voice_profiles()),
+            saved_transcripts=len(_asr_service.list_transcripts()),
+            saved_dub_projects=len(_dub_store.list()),
+            saved_voice_conversions=len(_vc_service.list()),
+        )
+    return snapshot
+
+
+@app.get("/api/runtime")
+def runtime_status() -> dict[str, Any]:
+    """Cheap desktop handshake and quit guard, without walking the media library."""
+    return {
+        "app": "timbreloom",
+        "version": app.version,
+        "project_root": str(APP_ROOT),
+        "data_root": str(DATA_DIR),
+        "pid": os.getpid(),
+        "busy": bool(_accelerator.active) or _model_store.has_active_jobs() or any(service.has_active_jobs() for service in (
+            _tts_jobs, _asr_service, _vc_service, _dub_render_service, _dub_export_service,
+        )),
+    }
+
+
+@app.get("/api/models")
+def list_models() -> dict[str, Any]:
+    return _model_store.snapshot()
+
+
+@app.post("/api/models/{model_id}/download", status_code=202)
+def download_model(model_id: str) -> dict[str, Any]:
+    try:
+        return _model_store.start(model_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="没有这个可下载模型。") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail="无法写入模型目录，请检查磁盘空间和访问权限。") from exc
+
+
+@app.post("/api/models/{model_id}/pause")
+def pause_model_download(model_id: str) -> dict[str, Any]:
+    try:
+        return _model_store.pause(model_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="没有这个可下载模型。") from exc
 
 
 @app.post("/api/preload")
@@ -400,7 +418,7 @@ def _validate_asr_suffix(filename: str | None) -> str:
     suffix = Path(filename or "").suffix.lower()
     if suffix not in ALLOWED_ASR_SUFFIXES:
         allowed = "、".join(sorted(ALLOWED_ASR_SUFFIXES))
-        raise ValueError(f"不支持该转录格式。可用格式：{allowed}")
+        raise ValueError(f"不支持该媒体格式。可用格式：{allowed}")
     return suffix
 
 
@@ -505,6 +523,13 @@ def _list_voice_profiles() -> list[dict[str, Any]]:
     return profiles
 
 
+_vc_service = VoiceConversionService(
+    CONVERSION_DIR,
+    _vc_provider,
+    load_voice=_load_voice_profile,
+)
+
+
 def _persist_voice_profile(
     *,
     name: str,
@@ -605,13 +630,10 @@ def delete_voice(voice_id: str) -> dict[str, Any]:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    with _jobs_lock:
-        in_use = any(
-            job.voice_id == voice_id and job.status in {"queued", "running"}
-            for job in _jobs.values()
-        )
-    if in_use:
+    if _tts_jobs.voice_in_use(voice_id):
         raise HTTPException(status_code=409, detail="该音色正在用于生成，暂时不能删除。")
+    if _vc_service.voice_in_use(voice_id):
+        raise HTTPException(status_code=409, detail="该音色正在用于原声换色，暂时不能删除。")
 
     for project_summary in _dub_store.list():
         try:
@@ -636,6 +658,7 @@ def list_providers() -> dict[str, Any]:
         "providers": [
             _tts_provider.descriptor.public(),
             _asr_provider.descriptor.public(),
+            _vc_provider.descriptor.public(),
             _gemini_provider.descriptor.public(),
         ],
         "active_local_workload": _accelerator.active,
@@ -652,12 +675,190 @@ async def check_gemini_provider() -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=f"Gemini 连接检查失败：{exc}") from exc
 
 
+def _public_voice_conversion(job: Any) -> dict[str, Any]:
+    payload = _vc_service.snapshot(job)
+    job_id = payload["id"]
+    payload["source_url"] = f"/api/voice-conversions/{job_id}/source"
+    chunks = []
+    for chunk in payload.pop("stream_chunks", []):
+        chunk_payload = dict(chunk)
+        chunk_payload["audio_url"] = (
+            f"/api/voice-conversions/{job_id}/chunks/{chunk['index']}/audio"
+        )
+        chunks.append(chunk_payload)
+    payload["stream"] = {
+        "kind": "generated",
+        "available": len(chunks),
+        "total": payload.get("chunk_total", 0),
+        "complete": payload.get("status") == "complete",
+        "chunks": chunks,
+    }
+    if payload.get("status") == "complete" and payload.get("result"):
+        payload["result"]["audio_url"] = f"/api/voice-conversions/{job_id}/audio"
+        if payload["result"].get("video_filename"):
+            payload["result"]["video_url"] = f"/api/voice-conversions/{job_id}/video"
+    return payload
+
+
+@app.get("/api/voice-conversions/presets")
+def list_voice_conversion_presets() -> dict[str, Any]:
+    return {
+        "presets": [
+            {"id": preset_id, **settings}
+            for preset_id, settings in VC_PRESETS.items()
+        ],
+        "default": "balanced",
+    }
+
+
+@app.post("/api/voice-conversions", status_code=202)
+async def create_voice_conversion(
+    media: UploadFile = File(...),
+    voice_id: str = Form(...),
+    preset: str = Form("balanced"),
+    confirm_rights: bool = Form(False),
+) -> dict[str, Any]:
+    if not confirm_rights:
+        await media.close()
+        raise HTTPException(
+            status_code=400,
+            detail="请确认你有权使用原始媒体和目标音色。",
+        )
+    if not _vc_provider.descriptor.configured:
+        await media.close()
+        raise HTTPException(
+            status_code=503,
+            detail="请先在“模型管理”中下载 Seed-VC，再开始换色。",
+        )
+    try:
+        voice = _load_voice_profile(voice_id.strip())
+        suffix = _validate_asr_suffix(media.filename)
+        if preset not in VC_PRESETS:
+            raise ValueError("原声换色质量档无效。")
+    except FileNotFoundError as exc:
+        await media.close()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        await media.close()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    job_id = uuid.uuid4().hex
+    job_dir = CONVERSION_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=False)
+    source_path = job_dir / f"source{suffix}"
+    source_filename = Path(media.filename or f"media{suffix}").name
+    try:
+        source_bytes = await _save_upload_stream(
+            media,
+            source_path,
+            MAX_ASR_UPLOAD_BYTES,
+            oversize_detail="原声换色媒体不能超过 2 GB。",
+        )
+        job = _vc_service.create_job(
+            job_id=job_id,
+            source_path=source_path,
+            source_filename=source_filename,
+            source_bytes=source_bytes,
+            voice_id=voice["id"],
+            voice_name=voice["name"],
+            preset=preset,
+        )
+        _vc_service.launch(job)
+        return _public_voice_conversion(job)
+    except HTTPException:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
+    except ValueError as exc:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail=f"建立原声换色任务失败：{exc}") from exc
+
+
+@app.get("/api/voice-conversions")
+def list_voice_conversions() -> dict[str, Any]:
+    jobs = []
+    for item in _vc_service.list():
+        try:
+            jobs.append(_public_voice_conversion(_vc_service.get_job(item["id"])))
+        except FileNotFoundError:
+            continue
+    return {"conversions": jobs}
+
+
+@app.get("/api/voice-conversions/{job_id}")
+def get_voice_conversion(job_id: str) -> dict[str, Any]:
+    try:
+        return _public_voice_conversion(_vc_service.get_job(job_id))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/voice-conversions/{job_id}/cancel")
+def cancel_voice_conversion(job_id: str) -> dict[str, Any]:
+    try:
+        return _public_voice_conversion(_vc_service.cancel(job_id))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/voice-conversions/{job_id}/retry", status_code=202)
+def retry_voice_conversion(job_id: str) -> dict[str, Any]:
+    try:
+        return _public_voice_conversion(_vc_service.retry(job_id))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/voice-conversions/{job_id}/source")
+def get_voice_conversion_source(job_id: str) -> FileResponse:
+    try:
+        path = _vc_service.source_media(job_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    media_type, _ = mimetypes.guess_type(path.name)
+    return FileResponse(path, media_type=media_type or "application/octet-stream")
+
+
+@app.get("/api/voice-conversions/{job_id}/audio")
+def get_voice_conversion_audio(job_id: str) -> FileResponse:
+    try:
+        path = _vc_service.result_audio(job_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(path, media_type="audio/wav", filename=f"{job_id}-converted.wav")
+
+
+@app.get("/api/voice-conversions/{job_id}/chunks/{chunk_index}/audio")
+def get_voice_conversion_stream_chunk(job_id: str, chunk_index: int) -> FileResponse:
+    try:
+        path = _vc_service.stream_chunk(job_id, chunk_index)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(path, media_type="audio/wav")
+
+
+@app.get("/api/voice-conversions/{job_id}/video")
+def get_voice_conversion_video(job_id: str) -> FileResponse:
+    try:
+        path = _vc_service.result_video(job_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(path, media_type="video/mp4", filename=f"{job_id}-converted.mp4")
+
+
 @app.post("/api/asr/jobs", status_code=202)
 async def create_asr_job(
     media: UploadFile = File(...),
     language: str = Form("auto"),
     initial_prompt: str = Form(""),
 ) -> dict[str, Any]:
+    if not _asr_provider.descriptor.configured:
+        await media.close()
+        raise HTTPException(status_code=409, detail="请先在“模型管理”中下载 Whisper，再开始转录。")
     try:
         language = _validate_asr_language(language)
         suffix = _validate_asr_suffix(media.filename)
@@ -689,7 +890,7 @@ async def create_asr_job(
             initial_prompt=initial_prompt,
         )
         _asr_service.launch(job)
-        return _asr_service.snapshot(job)
+        return _public_asr_job(job)
     except HTTPException:
         shutil.rmtree(transcript_dir, ignore_errors=True)
         raise
@@ -707,7 +908,7 @@ def get_asr_job(job_id: str) -> dict[str, Any]:
         job = _asr_service.get_job(job_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return _asr_service.snapshot(job)
+    return _public_asr_job(job)
 
 
 @app.post("/api/asr/jobs/{job_id}/cancel")
@@ -716,7 +917,42 @@ def cancel_asr_job(job_id: str) -> dict[str, Any]:
         job = _asr_service.cancel(job_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return _asr_service.snapshot(job)
+    return _public_asr_job(job)
+
+
+def _public_asr_job(job: Any) -> dict[str, Any]:
+    payload = _asr_service.snapshot(job)
+    audio_path = job.transcript_dir / "audio.wav"
+    chunks = []
+    if payload.get("audio_ready") and audio_path.is_file():
+        chunks.append(
+            {
+                "index": 1,
+                "duration_seconds": payload.get("duration_seconds", 0),
+                "label": "原始音轨",
+                "audio_url": f"/api/asr/jobs/{job.job_id}/audio",
+            }
+        )
+    payload["stream"] = {
+        "kind": "source",
+        "available": len(chunks),
+        "total": 1,
+        "complete": bool(chunks),
+        "chunks": chunks,
+    }
+    return payload
+
+
+@app.get("/api/asr/jobs/{job_id}/audio")
+def get_asr_job_audio(job_id: str) -> FileResponse:
+    try:
+        job = _asr_service.get_job(job_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    audio_path = job.transcript_dir / "audio.wav"
+    if not getattr(job, "audio_ready", False) or not audio_path.is_file():
+        raise HTTPException(status_code=404, detail="转录音频仍在准备中。")
+    return FileResponse(audio_path, media_type="audio/wav")
 
 
 @app.get("/api/transcripts")
@@ -942,6 +1178,16 @@ def _generate_segment(
     }
 
 
+_tts_jobs = TTSService(
+    JOB_DIR, OUTPUT_DIR,
+    generate_segment=lambda *args: _generate_segment(*args),
+    normalize_audio=_normalize_audio,
+    model_id=MODEL_ID,
+    settings={"temperature": SAMPLING_TEMPERATURE, "max_tokens": GENERATION_TOKEN_LIMIT},
+    max_attempts=MAX_GENERATION_ATTEMPTS,
+)
+
+
 _dub_render_service = DubRenderService(
     _dub_store,
     load_voice=_load_voice_profile,
@@ -958,647 +1204,16 @@ _dub_render_service = DubRenderService(
 _dub_export_service = DubExportService(_dub_store, _dub_render_service)
 
 
-def _public_dub_project(project: dict[str, Any]) -> dict[str, Any]:
-    project_id = project["id"]
-    project["source_audio_url"] = f"/api/dub/projects/{project_id}/audio"
-    if project.get("source_has_video"):
-        project["source_media_url"] = f"/api/dub/projects/{project_id}/media"
-    for index, segment in enumerate(project["segments"]):
-        render = segment["render"]
-        slot_duration = max(0.0, float(segment["end"]) - float(segment["start"]))
-        natural_duration = float(render.get("duration_seconds", 0.0))
-        requested_speed = natural_duration / slot_duration if slot_duration > 0 else 1.0
-        applied_speed = min(1.25, max(0.8, requested_speed))
-        fitted_duration = (
-            natural_duration / applied_speed
-            if segment.get("fit_mode") == "slot" and natural_duration > 0
-            else natural_duration
-        )
-        overflow = max(0.0, fitted_duration - slot_duration)
-        next_start = (
-            float(project["segments"][index + 1]["start"])
-            if index + 1 < len(project["segments"])
-            else None
-        )
-        rendered_end = float(segment["start"]) + fitted_duration
-        overlap_next = max(0.0, rendered_end - next_start) if next_start is not None else 0.0
-        render["slot_duration_seconds"] = round(slot_duration, 3)
-        render["overflow_seconds"] = round(overflow, 3)
-        render["natural_overflow_seconds"] = round(max(0.0, natural_duration - slot_duration), 3)
-        render["fitted_duration_seconds"] = round(fitted_duration, 3)
-        render["fit_speed"] = round(applied_speed, 3) if segment.get("fit_mode") == "slot" else 1.0
-        render["fit_limited"] = bool(
-            segment.get("fit_mode") == "slot" and abs(requested_speed - applied_speed) > 0.001
-        )
-        render["overlap_next_seconds"] = round(overlap_next, 3)
-        if render.get("filename"):
-            render["audio_url"] = (
-                f"/api/dub/projects/{project_id}/segments/{segment['id']}/audio"
-            )
-    for export in project.get("exports", []):
-        export["wav_url"] = (
-            f"/api/dub/projects/{project_id}/exports/{export['wav_filename']}"
-        )
-        export["srt_url"] = (
-            f"/api/dub/projects/{project_id}/exports/{export['srt_filename']}"
-        )
-        if export.get("mp4_filename"):
-            export["mp4_url"] = (
-                f"/api/dub/projects/{project_id}/exports/{export['mp4_filename']}"
-            )
-    if project.get("last_job_id"):
-        try:
-            project["last_job"] = _dub_render_service.get_job(
-                project_id,
-                project["last_job_id"],
-            )
-        except (FileNotFoundError, ValueError):
-            project["last_job"] = None
-    else:
-        project["last_job"] = None
-    if project.get("last_export_job_id"):
-        try:
-            project["last_export_job"] = _dub_export_service.get_job(
-                project_id,
-                project["last_export_job_id"],
-            )
-        except (FileNotFoundError, ValueError):
-            project["last_export_job"] = None
-    else:
-        project["last_export_job"] = None
-    project["quality"] = project_quality(project)
-    return project
-
-
-@app.get("/api/dub/projects")
-def list_dub_projects() -> dict[str, Any]:
-    return {"projects": _dub_store.list()}
-
-
-@app.post("/api/dub/projects", status_code=201)
-async def create_dub_project(request: DubProjectCreateRequest) -> dict[str, Any]:
-    try:
-        target_language = _validate_language(request.target_language)
-        transcript = _asr_service.get_transcript(request.transcript_id)
-        source_audio = _asr_service.transcript_dir(request.transcript_id) / "audio.wav"
-        source_media = _asr_service.source_media(request.transcript_id)
-        source_media_info = await asyncio.to_thread(probe_media, source_media)
-        if request.default_voice_id:
-            _load_voice_profile(request.default_voice_id)
-        project = await asyncio.to_thread(
-            _dub_store.create,
-            transcript=transcript,
-            source_audio=source_audio,
-            source_media=source_media if source_media_info.has_video else None,
-            title=request.title,
-            target_language=target_language,
-            default_voice_id=request.default_voice_id,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"创建配音项目失败：{exc}") from exc
-    return {"ok": True, "project": _public_dub_project(project)}
-
-
-@app.get("/api/dub/projects/{project_id}")
-def get_dub_project(project_id: str) -> dict[str, Any]:
-    try:
-        return _public_dub_project(_dub_store.load(project_id))
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@app.patch("/api/dub/projects/{project_id}")
-def update_dub_project(
-    project_id: str,
-    patch: DubProjectPatch,
-) -> dict[str, Any]:
-    try:
-        target_language = (
-            _validate_language(patch.target_language)
-            if patch.target_language is not None
-            else None
-        )
-        updates = [item.model_dump(exclude_unset=True) for item in patch.segments]
-        for update in updates:
-            voice_id = update.get("voice_id")
-            if voice_id:
-                _load_voice_profile(voice_id)
-        project = _dub_store.update(
-            project_id,
-            title=patch.title,
-            target_language=target_language,
-            segment_updates=updates,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"ok": True, "project": _public_dub_project(project)}
-
-
-@app.post("/api/dub/projects/{project_id}/roles")
-def upsert_dub_role(project_id: str, request: DubRoleRequest) -> dict[str, Any]:
-    try:
-        if request.voice_id:
-            _load_voice_profile(request.voice_id)
-        project = _dub_store.upsert_role(
-            project_id,
-            role_id=request.id,
-            name=request.name,
-            voice_id=request.voice_id,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"ok": True, "project": _public_dub_project(project)}
-
-
-@app.post("/api/dub/projects/{project_id}/segments/{segment_id}/split")
-def split_dub_segment(
-    project_id: str,
-    segment_id: str,
-    request: DubSplitRequest,
-) -> dict[str, Any]:
-    try:
-        project = _dub_store.split_segment(project_id, segment_id, split_at=request.split_at)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"ok": True, "project": _public_dub_project(project)}
-
-
-@app.post("/api/dub/projects/{project_id}/segments/merge")
-def merge_dub_segments(project_id: str, request: DubMergeRequest) -> dict[str, Any]:
-    try:
-        project = _dub_store.merge_segments(project_id, request.segment_ids)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"ok": True, "project": _public_dub_project(project)}
-
-
-@app.get("/api/dub/projects/{project_id}/waveform")
-def get_dub_waveform(project_id: str, points: int = 1600) -> dict[str, Any]:
-    try:
-        return _dub_store.waveform(project_id, points=points)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.get("/api/dub/projects/{project_id}/audio")
-def get_dub_source_audio(project_id: str) -> FileResponse:
-    try:
-        path = _dub_store.source_audio(project_id)
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return FileResponse(path, media_type="audio/wav")
-
-
-@app.get("/api/dub/projects/{project_id}/media")
-def get_dub_source_media(project_id: str) -> FileResponse:
-    try:
-        path = _dub_store.source_media(project_id)
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    return FileResponse(path, media_type=media_type)
-
-
-@app.get("/api/dub/projects/{project_id}/segments/{segment_id}/audio")
-def get_dub_segment_audio(project_id: str, segment_id: str) -> FileResponse:
-    try:
-        project = _dub_store.load(project_id)
-        segment = next(
-            item for item in project["segments"] if item["id"] == segment_id
-        )
-        filename = str(segment["render"].get("filename", ""))
-        if not filename:
-            raise FileNotFoundError("该片段还没有可试听的音频。")
-        path = _dub_store.render_path(project_id, filename)
-        if not path.is_file():
-            raise FileNotFoundError("该片段的试听文件不存在。")
-    except StopIteration as exc:
-        raise HTTPException(status_code=404, detail="配音片段不存在。") from exc
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return FileResponse(path, media_type="audio/wav")
-
-
-@app.post("/api/dub/projects/{project_id}/jobs", status_code=202)
-def create_dub_job(
-    project_id: str,
-    request: DubJobCreateRequest,
-) -> dict[str, Any]:
-    try:
-        return _dub_render_service.create_job(
-            project_id,
-            mode=request.mode,
-            segment_ids=request.segment_ids,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-
-@app.get("/api/dub/projects/{project_id}/jobs/{job_id}")
-def get_dub_job(project_id: str, job_id: str) -> dict[str, Any]:
-    try:
-        return _dub_render_service.get_job(project_id, job_id)
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@app.post("/api/dub/projects/{project_id}/jobs/{job_id}/cancel")
-def cancel_dub_job(project_id: str, job_id: str) -> dict[str, Any]:
-    try:
-        return _dub_render_service.cancel(project_id, job_id)
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@app.post("/api/dub/projects/{project_id}/export")
-async def export_dub_project(
-    project_id: str,
-    request: DubExportRequest | None = None,
-) -> dict[str, Any]:
-    try:
-        original_audio_gain = request.original_audio_gain if request else 0.0
-        export = await asyncio.to_thread(
-            _dub_render_service.export,
-            project_id,
-            original_audio_gain=original_audio_gain,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"导出配音项目失败：{exc}") from exc
-    export["wav_url"] = f"/api/dub/projects/{project_id}/exports/{export['wav_filename']}"
-    export["srt_url"] = f"/api/dub/projects/{project_id}/exports/{export['srt_filename']}"
-    if export.get("mp4_filename"):
-        export["mp4_url"] = f"/api/dub/projects/{project_id}/exports/{export['mp4_filename']}"
-    return {"ok": True, "export": export}
-
-
-@app.post("/api/dub/projects/{project_id}/export-jobs", status_code=202)
-def create_dub_export_job(
-    project_id: str,
-    request: DubExportRequest | None = None,
-) -> dict[str, Any]:
-    try:
-        return _dub_export_service.create_job(
-            project_id,
-            original_audio_gain=request.original_audio_gain if request else 0.0,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-
-@app.get("/api/dub/projects/{project_id}/export-jobs/{job_id}")
-def get_dub_export_job(project_id: str, job_id: str) -> dict[str, Any]:
-    try:
-        job = _dub_export_service.get_job(project_id, job_id)
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    if job.get("result"):
-        result = job["result"]
-        result["wav_url"] = f"/api/dub/projects/{project_id}/exports/{result['wav_filename']}"
-        result["srt_url"] = f"/api/dub/projects/{project_id}/exports/{result['srt_filename']}"
-        if result.get("mp4_filename"):
-            result["mp4_url"] = f"/api/dub/projects/{project_id}/exports/{result['mp4_filename']}"
-    return job
-
-
-@app.get("/api/dub/projects/{project_id}/bundle")
-def download_dub_project_bundle(project_id: str) -> FileResponse:
-    try:
-        path = _dub_store.create_bundle(project_id)
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return FileResponse(
-        path,
-        media_type="application/zip",
-        filename=path.name,
+def _dubbing_context() -> DubbingContext:
+    return DubbingContext(
+        store=_dub_store, render=_dub_render_service, exports=_dub_export_service,
+        asr=_asr_service, gemini=_gemini_provider, load_voice=_load_voice_profile,
+        validate_language=_validate_language, save_upload=_save_upload_stream,
+        upload_dir=UPLOAD_DIR, max_upload_bytes=MAX_ASR_UPLOAD_BYTES,
     )
 
 
-@app.post("/api/dub/projects/import", status_code=201)
-async def import_dub_project_bundle(bundle: UploadFile = File(...)) -> dict[str, Any]:
-    upload_id = uuid.uuid4().hex
-    path = UPLOAD_DIR / f"dub-bundle-{upload_id}.timbreloom"
-    try:
-        await _save_upload_stream(
-            bundle,
-            path,
-            MAX_ASR_UPLOAD_BYTES,
-            "Timbreloom 项目包不能超过 2 GB。",
-        )
-        project = await asyncio.to_thread(_dub_store.import_bundle, path)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    finally:
-        path.unlink(missing_ok=True)
-    return {"ok": True, "project": _public_dub_project(project)}
-
-
-@app.get("/api/dub/projects/{project_id}/exports/{filename}")
-def get_dub_export(project_id: str, filename: str) -> FileResponse:
-    try:
-        project = _dub_store.load(project_id)
-        allowed = {
-            value
-            for item in project.get("exports", [])
-            for key in ("wav_filename", "srt_filename", "mp4_filename")
-            if (value := item.get(key))
-        }
-        if filename not in allowed or Path(filename).name != filename:
-            raise FileNotFoundError("配音导出文件不存在。")
-        path = _dub_store.project_dir(project_id) / "exports" / filename
-        if not path.is_file():
-            raise FileNotFoundError("配音导出文件不存在。")
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    media_types = {
-        ".wav": "audio/wav",
-        ".srt": "application/x-subrip; charset=utf-8",
-        ".mp4": "video/mp4",
-    }
-    media_type = media_types.get(path.suffix.lower(), "application/octet-stream")
-    return FileResponse(path, media_type=media_type, filename=filename)
-
-
-@app.post("/api/dub/projects/{project_id}/gemini")
-async def transform_dub_segment_with_gemini(
-    project_id: str,
-    request: GeminiTransformRequest,
-) -> dict[str, Any]:
-    if not request.confirm_cloud:
-        raise HTTPException(
-            status_code=400,
-            detail="必须明确确认后才能把所选文字发送到 Gemini。",
-        )
-    if not _gemini_provider.configured:
-        raise HTTPException(status_code=503, detail="没有配置 GEMINI_API_KEY。")
-    try:
-        project = _dub_store.load(project_id)
-        segment = next(
-            item for item in project["segments"] if item["id"] == request.segment_id
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except StopIteration as exc:
-        raise HTTPException(status_code=404, detail="配音片段不存在。") from exc
-    try:
-        result = await asyncio.to_thread(
-            _gemini_provider.transform,
-            segment["active_text"],
-            request.task,
-            request.target_language,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Gemini 处理失败：{exc}") from exc
-    result["segment_id"] = request.segment_id
-    result["cloud_request"] = True
-    return result
-
-
-@app.post("/api/dub/projects/{project_id}/gemini-batch")
-async def transform_dub_segments_with_gemini(
-    project_id: str,
-    request: GeminiBatchRequest,
-) -> dict[str, Any]:
-    if not request.confirm_cloud:
-        raise HTTPException(status_code=400, detail="必须明确确认后才能把所选文字发送到 Gemini。")
-    if not _gemini_provider.configured:
-        raise HTTPException(status_code=503, detail="没有配置 GEMINI_API_KEY。")
-    try:
-        project = _dub_store.load(project_id)
-        by_id = {item["id"]: item for item in project["segments"]}
-        segment_ids = list(dict.fromkeys(request.segment_ids))
-        if not set(segment_ids).issubset(by_id):
-            raise ValueError("选择中包含不存在的配音片段。")
-        total_chars = sum(len(by_id[item]["active_text"]) for item in segment_ids)
-        if total_chars > 60_000:
-            raise ValueError("批量 Gemini 处理的文字总量不能超过 60,000 个字符。")
-
-        def run_batch() -> list[dict[str, Any]]:
-            results = []
-            for segment_id in segment_ids:
-                result = _gemini_provider.transform(
-                    by_id[segment_id]["active_text"],
-                    request.task,
-                    request.target_language,
-                )
-                results.append({"segment_id": segment_id, "text": result["text"]})
-            return results
-
-        results = await asyncio.to_thread(run_batch)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Gemini 批量处理失败：{exc}") from exc
-    return {
-        "ok": True,
-        "provider": "gemini-text",
-        "cloud_request": True,
-        "task": request.task,
-        "results": results,
-    }
-
-
-def _job_snapshot(job: GenerationJob) -> dict[str, Any]:
-    with _jobs_lock:
-        snapshot = {
-            "job_id": job.job_id,
-            "status": job.status,
-            "phase": job.phase,
-            "message": job.message,
-            "progress": round(job.progress, 4),
-            "segment_total": len(job.segments),
-            "segments_completed": job.segments_completed,
-            "current_segment": job.current_segment,
-            "current_text": job.current_text,
-            "voice_name": job.voice_name,
-            "created_at": job.created_at,
-            "error": job.error,
-            "result": job.result,
-        }
-    return snapshot
-
-
-def _update_job(job: GenerationJob, **changes: Any) -> None:
-    with _jobs_lock:
-        for key, value in changes.items():
-            setattr(job, key, value)
-
-
-def _process_job(job: GenerationJob) -> None:
-    started = time.perf_counter()
-    segment_paths: list[Path] = []
-    peak_memory = 0.0
-    reference_path = job.reference_source
-
-    try:
-        _update_job(
-            job,
-            status="running",
-            phase="preparing",
-            message="正在准备参考音色",
-            progress=0.02,
-        )
-
-        if not job.reference_is_normalized:
-            reference_path = job.job_dir / "reference.wav"
-            duration = _normalize_audio(job.reference_source, reference_path)
-            _update_job(job, reference_duration_seconds=duration)
-
-        if job.cancel_event.is_set():
-            raise InterruptedError("生成已取消。")
-
-        total = len(job.segments)
-        for index, segment in enumerate(job.segments, start=1):
-            if job.cancel_event.is_set():
-                raise InterruptedError("生成已取消。")
-
-            preview = " ".join(segment.text.split())
-            preview_text = preview if len(preview) <= 180 else f"{preview[:177]}..."
-            _update_job(
-                job,
-                phase="generating",
-                message=f"正在生成第 {index} / {total} 段",
-                current_segment=index,
-                current_text=preview_text,
-                progress=0.04 + 0.88 * ((index - 1) / total),
-            )
-
-            segment_path = job.job_dir / f"segment-{index:05d}.wav"
-            last_error: Exception | None = None
-            metrics: dict[str, float] | None = None
-            for attempt in range(1, MAX_GENERATION_ATTEMPTS + 1):
-                try:
-                    metrics = _generate_segment(
-                        reference_path,
-                        job.reference_text,
-                        segment.text,
-                        job.language,
-                        segment_path,
-                    )
-                    expected_duration = (
-                        segment.estimated_audio_tokens / AUDIO_TOKENS_PER_SECOND
-                    )
-                    if (
-                        segment.estimated_audio_tokens >= 240
-                        and metrics["duration_seconds"] < expected_duration * 0.35
-                    ):
-                        segment_path.unlink(missing_ok=True)
-                        raise RuntimeError(
-                            "生成音频明显短于本段文字，可能存在漏读。"
-                        )
-                    break
-                except Exception as exc:
-                    last_error = exc
-                    metrics = None
-                    if attempt < MAX_GENERATION_ATTEMPTS:
-                        _update_job(job, message=f"第 {index} 段正在重试")
-                        time.sleep(0.25)
-
-            if metrics is None:
-                raise RuntimeError(f"第 {index} 段生成失败：{last_error}")
-
-            segment_paths.append(segment_path)
-            peak_memory = max(peak_memory, metrics["peak_memory_gb"])
-            _update_job(
-                job,
-                segments_completed=index,
-                progress=0.04 + 0.88 * (index / total),
-            )
-
-        if job.cancel_event.is_set():
-            raise InterruptedError("生成已取消。")
-
-        _update_job(
-            job,
-            phase="assembling",
-            message="正在无损拼接所有分段",
-            progress=0.95,
-            current_text="",
-        )
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        filename = f"timbreloom-long-{stamp}-{job.job_id[:6]}.wav"
-        output_path = OUTPUT_DIR / filename
-        generated_duration = stitch_wav_files(segment_paths, output_path)
-        elapsed = time.perf_counter() - started
-        result = {
-            "ok": True,
-            "audio_url": f"/outputs/{filename}",
-            "filename": filename,
-            "model": MODEL_ID,
-            "voice_name": job.voice_name,
-            "reference_duration_seconds": round(job.reference_duration_seconds or 0.0, 2),
-            "audio_duration_seconds": round(generated_duration, 2),
-            "generation_seconds": round(elapsed, 2),
-            "peak_memory_gb": round(peak_memory, 2),
-            "segment_count": len(job.segments),
-            "text_characters": sum(len(segment.text) for segment in job.segments),
-            "generation_token_limit_per_segment": GENERATION_TOKEN_LIMIT,
-        }
-        _update_job(
-            job,
-            status="complete",
-            phase="complete",
-            message="全部分段已生成并拼接完成",
-            progress=1.0,
-            current_segment=len(job.segments),
-            result=result,
-        )
-    except InterruptedError as exc:
-        _update_job(
-            job,
-            status="cancelled",
-            phase="cancelled",
-            message=str(exc),
-            error=str(exc),
-        )
-    except Exception as exc:
-        _update_job(
-            job,
-            status="error",
-            phase="error",
-            message="生成停止，没有跳过失败分段",
-            error=str(exc),
-        )
-    finally:
-        shutil.rmtree(job.job_dir, ignore_errors=True)
-
-
-def _launch_job(job: GenerationJob) -> None:
-    threading.Thread(
-        target=_process_job,
-        args=(job,),
-        name=f"voice-job-{job.job_id[:8]}",
-        daemon=True,
-    ).start()
+app.include_router(create_dubbing_router(_dubbing_context))
 
 
 @app.post("/api/jobs", status_code=202)
@@ -1609,6 +1224,10 @@ async def create_generation_job(
     reference_text: str = Form(""),
     reference_audio: UploadFile | None = File(None),
 ) -> dict[str, Any]:
+    if not _tts_provider.descriptor.configured:
+        if reference_audio is not None:
+            await reference_audio.close()
+        raise HTTPException(status_code=409, detail="请先在“模型管理”中下载 Qwen3-TTS，再开始生成。")
     try:
         target_text = _normalize_target_text(target_text)
         language = _validate_language(language)
@@ -1664,10 +1283,9 @@ async def create_generation_job(
             created_at=datetime.now(timezone.utc).isoformat(),
             message=f"已完成无丢字分段，共 {len(segments)} 段",
         )
-        with _jobs_lock:
-            _jobs[job_id] = job
-        _launch_job(job)
-        return _job_snapshot(job)
+        _tts_jobs.add(job)
+        _tts_jobs.launch(job)
+        return _tts_jobs.snapshot(job)
     except Exception:
         shutil.rmtree(job_dir, ignore_errors=True)
         raise
@@ -1675,28 +1293,31 @@ async def create_generation_job(
 
 @app.get("/api/jobs/{job_id}")
 def get_generation_job(job_id: str) -> dict[str, Any]:
-    if not _valid_identifier(job_id):
-        raise HTTPException(status_code=404, detail="生成任务不存在。")
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="生成任务不存在或服务已经重启。")
-    return _job_snapshot(job)
+    try:
+        return _tts_jobs.snapshot(_tts_jobs.get_job(job_id))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/jobs/{job_id}/segments/{segment_index}/audio")
+def get_generation_stream_chunk(job_id: str, segment_index: int) -> FileResponse:
+    try:
+        job = _tts_jobs.get_job(job_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    available = {chunk["index"] for chunk in _tts_jobs.snapshot(job)["stream"]["chunks"]}
+    path = job.job_dir / f"segment-{segment_index:05d}.wav"
+    if segment_index not in available or not path.is_file():
+        raise HTTPException(status_code=404, detail="该生成片段尚未完成。")
+    return FileResponse(path, media_type="audio/wav")
 
 
 @app.post("/api/jobs/{job_id}/cancel")
 def cancel_generation_job(job_id: str) -> dict[str, Any]:
-    if not _valid_identifier(job_id):
-        raise HTTPException(status_code=404, detail="生成任务不存在。")
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="生成任务不存在。")
-    if job.status not in {"queued", "running"}:
-        return _job_snapshot(job)
-    job.cancel_event.set()
-    _update_job(job, message="将在当前分段结束后取消")
-    return _job_snapshot(job)
+    try:
+        return _tts_jobs.snapshot(_tts_jobs.cancel(job_id))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 def _run_generation(

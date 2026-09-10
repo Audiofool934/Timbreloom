@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from google import genai
-
 from .base import ProviderDescriptor, TextModelProvider
 
 
@@ -32,7 +30,9 @@ class GeminiTextProvider(TextModelProvider):
             detail=self.model if self.configured else "missing-api-key",
         )
 
-    def _client(self) -> genai.Client:
+    def _client(self) -> Any:
+        from google import genai
+
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
             raise RuntimeError("没有配置 GEMINI_API_KEY。")

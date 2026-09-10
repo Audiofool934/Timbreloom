@@ -1,16 +1,20 @@
 .DS_Store
 .pytest_cache/
 .venv/
+runtime/
 artifacts/
 output/
 __pycache__/
 *.pyc
 data/uploads/
 data/jobs/
+data/.service.lock
+build/
 data/voices/
 data/smoke/
 data/transcripts/
 data/projects/
+data/conversions/
 data/outputs/*.wav
 !data/README.md
 !data/outputs/.gitkeep
@@ -19,3 +23,10 @@ models/*
 .env
 .env.*
 !.env.example
+
+# Keep all personal library formats out of version control.
+/data/*
+!/data/README.md
+!/data/outputs/
+/data/outputs/*
+!/data/outputs/.gitkeep

@@ -20,11 +20,13 @@ class LocalWhisperASRProvider(ASRProvider):
         model_source: Path,
         coordinator: AcceleratorCoordinator,
         before_load: Callable[[], None] | None = None,
+        model_available: Callable[[], bool] | None = None,
     ) -> None:
         self.model_id = model_id
         self.model_source = model_source
         self.coordinator = coordinator
         self.before_load = before_load
+        self.model_available = model_available
 
     @property
     def descriptor(self) -> ProviderDescriptor:
@@ -32,6 +34,8 @@ class LocalWhisperASRProvider(ASRProvider):
             (self.model_source / "config.json").is_file()
             and (self.model_source / "weights.npz").is_file()
         )
+        if self.model_available:
+            model_ready = self.model_available()
         return ProviderDescriptor(
             provider_id="local-whisper-asr",
             name="Whisper Large v3 Turbo Q4",
@@ -56,7 +60,7 @@ class LocalWhisperASRProvider(ASRProvider):
     ) -> dict[str, Any]:
         descriptor = self.descriptor
         if not descriptor.ready:
-            raise RuntimeError("本地 Whisper 权重缺失，请先运行 ./setup.sh。")
+            raise RuntimeError("请先在“模型管理”中下载 Whisper，再开始转录。")
 
         request.raw_output_path.parent.mkdir(parents=True, exist_ok=True)
         log_path = request.raw_output_path.with_suffix(".log")

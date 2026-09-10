@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from .media import prepare_asr_audio, probe_media
+from .job_storage import atomic_json, file_digest, local_file
 from .providers import ASRProvider, ASRRequest
 from .transcripts import (
     build_transcript,
@@ -38,6 +39,9 @@ class ASRJob:
     message: str = "等待转录"
     progress: float = 0.0
     duration_seconds: float = 0.0
+    audio_ready: bool = False
+    audio_sha256: str = ""
+    raw_ready: bool = False
     result: dict[str, Any] | None = None
     error: str | None = None
     cancel_event: threading.Event = field(default_factory=threading.Event)
@@ -49,8 +53,13 @@ class ASRService:
         self.provider = provider
         self.transcript_root.mkdir(parents=True, exist_ok=True)
         self._jobs: dict[str, ASRJob] = {}
-        self._jobs_lock = threading.Lock()
+        self._jobs_lock = threading.RLock()
+        self._threads: dict[str, threading.Thread] = {}
         self._transcript_lock = threading.Lock()
+
+    def has_active_jobs(self) -> bool:
+        with self._jobs_lock:
+            return any(job.status in {"queued", "running"} for job in self._jobs.values())
 
     def create_job(
         self,
@@ -75,20 +84,38 @@ class ASRService:
         )
         with self._jobs_lock:
             self._jobs[job_id] = job
+            self._persist(job)
         return job
 
     def launch(self, job: ASRJob) -> None:
-        threading.Thread(
-            target=self._process_job,
-            args=(job,),
-            name=f"asr-job-{job.job_id[:8]}",
-            daemon=True,
-        ).start()
+        with self._jobs_lock:
+            thread = self._threads.get(job.job_id)
+            if thread and thread.is_alive():
+                return
+            thread = threading.Thread(
+                target=self._process_job, args=(job,),
+                name=f"asr-job-{job.job_id[:8]}", daemon=True,
+            )
+            self._threads[job.job_id] = thread
+            thread.start()
+
+    def _persist(self, job: ASRJob) -> None:
+        payload = {
+            item.name: getattr(job, item.name) for item in fields(job)
+            if item.name not in {"transcript_dir", "source_path", "cancel_event"}
+        }
+        payload.update(
+            schema_version=1, source_path=job.source_path.name,
+            cancel_requested=job.cancel_event.is_set(),
+            model=getattr(self.provider, "model_id", self.provider.descriptor.name),
+        )
+        atomic_json(job.transcript_dir / "job.json", payload)
 
     def _update(self, job: ASRJob, **changes: Any) -> None:
         with self._jobs_lock:
             for key, value in changes.items():
                 setattr(job, key, value)
+            self._persist(job)
 
     def snapshot(self, job: ASRJob) -> dict[str, Any]:
         with self._jobs_lock:
@@ -100,24 +127,63 @@ class ASRService:
                 "progress": round(job.progress, 4),
                 "source_filename": job.source_filename,
                 "duration_seconds": round(job.duration_seconds, 3),
+                "audio_ready": job.audio_ready,
                 "created_at": job.created_at,
                 "result": job.result,
                 "error": job.error,
             }
 
     def get_job(self, job_id: str) -> ASRJob:
+        directory = self.transcript_dir(job_id)
         with self._jobs_lock:
             job = self._jobs.get(job_id)
-        if job is None:
-            raise FileNotFoundError("转录任务不存在。")
-        return job
+            if job is not None:
+                return job
+            try:
+                payload = json.loads((directory / "job.json").read_text(encoding="utf-8"))
+                if payload["schema_version"] != 1 or payload["job_id"] != job_id:
+                    raise ValueError("不支持的转录任务格式。")
+                source = local_file(directory, payload["source_path"])
+                kwargs = {
+                    item.name: payload[item.name] for item in fields(ASRJob)
+                    if item.name not in {"transcript_dir", "source_path", "cancel_event"}
+                }
+                job = ASRJob(**kwargs, transcript_dir=directory, source_path=source)
+                if payload.get("model") != getattr(self.provider, "model_id", self.provider.descriptor.name):
+                    job.raw_ready = False
+                if payload.get("cancel_requested"):
+                    job.cancel_event.set()
+                self._jobs[job_id] = job
+                return job
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                raise FileNotFoundError("转录任务不存在或记录损坏。") from exc
+
+    def recover(self) -> int:
+        recovered = 0
+        for path in self.transcript_root.glob("*/job.json"):
+            try:
+                job = self.get_job(path.parent.name)
+            except FileNotFoundError:
+                continue
+            if job.status not in {"queued", "running"}:
+                continue
+            if job.cancel_event.is_set():
+                self._update(job, status="cancelled", phase="cancelled",
+                             message="服务重启时确认了此前的停止请求")
+                continue
+            self._update(job, status="queued", phase="queued", error=None,
+                         message="服务重启后继续本地转录")
+            self.launch(job)
+            recovered += 1
+        return recovered
 
     def cancel(self, job_id: str) -> ASRJob:
         job = self.get_job(job_id)
         if job.status in {"complete", "error", "cancelled"}:
             return job
-        job.cancel_event.set()
-        self._update(job, message="正在停止转录")
+        with self._jobs_lock:
+            job.cancel_event.set()
+            self._update(job, message="正在停止转录")
         return job
 
     def _process_job(self, job: ASRJob) -> None:
@@ -150,7 +216,11 @@ class ASRService:
                 message="正在提取并标准化音频",
                 progress=0.14,
             )
-            prepare_asr_audio(job.source_path, audio_path)
+            if not (job.audio_ready and audio_path.is_file()
+                    and file_digest(audio_path) == job.audio_sha256):
+                self._update(job, audio_ready=False, raw_ready=False)
+                prepare_asr_audio(job.source_path, audio_path)
+                self._update(job, audio_ready=True, audio_sha256=file_digest(audio_path))
 
             if job.cancel_event.is_set():
                 raise InterruptedError("转录已取消。")
@@ -162,15 +232,26 @@ class ASRService:
                 progress=0.24,
             )
             language = None if job.requested_language == "auto" else job.requested_language
-            raw_result = self.provider.transcribe(
-                ASRRequest(
-                    audio_path=audio_path,
-                    language=language,
-                    raw_output_path=raw_path,
-                    initial_prompt=job.initial_prompt,
-                ),
-                cancel_event=job.cancel_event,
-            )
+            raw_result = None
+            if job.raw_ready:
+                try:
+                    raw_result = json.loads(raw_path.read_text(encoding="utf-8"))
+                    if not isinstance(raw_result, dict) or "segments" not in raw_result:
+                        raw_result = None
+                except (OSError, ValueError):
+                    pass
+            if raw_result is None:
+                raw_result = self.provider.transcribe(
+                    ASRRequest(
+                        audio_path=audio_path,
+                        language=language,
+                        raw_output_path=raw_path,
+                        initial_prompt=job.initial_prompt,
+                    ),
+                    cancel_event=job.cancel_event,
+                )
+                atomic_json(raw_path, raw_result)
+                self._update(job, raw_ready=True)
 
             if job.cancel_event.is_set():
                 raise InterruptedError("转录已取消。")

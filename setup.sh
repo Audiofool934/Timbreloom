@@ -31,3 +31,4 @@ if [[ ! -f "$ASR_MODEL_FILE" ]]; then
 fi
 
 uv run python scripts/preload_model.py
+"$SCRIPT_DIR/scripts/setup_seed_vc.sh"

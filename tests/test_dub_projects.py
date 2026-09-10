@@ -76,6 +76,24 @@ def _wait_for_job(service: DubRenderService, project_id: str, job_id: str) -> di
     raise AssertionError("配音测试任务没有按时结束。")
 
 
+def test_waveform_never_reads_the_entire_recording_at_once(tmp_path: Path, monkeypatch) -> None:
+    store = DubProjectStore(tmp_path / "projects")
+    project = _project(store, tmp_path)
+    readframes = wave.Wave_read.readframes
+    requested = []
+
+    def bounded_read(reader, count):
+        requested.append(count)
+        assert count < reader.getnframes(), "Waveform analysis must stream long recordings"
+        return readframes(reader, count)
+
+    monkeypatch.setattr(wave.Wave_read, "readframes", bounded_read)
+    waveform = store.waveform(project["id"], points=240)
+    assert len(requested) > 1
+    assert waveform["duration_seconds"] == pytest.approx(3.0)
+    assert waveform["peaks"] == [round(1000 / 32768, 4)] * 240
+
+
 def test_project_preserves_source_text_and_only_invalidates_edited_segment(
     tmp_path: Path,
 ) -> None:

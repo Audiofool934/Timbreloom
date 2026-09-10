@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -19,7 +21,8 @@ class MediaInfo:
 def _tool(name: str) -> str:
     executable = shutil.which(name)
     if executable is None:
-        raise RuntimeError(f"没有找到 {name}。请先运行 brew install ffmpeg。")
+        instruction = "请重新安装 Timbreloom。" if os.getenv("TIMBRELOOM_EMBEDDED") == "1" else "请先运行 brew install ffmpeg。"
+        raise RuntimeError(f"没有找到 {name}。{instruction}")
     return executable
 
 
@@ -90,6 +93,158 @@ def prepare_asr_audio(source: Path, destination: Path) -> None:
     if result.returncode != 0:
         detail = result.stderr.strip() or "无法提取音频。"
         raise ValueError(f"音频准备失败：{detail}")
+
+
+def prepare_vc_audio(source: Path, destination: Path) -> None:
+    """Extract the primary audio track for voice conversion without clipping it."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [
+            _tool("ffmpeg"),
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(source),
+            "-map",
+            "0:a:0",
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "22050",
+            "-c:a",
+            "pcm_s16le",
+            str(destination),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=21_600,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or "无法提取换声所需的音频。"
+        raise ValueError(f"换声音频准备失败：{detail}")
+
+
+def detect_silence_midpoints(source: Path) -> list[float]:
+    """Return safe cut candidates at the middle of speech pauses."""
+    result = subprocess.run(
+        [
+            _tool("ffmpeg"),
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "info",
+            "-i",
+            str(source),
+            "-vn",
+            "-af",
+            "silencedetect=noise=-35dB:d=0.30",
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=21_600,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+
+    silence_start: float | None = None
+    midpoints: list[float] = []
+    for line in result.stderr.splitlines():
+        start_match = re.search(r"silence_start:\s*([0-9.]+)", line)
+        if start_match is not None:
+            silence_start = float(start_match.group(1))
+        end_match = re.search(r"silence_end:\s*([0-9.]+)", line)
+        if end_match is not None and silence_start is not None:
+            silence_end = float(end_match.group(1))
+            if silence_end > silence_start:
+                midpoints.append((silence_start + silence_end) / 2.0)
+            silence_start = None
+    return midpoints
+
+
+def extract_vc_chunk(
+    source: Path,
+    destination: Path,
+    start_seconds: float,
+    end_seconds: float,
+) -> None:
+    """Extract one non-overlapping 22.05 kHz PCM chunk for Seed-VC."""
+    if start_seconds < 0 or end_seconds <= start_seconds:
+        raise ValueError("换声音频分段时间范围无效。")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [
+            _tool("ffmpeg"),
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(source),
+            "-ss",
+            f"{start_seconds:.3f}",
+            "-t",
+            f"{end_seconds - start_seconds:.3f}",
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "22050",
+            "-c:a",
+            "pcm_s16le",
+            str(destination),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=21_600,
+        check=False,
+    )
+    if result.returncode != 0:
+        destination.unlink(missing_ok=True)
+        detail = result.stderr.strip() or "无法截取换声音频分段。"
+        raise ValueError(f"换声音频分段失败：{detail}")
+
+
+def normalize_vc_audio(source: Path, destination: Path) -> None:
+    """Normalize a converter result to Timbreloom's 24 kHz mono WAV contract."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [
+            _tool("ffmpeg"),
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(source),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "24000",
+            "-c:a",
+            "pcm_s16le",
+            str(destination),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=21_600,
+        check=False,
+    )
+    if result.returncode != 0:
+        destination.unlink(missing_ok=True)
+        detail = result.stderr.strip() or "无法标准化换声结果。"
+        raise ValueError(f"换声结果处理失败：{detail}")
 
 
 def extract_voice_clip(
@@ -270,6 +425,10 @@ def mux_dubbed_video(
         "make_zero",
     ]
 
+    encoder = os.getenv("TIMBRELOOM_H264_ENCODER", "libx264")
+    if encoder not in {"libx264", "h264_videotoolbox"}:
+        raise ValueError("不支持的视频编码器配置。")
+    quality = ["-q:v", "75"] if encoder == "h264_videotoolbox" else ["-preset", "medium", "-crf", "18"]
     attempts = [
         ("copy", [*common, "-c:v", "copy", str(destination)]),
         (
@@ -277,11 +436,8 @@ def mux_dubbed_video(
             [
                 *common,
                 "-c:v",
-                "libx264",
-                "-preset",
-                "medium",
-                "-crf",
-                "18",
+                encoder,
+                *quality,
                 "-pix_fmt",
                 "yuv420p",
                 str(destination),

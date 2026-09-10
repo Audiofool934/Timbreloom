@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +59,25 @@ class ASRRequest:
     initial_prompt: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class VCRequest:
+    source_audio: Path
+    reference_audio: Path
+    output_path: Path
+    work_dir: Path
+    diffusion_steps: int
+    inference_cfg_rate: float
+    length_adjust: float = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class VCResult:
+    duration_seconds: float
+    generation_seconds: float
+    realtime_factor: float
+    sample_rate: int
+
+
 class TTSProvider(ABC):
     @property
     @abstractmethod
@@ -92,6 +111,21 @@ class ASRProvider(ABC):
     ) -> dict[str, Any]:
         raise NotImplementedError
 
+
+class VCProvider(ABC):
+    @property
+    @abstractmethod
+    def descriptor(self) -> ProviderDescriptor:
+        raise NotImplementedError
+
+    @abstractmethod
+    def convert(
+        self,
+        request: VCRequest,
+        cancel_event: Event | None = None,
+        progress_callback: Callable[[float, str], None] | None = None,
+    ) -> VCResult:
+        raise NotImplementedError
 
 class TextModelProvider(ABC):
     @property

@@ -1,0 +1,247 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "qwen",
+      "name": "Qwen3-TTS",
+      "purpose": "声音克隆与配音",
+      "description": "让文字使用参考音色朗读，也用于生成配音项目中的台词。",
+      "directory": "Qwen3-TTS-12Hz-0.6B-Base-bf16",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 5317,
+          "sha256": "ee1871ab778c89645f8806df736cb35958619c40276598a41aeaa014615656a4",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "config.json"
+        },
+        {
+          "path": "generation_config.json",
+          "size": 245,
+          "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "generation_config.json"
+        },
+        {
+          "path": "merges.txt",
+          "size": 1671839,
+          "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "merges.txt"
+        },
+        {
+          "path": "model.safetensors",
+          "size": 1829344448,
+          "sha256": "d7c7ed3e3464e3e59de0f955b3755891fa8319ff061c3f0307fe2e1343bc122d",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "model.safetensors"
+        },
+        {
+          "path": "model.safetensors.index.json",
+          "size": 38573,
+          "sha256": "e02433c97b2894586e8842af2b40381c5bb644bc1c6bf71a6a52a727efe92313",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "model.safetensors.index.json"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "size": 127,
+          "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "preprocessor_config.json"
+        },
+        {
+          "path": "speech_tokenizer/config.json",
+          "size": 2336,
+          "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "speech_tokenizer/config.json"
+        },
+        {
+          "path": "speech_tokenizer/configuration.json",
+          "size": 76,
+          "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "speech_tokenizer/configuration.json"
+        },
+        {
+          "path": "speech_tokenizer/model.safetensors",
+          "size": 682293092,
+          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "speech_tokenizer/model.safetensors"
+        },
+        {
+          "path": "speech_tokenizer/preprocessor_config.json",
+          "size": 234,
+          "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "speech_tokenizer/preprocessor_config.json"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 7344,
+          "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "tokenizer_config.json"
+        },
+        {
+          "path": "vocab.json",
+          "size": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "filename": "vocab.json"
+        }
+      ],
+      "sources": [
+        {
+          "repository": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+          "revision": "1eccf1cb2519b5a4e8a95b5f0544f3303568164f",
+          "license": "apache-2.0"
+        }
+      ],
+      "bytes": 2516140464
+    },
+    {
+      "id": "whisper",
+      "name": "Whisper",
+      "purpose": "本地转录",
+      "description": "把音频和视频转成带时间戳的文字，支持多种语言。",
+      "directory": "Whisper-large-v3-turbo-q4",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 341,
+          "sha256": "538e24557b8f9bc504700add5e7bbe32087c2353001ff563e64772ad4398671a",
+          "repository": "mlx-community/whisper-large-v3-turbo-q4",
+          "revision": "660c343bbf4e52ac257f0b7d952e5388e6f93bef",
+          "filename": "config.json"
+        },
+        {
+          "path": "weights.npz",
+          "size": 463664664,
+          "sha256": "862bbc832b05f3f4ec19dd632b701d61a6d3f5c7906360a10d72a79870642a80",
+          "repository": "mlx-community/whisper-large-v3-turbo-q4",
+          "revision": "660c343bbf4e52ac257f0b7d952e5388e6f93bef",
+          "filename": "weights.npz"
+        }
+      ],
+      "sources": [
+        {
+          "repository": "mlx-community/whisper-large-v3-turbo-q4",
+          "revision": "660c343bbf4e52ac257f0b7d952e5388e6f93bef",
+          "license": null
+        }
+      ],
+      "bytes": 463665005
+    },
+    {
+      "id": "seed-vc",
+      "name": "Seed-VC",
+      "purpose": "原声换色",
+      "description": "保留原表演的节奏与停顿，转换为另一种音色。包含所需的辅助模型。",
+      "directory": "Seed-VC",
+      "files": [
+        {
+          "path": "v1-offline/DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
+          "size": 440312082,
+          "sha256": "8ec8841b20bb46df9f7e8e570a6946a4b87b940133c7f0e778487ff33841f720",
+          "repository": "Plachta/Seed-VC",
+          "revision": "257283f9f41585055e8f858fba4fd044e5caed6e",
+          "filename": "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth"
+        },
+        {
+          "path": "v1-offline/config_dit_mel_seed_uvit_whisper_small_wavenet.yml",
+          "size": 2289,
+          "sha256": "27a91ac41bdb41d0b6951c63642d791b4a70d60b9fc5550eb645f9ddcb3c94da",
+          "repository": "Plachta/Seed-VC",
+          "revision": "257283f9f41585055e8f858fba4fd044e5caed6e",
+          "filename": "config_dit_mel_seed_uvit_whisper_small_wavenet.yml"
+        },
+        {
+          "path": "dependencies/bigvgan/bigvgan_generator.pt",
+          "size": 449228171,
+          "sha256": "e95ba25972d3de0628d99cd156e9315a9c018899bf739988959ebe3544080ced",
+          "repository": "nvidia/bigvgan_v2_22khz_80band_256x",
+          "revision": "633ff708ed5b74903e86ff1298cf4a98e921c513",
+          "filename": "bigvgan_generator.pt"
+        },
+        {
+          "path": "dependencies/bigvgan/config.json",
+          "size": 1405,
+          "sha256": "88a1f47acf747db0b21e97a389d838566147f7a5464583ff5c8d819d870f03ee",
+          "repository": "nvidia/bigvgan_v2_22khz_80band_256x",
+          "revision": "633ff708ed5b74903e86ff1298cf4a98e921c513",
+          "filename": "config.json"
+        },
+        {
+          "path": "dependencies/whisper-small/config.json",
+          "size": 1967,
+          "sha256": "e6a2b489da1b5aed65a8eb8d1e7466fa867ad5643a8bc138ba708bd56b2875c4",
+          "repository": "openai/whisper-small",
+          "revision": "973afd24965f72e36ca33b3055d56a652f456b4d",
+          "filename": "config.json"
+        },
+        {
+          "path": "dependencies/whisper-small/model.safetensors",
+          "size": 966995080,
+          "sha256": "1d7734884874f1a1513ed9aa760a4f8e97aaa02fd6d93a3a85d27b2ae9ca596b",
+          "repository": "openai/whisper-small",
+          "revision": "973afd24965f72e36ca33b3055d56a652f456b4d",
+          "filename": "model.safetensors"
+        },
+        {
+          "path": "dependencies/whisper-small/preprocessor_config.json",
+          "size": 184990,
+          "sha256": "9b5cd03a36fbb8a627c64d98a5b5b126ead95a77720723944487311f0110b666",
+          "repository": "openai/whisper-small",
+          "revision": "973afd24965f72e36ca33b3055d56a652f456b4d",
+          "filename": "preprocessor_config.json"
+        },
+        {
+          "path": "dependencies/campplus/campplus_cn_common.bin",
+          "size": 28036335,
+          "sha256": "3388cf5fd3493c9ac9c69851d8e7a8badcfb4f3dc631020c4961371646d5ada8",
+          "repository": "funasr/campplus",
+          "revision": "e4b6ede7ce16997aff4ae69fbca1f0175e2afede",
+          "filename": "campplus_cn_common.bin"
+        }
+      ],
+      "sources": [
+        {
+          "repository": "Plachta/Seed-VC",
+          "revision": "257283f9f41585055e8f858fba4fd044e5caed6e",
+          "license": "gpl-3.0"
+        },
+        {
+          "repository": "nvidia/bigvgan_v2_22khz_80band_256x",
+          "revision": "633ff708ed5b74903e86ff1298cf4a98e921c513",
+          "license": "mit"
+        },
+        {
+          "repository": "openai/whisper-small",
+          "revision": "973afd24965f72e36ca33b3055d56a652f456b4d",
+          "license": "apache-2.0"
+        },
+        {
+          "repository": "funasr/campplus",
+          "revision": "e4b6ede7ce16997aff4ae69fbca1f0175e2afede",
+          "license": "apache-2.0"
+        }
+      ],
+      "bytes": 1884762319
+    }
+  ]
+}

@@ -17,5 +17,13 @@ The model directories are intentionally excluded from Git.
 - Fixed revision: `660c343bbf4e52ac257f0b7d952e5388e6f93bef`.
 - Approximate weight size: 442 MB.
 
-Run `./setup.sh` to restore either model when its local weight file is missing.
-Runtime inference uses the local directories directly and can run ASR with `HF_HUB_OFFLINE=1`.
+## Voice conversion
+
+- Hugging Face repository: `Plachta/Seed-VC` with project-local BigVGAN, Whisper Small, and CAMPPlus dependencies.
+- Local directory: `Seed-VC/`.
+- Fixed Seed-VC model revision: `257283f9f41585055e8f858fba4fd044e5caed6e`.
+- The isolated source and Python 3.10 runtime live under `runtime/seed-vc/` and do not enter Git.
+- Run `scripts/setup_seed_vc.sh` to reproduce this runtime without changing the main MLX environment.
+
+Run `./setup.sh` to restore the complete local model set when a required file is missing.
+Runtime inference uses the local directories directly and runs ASR and voice conversion with offline model flags.
