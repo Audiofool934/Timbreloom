@@ -1,0 +1,174 @@
+/* Shared studio surfaces, with the native shell remaining responsible for navigation. */
+:root, html.desktop {
+  --paper: #f3f4ef;
+  --panel: #fffefa;
+  --ink: #252c23;
+  --muted: #626c5c;
+  --line: #d8ddd1;
+  --soft-line: #e7eadf;
+  --accent: #dcecb9;
+  --selection: #eef4df;
+  --focus: #607c3e;
+  --radius: 12px;
+  --surface-raised: #ffffff;
+  --surface-soft: #f7f8f2;
+  --control-height: 38px;
+  --studio-shadow: 0 1px 2px #27311d05, 0 4px 16px #27311d03;
+}
+:root body { background: var(--paper); }
+:root [hidden] { display: none !important; }
+:root .shell { width: min(1320px, calc(100% - 48px)); padding: 24px 0 36px; }
+:root .hero, :root .asr-hero {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 6px; padding: 0 0 22px; margin: 0;
+}
+:root .hero h1, :root .asr-hero h1 {
+  font-size: 26px; line-height: 1.25; letter-spacing: -.035em; font-weight: 650;
+}
+:root .hero .eyebrow { display: none; }
+:root .lede { max-width: 760px; font-size: 13px; line-height: 1.6; color: var(--muted); margin: 0; }
+:root .workspace, :root .panel-card, :root .transcript-editor, :root .result-card, :root .stream-card {
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--studio-shadow);
+}
+:root .workspace { overflow: hidden; grid-template-columns: minmax(260px, .85fr) minmax(300px, 1.15fr); }
+:root .panel, :root .panel-card, :root .transcript-editor, :root .result-card { padding: 20px; }
+:root .reference-panel { background: var(--surface-soft); border-right: 1px solid var(--soft-line); }
+:root .panel-heading { min-height: 0; gap: 10px; margin-bottom: 18px; }
+:root .panel-heading h2, :root .library-heading h2 { font-size: 16px; line-height: 1.35; letter-spacing: -.02em; }
+:root .panel-heading p { font-size: 12px; line-height: 1.55; margin-top: 4px; }
+:root .step { width: 23px; height: 23px; margin-top: 0; border-radius: 7px; background: #e9efdc; color: #53683b; font-size: 10px; }
+:root .field, :root .select-field { min-width: 0; gap: 6px; }
+:root .field > span, :root .select-field > span { font-size: 12px; font-weight: 550; color: #4f5b47; }
+:root input[type='text'], :root input[type='search'], :root input[type='number'], :root select {
+  min-width: 0; height: var(--control-height); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--ink); background-color: var(--surface-raised); font-size: 13px; padding: 0 11px;
+}
+:root select { padding-right: 30px; background-position: calc(100% - 16px) 16px, calc(100% - 11px) 16px; }
+:root textarea { border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--ink); padding: 11px; font-size: 14px; line-height: 1.7; }
+:root input::placeholder, :root textarea::placeholder { color: #79836f; opacity: 1; }
+:root input:focus-visible, :root select:focus-visible, :root textarea:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 2px; border-color: var(--focus); box-shadow: none;
+}
+:root button:focus-visible, :root a:focus-visible, :root summary:focus-visible, :root [tabindex='0']:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 3px;
+}
+:root .target-field textarea { min-height: 252px; font-size: 15px; }
+:root .target-field small { position: static; align-self: flex-end; margin: 1px 0 0; font-size: 11px; color: var(--muted); }
+:root #referenceText { height: 92px; min-height: 80px; }
+:root .dropzone {
+  min-height: 116px; padding: 16px; margin-bottom: 12px; border: 1px dashed #bbc8a9;
+  border-radius: 9px; background: #f3f6e9; gap: 5px;
+}
+:root .dropzone:hover, :root .dropzone.is-dragging { background: #eaf1dd; border-color: var(--focus); }
+:root .dropzone.has-file { background: #eef4df; border-style: solid; }
+:root .upload-icon { width: 26px; height: 26px; margin: 0 0 3px; border: 0; background: none; color: #6b8052; }
+:root .upload-icon .desktop-icon { width: 24px; height: 24px; }
+:root .dropzone strong { font-size: 13px; overflow-wrap: anywhere; }
+:root .dropzone > span:last-child { font-size: 11px; margin: 0; }
+:root .recorder-panel { margin-bottom: 16px; padding: 10px; gap: 10px; background: var(--panel); border: 1px solid var(--soft-line); border-radius: 8px; }
+:root .recorder-copy strong { font-size: 12px; }
+:root .recorder-copy p { font-size: 11px; line-height: 1.45; }
+:root .quiet-button, :root .icon-button, :root .micro-button, :root .download-link {
+  min-height: 32px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--panel); color: var(--ink); font-size: 12px; font-weight: 500; line-height: 1.35;
+  box-shadow: 0 1px 1px #27311d04; text-decoration: none;
+}
+:root .quiet-button:hover:not(:disabled), :root .icon-button:hover:not(:disabled), :root .download-link:hover { background: #edf2e3; border-color: #b4c49f; }
+:root .generate-button {
+  min-height: var(--control-height); height: auto; padding: 10px 14px; border: 1px solid #334328;
+  border-radius: 8px; background: #334328; color: #fffefa; font-size: 13px; font-weight: 600;
+}
+:root .generate-button:hover:not(:disabled) { background: #435b32; border-color: #435b32; transform: none; }
+:root button { transition: background-color 120ms, border-color 120ms, box-shadow 120ms; }
+:root button:disabled { opacity: .48; cursor: default; box-shadow: none; }
+:root .danger-button, :root .danger-text { color: #9f3b2c; }
+:root .record-stop { background: #a54434; color: white; border-color: #a54434; }
+:root .controls { margin-top: 16px; gap: 12px; }
+:root .prosody-guide { margin-top: 14px; background: var(--surface-soft); border-color: var(--soft-line); border-radius: 8px; }
+:root .prosody-guide summary { padding: 11px; font-size: 12px; }
+:root .save-voice-row { margin-top: 14px; gap: 8px; }
+:root .save-voice-button { height: var(--control-height); }
+:root .asr-workspace, :root .vc-workspace, :root .dub-intake-grid { grid-template-columns: minmax(330px, 1fr) minmax(230px, .56fr); gap: 16px; align-items: start; }
+:root .library-heading { margin-bottom: 14px; }
+:root .result-kicker, :root .action-label, :root .stream-kicker { font-size: 10px; letter-spacing: .04em; font-weight: 550; color: #68785a; }
+:root .library-search { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+:root .library-search input { flex: 1; width: 100%; height: 34px; background-color: var(--surface-soft); font-size: 12px; }
+:root .library-count { color: var(--muted); font-size: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+:root .library-no-results { padding: 20px 10px; color: var(--muted); font-size: 12px; line-height: 1.6; text-align: center; }
+:root .transcript-list { max-height: 440px; scrollbar-gutter: stable; gap: 5px; }
+:root .transcript-list-item { border-radius: 8px; padding: 11px; background: transparent; border-color: transparent; gap: 5px; }
+:root .transcript-list-item strong { font-size: 13px; font-weight: 550; }
+:root .transcript-list-item span, :root .transcript-list-item small { font-size: 11px; line-height: 1.5; }
+:root .history-item { border: 1px solid var(--soft-line); border-radius: 8px; background: var(--panel); overflow: hidden; }
+:root .history-item.is-active, :root .transcript-list-item.is-active { border-color: #b9cba3; background: var(--selection); }
+:root .history-actions { border-top: 1px solid var(--soft-line); padding: 5px 9px; background: var(--surface-soft); }
+:root .history-action { font-size: 11px; min-height: 28px; }
+:root .empty-copy { padding: 24px 16px; gap: 9px; border: 0; border-radius: 9px; background: var(--surface-soft); font-size: 12px; line-height: 1.6; }
+:root .empty-copy strong { color: #49583f; font-size: 13px; }
+:root .asr-input-modes { padding: 3px; border-radius: 9px; margin-bottom: 14px; background: #ecefe5; border-color: var(--soft-line); }
+:root .asr-input-modes button { min-height: 32px; border-radius: 6px; font-size: 12px; }
+:root .asr-options { gap: 12px; }
+:root .local-engine-note { margin: 14px 0; padding: 0; border: 0; background: none; font-size: 11px; }
+:root .local-engine-note p { font-size: 11px; }
+:root .transcript-editor { margin-top: 12px; scroll-margin-top: 16px; }
+:root .editor-focus-bar { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-top: 20px; scroll-margin-top: 12px; }
+:root .editor-focus-bar > span { color: var(--muted); font-size: 11px; }
+:root .editor-focus-button[aria-pressed='true'] { border-color: #a8bd8d; background: var(--selection); }
+:root .editor-focused .hero { padding-bottom: 0; }
+:root .editor-focused .hero .lede { display: none; }
+:root .transcript-header h2 { font-size: 20px; line-height: 1.4; }
+:root .transcript-toolbar, :root .dub-toolbar {
+  display: flex; flex-wrap: wrap; gap: 9px; position: sticky; top: 0; z-index: 3;
+  margin: 12px -8px; padding: 10px 8px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+:root .transcript-actions-grid { gap: 12px; }
+:root .action-panel { padding: 14px; background: var(--surface-soft); border-color: var(--soft-line); border-radius: 8px; }
+:root .transcript-segment { padding: 12px 5px; }
+:root .transcript-segment textarea { min-height: 64px; }
+:root .dub-segment { padding: 14px 6px; gap: 10px; }
+:root .dub-role-panel { padding: 14px; background: var(--surface-soft); border-color: var(--soft-line); }
+:root .dub-timeline { background: var(--surface-soft); border-color: var(--soft-line); }
+:root .dub-time-readout { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; margin-top: 10px; align-items: start; }
+:root .dub-time-readout > span:last-child { font: 11px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; text-align: right; color: var(--muted); }
+:root .dub-quality { padding: 12px 14px; }
+:root .dub-quality p { font-size: 12px; }
+:root .progress-card { padding: 20px; border: 1px solid #ccd9b9; border-radius: 12px; background: #f5f8ed; box-shadow: none; }
+:root .progress-track { height: 5px; background: #e1e8d6; border: 0; border-radius: 4px; }
+:root .progress-track span { background: #759551; }
+:root .error-card { border: 1px solid #ddbbaf; border-radius: 10px; background: #fff5ef; }
+:root .metrics dd { font-size: 22px; font-weight: 550; font-variant-numeric: tabular-nums; }
+:root .history-dialog { max-width: min(440px, calc(100vw - 32px)); padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink); box-shadow: 0 18px 70px #20251f24; }
+:root .history-dialog::backdrop { background: #18231540; backdrop-filter: blur(3px); }
+:root .history-dialog .danger-button { color: white; background: #a23727; border-color: #a23727; }
+:root ::selection { background: #dcecb9; color: var(--ink); }
+html:not(.desktop) .masthead { padding: 0 0 16px; border-bottom: 1px solid var(--line); }
+html:not(.desktop) .mode-switch { margin: 18px 0 28px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 4px; }
+html:not(.desktop) .mode-button { font-size: 12px; border: 0; border-radius: 7px; min-height: 38px; }
+html:not(.desktop) .mode-button.is-active { background: var(--selection); color: #334328; box-shadow: inset 0 0 0 1px #c3d2ae; }
+html:not(.desktop) .mode-button > span { display: none; }
+@media (max-width: 900px) {
+  :root .shell { width: calc(100% - 32px); padding-top: 20px; }
+  :root .panel, :root .panel-card, :root .transcript-editor { padding: 18px; }
+  :root .asr-workspace, :root .vc-workspace, :root .dub-intake-grid { grid-template-columns: minmax(300px, 1fr) minmax(205px, .56fr); gap: 12px; }
+  :root .library-search { flex-wrap: wrap; gap: 5px; }
+  :root .library-count { margin-left: 2px; }
+}
+@media (max-width: 680px) {
+  :root .shell { width: calc(100% - 28px); padding-top: 18px; }
+  :root .workspace, :root .asr-workspace, :root .vc-workspace, :root .dub-intake-grid { grid-template-columns: minmax(0, 1fr); }
+  :root .reference-panel { border-right: 0; border-bottom: 1px solid var(--soft-line); }
+  :root .hero h1 { font-size: 23px; }
+  :root .panel, :root .panel-card, :root .transcript-editor { padding: 16px; }
+  :root .target-field textarea { min-height: 200px; }
+  :root .library-search { flex-wrap: nowrap; }
+  :root .editor-focus-bar > span { max-width: 52%; line-height: 1.5; }
+  :root .editor-focus-button { flex-shrink: 0; }
+  :root .transcript-toolbar, :root .dub-toolbar { gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root *, :root *::before, :root *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media (prefers-contrast: more) {
+  :root, html.desktop { --line: #8f9c82; --soft-line: #aab59e; --muted: #47513e; }
+  :root button:disabled { opacity: .65; }
+}

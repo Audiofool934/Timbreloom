@@ -33,7 +33,7 @@ def test_local_api_rejects_other_websites_and_rebound_hostnames() -> None:
 def test_home_renders_local_privacy_copy() -> None:
     response = client.get("/")
     assert response.status_code == 200
-    assert "Everything is generated and joined on this Mac" in response.text
+    assert "Speech is generated on this Mac" in response.text
     assert "TEMPERATURE 1.0" in response.text
     assert "The Base cloning model has no hidden emotion tags" in response.text
     assert response.text.count('class="recorder-panel"') == 3

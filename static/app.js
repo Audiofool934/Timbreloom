@@ -6,6 +6,7 @@ import { createDubbingWorkspace } from "./dubbing.js?v=5";
 import { readJob, JobConnectionError } from "./job-client.js?v=2";
 import { installDesktop, notifyDesktop } from "./desktop.js?v=8";
 import { installModelManager } from "./model-manager.js?v=4";
+import { installWorkbench } from "./workbench.js?v=1";
 import { countLabel } from "./text-format.js?v=1";
 import { renderHistoryList } from "./history.js?v=1";
 
@@ -1657,3 +1658,4 @@ installDesktop({
   switchView,
   hasUnsavedEdits: () => dirtyTranscriptSegments.size > 0 || dubWorkspace.hasUnsavedChanges(),
 });
+installWorkbench();

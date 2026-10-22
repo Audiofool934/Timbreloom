@@ -164,6 +164,7 @@ export function installDesktop({ switchView, hasUnsavedEdits }) {
     },
     openFile() {
       const view = currentView();
+      byId(`${view}View`).dispatchEvent(new Event("timbreloom-reveal-setup"));
       if (view === "clone" && byId("voiceSelect").value) {
         // A cancelled panel must leave the saved voice selected and usable.
         const picker = document.createElement("input");

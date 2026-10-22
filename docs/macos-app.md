@@ -59,6 +59,14 @@ On restart, TTS, ASR, dubbing generation, and export recover according to their 
 
 ## Workspace controls
 
+Search saved speech, conversions, transcripts, and dubbing projects by their displayed names or details.
+Press Escape in a search field to clear the filter.
+Search does not change or remove saved records.
+
+In the transcript or dubbing editor, choose **Focus editor** to hide the import area and library.
+Choose **Show import & library** to restore them with their settings intact.
+The native Import command also restores the setup area.
+
 Recording and live transcription show a real microphone input meter.
 The bar shows RMS level in dBFS, with a separate peak indicator.
 The meter warns about near-full-scale peaks and sustained silence without modifying the recorded audio.

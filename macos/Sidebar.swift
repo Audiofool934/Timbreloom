@@ -109,27 +109,27 @@ final class Sidebar: NSViewController {
         let brand = NSTextField(labelWithString: "TIMBRELOOM")
         brand.font = .systemFont(ofSize: 11, weight: .bold)
         brand.textColor = .secondaryLabelColor
-        let name = NSTextField(labelWithString: "Voice Studio")
-        name.font = .systemFont(ofSize: 21, weight: .semibold)
+        let name = NSTextField(labelWithString: "Your studio")
+        name.font = .systemFont(ofSize: 20, weight: .semibold)
         let caption = NSTextField(labelWithString: "Shape your sound on this Mac.")
         caption.font = .systemFont(ofSize: 11)
         caption.textColor = .secondaryLabelColor
         let header = NSStackView(views: [brand, name, caption])
         header.orientation = .vertical
         header.alignment = .leading
-        header.spacing = 9
-        place(header, top: 27, leading: 22, trailing: 16)
+        header.spacing = 7
+        place(header, top: 23, leading: 22, trailing: 16)
 
         let label = NSTextField(labelWithString: "Workspace")
         label.font = .systemFont(ofSize: 11, weight: .medium)
-        label.textColor = .tertiaryLabelColor
-        place(label, top: 138, leading: 24, trailing: 16)
+        label.textColor = .secondaryLabelColor
+        place(label, top: 119, leading: 24, trailing: 16)
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.distribution = .fillEqually
         stack.spacing = 4
-        place(stack, top: 157, leading: 12, trailing: 12)
+        place(stack, top: 139, leading: 12, trailing: 12)
         for (index, mode) in WorkspaceMode.all.enumerated() {
             let button = ModeButton(title: mode.title, target: self, action: #selector(selectMode(_:)))
             button.image = NSImage(systemSymbolName: mode.symbol, accessibilityDescription: nil)
@@ -148,7 +148,7 @@ final class Sidebar: NSViewController {
             button.setAccessibilityLabel(mode.title)
             stack.addArrangedSubview(button)
             button.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 58).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 54).isActive = true
             buttons.append(button)
         }
         let local = NSTextField(labelWithString: "Local engine")
