@@ -2,7 +2,9 @@
 """Exercise the desktop WebKit integration with synthetic ASR, without model inference."""
 
 import argparse
+import array
 import json
+import math
 import os
 import socket
 import subprocess
@@ -14,6 +16,41 @@ import wave
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def seed_history(app):
+    """Seed completed history with synthetic audio, without loading either model."""
+    import shutil
+    from datetime import datetime, timezone
+    from timbreloom.tts_service import GenerationJob
+
+    reference = app.DATA_DIR / "reference.wav"
+    directory = app.JOB_DIR / ("a" * 32)
+    directory.mkdir()
+    job = GenerationJob(
+        job_id=directory.name, voice_id=None, voice_name="Sample narration",
+        reference_source=reference, reference_is_normalized=True,
+        reference_text="A test reference voice.", reference_duration_seconds=3,
+        language="english", segments=app.segment_text("History narration.\n\nA second paragraph."),
+        job_dir=directory, created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    def generate(_reference, _ref_text, _text, _language, output):
+        shutil.copyfile(reference, output)
+        return {"duration_seconds": 3, "generation_seconds": .1, "peak_memory_gb": 0}
+    app._tts_jobs.generate_segment = generate
+    app._tts_jobs.add(job)
+    app._tts_jobs.process(job)
+    directory = app.CONVERSION_DIR / ("c" * 32)
+    directory.mkdir()
+    for name in ("source.wav", "converted.wav"):
+        shutil.copyfile(reference, directory / name)
+    job = app._vc_service.create_job(
+        job_id=directory.name, source_path=directory / "source.wav", source_filename="History performance.wav",
+        source_bytes=reference.stat().st_size, voice_id="b" * 32, voice_name="Sample narration", preset="balanced",
+    )
+    app._vc_service._update(job, status="complete", phase="complete", progress=1, duration_seconds=3,
+                           result={"audio_filename": "converted.wav", "duration_seconds": 3,
+                                   "generation_seconds": .1, "diffusion_steps": 8, "chunk_count": 1})
 
 
 def serve(port):
@@ -32,6 +69,29 @@ def serve(port):
         ]}
 
     app._asr_provider.transcribe = transcribe
+    from contextlib import contextmanager
+    @contextmanager
+    def live_engine(directory, cancel_event):
+        class Engine:
+            def transcribe(self, audio, language, prompt):
+                return {"language": "en", "segments": [{"start": 0, "end": 1.5,
+                        "text": "Live words appear while recording.", "words": [
+                            {"word": "Live words appear while recording.", "start": 0, "end": 1.5}]}]}
+        yield Engine()
+    app._asr_provider.live_engine = live_engine
+    @contextmanager
+    def native_live_engine(directory, cancel_event, language, prompt):
+        class Engine:
+            def push(self, pcm, *, final=False):
+                text = "Live words appear while recording."
+                return {"language": language, "text": text, "stable_text": text if final else "",
+                        "draft": "" if final else text, "segments": [{"start": 0, "end": 1.5, "text": text}]}
+        yield Engine()
+    for provider in app._streaming_asr_providers.values():
+        provider.transcribe = transcribe
+        provider.live_engine = native_live_engine
+    if os.getenv("TIMBRELOOM_TEST_MODEL_DOWNLOADS") != "1":
+        seed_history(app)
     if os.getenv("TIMBRELOOM_TEST_MODEL_DOWNLOADS") == "1":
         import copy
         import hashlib
@@ -77,7 +137,13 @@ def main():
         audio.setnchannels(1)
         audio.setsampwidth(2)
         audio.setframerate(24000)
-        audio.writeframes(b"\0\0" * 24000 * 3)
+        # Audible, bounded synthetic input also makes waveform rendering testable.
+        samples = array.array("h", (int(4000 * math.sin(2 * math.pi * 220 * i / 24000)
+                                      * math.sin(math.pi * (i % 12000) / 12000) ** 2)
+                                   for i in range(24000 * 3)))
+        if sys.byteorder != "little":
+            samples.byteswap()
+        audio.writeframes(samples.tobytes())
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]

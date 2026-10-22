@@ -52,10 +52,12 @@ The native shell continues to own navigation, window controls, menus, and file d
 The interface uses no React or animation-framework dependency.
 
 The WebKit harness checks all four workspaces at 1020, 760, and 640pt content widths, including populated transcript and dubbing editors.
-It detects visible horizontal overflow and verifies saved-voice preservation after canceled imports, temporary file-input cleanup, native import types, scroll restoration, project-creation shortcuts, subtitle content, and overwrite exports.
+It detects visible horizontal overflow, accounting for intentional clipping inside scrollable timelines.
+It verifies saved-voice preservation after canceled imports, temporary file-input cleanup, native import types, scroll restoration, library search, editor focus, zoomed time mapping, project-creation shortcuts, subtitle content, and overwrite exports.
 Real HTMLAudioElement checks cover playback, pause, seeking, and speed.
 
 The harness uses simulated ASR and synthetic microphone states in an isolated library.
+Its live microphone test routes a generated oscillator through Web Audio and verifies that the input meter receives samples and stops with capture.
 It does not request real microphone permission or measure model quality.
 Full AppKit layout, system dialogs, and the installed app are inspected separately.
 
