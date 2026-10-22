@@ -79,6 +79,7 @@ open ~/Applications/Timbreloom.app
 
 This builds a development app connected to your checkout.
 For a standalone app with bundled runtimes, see the [Mac build guide](docs/macos-app.md#build).
+For an installed-app update, follow the [update workflow](docs/update-workflow.md), including version increments and removal of duplicate app entries.
 
 ## Models, on your terms
 
@@ -132,6 +133,7 @@ Use your own voice or voices you have explicit permission to use, and disclose A
 
 - [User guide](docs/user-guide.md): the four workflows, long audio, exports, and recovery.
 - [Mac app](docs/macos-app.md): shortcuts, installation, builds, and validation.
+- [App update workflow](docs/update-workflow.md): version increments, safe replacement, and a single app-search entry.
 - [Provider architecture](docs/provider-architecture.md): model interfaces, job persistence, and accelerator lifecycle.
 - [Project format](docs/project-format.md): schema, segment caching, roles, and portable bundles.
 - [Mac design](docs/macos-design.md): visual system and interaction checks.

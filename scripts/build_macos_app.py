@@ -9,6 +9,7 @@ import plistlib
 import shutil
 import subprocess
 import tempfile
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -33,7 +34,13 @@ def replace_build(staged: Path, destination: Path) -> None:
         backup_root = ROOT / "build/previous-apps"
         backup_root.mkdir(parents=True, exist_ok=True)
         backup = backup_root / f"{datetime.now():%Y%m%d-%H%M%S-%f}-Timbreloom"
-        shutil.move(str(destination), str(backup.with_suffix(".app")))
+        archive = backup.with_suffix(".zip")
+        run("/usr/bin/ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", destination, archive)
+        with zipfile.ZipFile(archive) as saved:
+            corrupt = saved.testzip()
+            if corrupt is not None:
+                raise RuntimeError(f"Corrupt app backup: {archive}: {corrupt}")
+        shutil.rmtree(destination)
     shutil.move(str(staged), destination)
 
 
@@ -73,7 +80,7 @@ def main() -> None:
             "CFBundleName": "Timbreloom", "CFBundleDisplayName": "Timbreloom",
             "CFBundleIdentifier": BUNDLE_ID, "CFBundleExecutable": "Timbreloom",
             "CFBundleDevelopmentRegion": "en", "CFBundleLocalizations": ["en"],
-            "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "1.1.0",
+            "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "1.3.0",
             "CFBundleVersion": args.build_number, "CFBundleIconFile": "Timbreloom",
             "LSMinimumSystemVersion": "14.0", "LSMultipleInstancesProhibited": True,
             "LSApplicationCategoryType": "public.app-category.music",

@@ -163,7 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     }
     @objc func about() {
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "Timbreloom", .applicationVersion: "1.1.0", .version: "Native Mac app",
+            .applicationName: "Timbreloom", .applicationVersion: "1.3.0", .version: "Native Mac app",
             .credits: NSAttributedString(string: "Shape your sound on this Mac.\nVoice cloning · Voice conversion · Transcription · Dubbing studio"),
         ])
     }

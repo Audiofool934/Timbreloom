@@ -216,7 +216,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Timbreloom",
-    version="1.1.0",
+    version="1.3.0",
     lifespan=lifespan,
 )
 

@@ -55,7 +55,7 @@ def test_health_does_not_load_model() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["privacy"] == "localhost-only"
-    assert payload["version"] == "1.1.0"
+    assert payload["version"] == "1.3.0"
     assert payload["model"] == app.MODEL_ID
     assert payload["sampling_temperature"] == 1.0
     provider_ids = {provider["id"] for provider in payload["providers"]}

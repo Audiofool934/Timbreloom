@@ -102,6 +102,9 @@ The app does not read your full shell configuration, copy the key into its bundl
 
 ## Build
 
+When replacing an installed app, follow the [update workflow](update-workflow.md) for version increments, backup, duplicate-app cleanup, and installed-app verification.
+The build commands below do not complete that update workflow by themselves.
+
 Install Xcode or Command Line Tools and prepare the project environment first.
 From the repository root, build a development app with:
 
@@ -123,7 +126,7 @@ To build a standalone candidate and optionally migrate existing data and models:
 The standalone output is `build/release/Timbreloom.app`.
 `--development-signing` requires an Apple Development certificate and is intended for local validation.
 Omit it to produce an ad-hoc local build without Hardened Runtime validation.
-Public distribution requires an appropriate Developer ID signature and Apple notarization; see [release validation](release-readiness.md).
+Public distribution requires an appropriate Developer ID signature and Apple notarization; see [release validation](release-readiness.md) and [notarization credentials](notarization.md).
 
 Each release build creates temporary production environments rather than copying installed development packages.
 The main service installs runtime dependencies from `uv.lock`; Seed-VC and streaming ASR use pinned versions and distribution hashes in `packaging/seed-vc-runtime.lock` and `packaging/streaming-asr-runtime.lock`.
@@ -138,7 +141,7 @@ Model catalog metadata is included; weights are not copied into the app.
 See [packaging](../packaging/README.md) for dependency maintenance.
 
 Model migration verifies and copies existing weights, preserving the source and complete destination models.
-Before replacing an app, the builder moves the old bundle into `build/previous-apps/` for recovery.
+Before replacing an app, the builder archives the old bundle as a ZIP in `build/previous-apps/`, verifies the archive, and removes the old bundle before installing its replacement.
 Personal voices, recordings, transcripts, projects, and credentials are excluded from the bundle.
 Changes to Swift, Python, or static UI in a standalone app require rebuilding and signing again.
 

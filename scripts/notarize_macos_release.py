@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -42,7 +43,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", type=Path, required=True)
     parser.add_argument("--dmg", type=Path, required=True)
-    parser.add_argument("--keychain-profile", required=True, help="Existing notarytool credential profile; no password is accepted in this script")
+    parser.add_argument("--keychain-profile", default=os.environ.get("APPLE_NOTARY_PROFILE") or "mac-mini-notary",
+                        help="Existing notarytool profile (default: APPLE_NOTARY_PROFILE or mac-mini-notary); no password is accepted")
     parser.add_argument("--submit", action="store_true", help="Explicitly upload this reviewed DMG to Apple's notary service")
     args = parser.parse_args()
     app, dmg = args.app.resolve(), args.dmg.resolve()
