@@ -64,6 +64,11 @@ final class SmokeDelegate: NSObject, NSApplicationDelegate {
     func js(_ source: String) async throws -> Any? {
         try await workspace.webView.evaluateJavaScript(source)
     }
+    // Microphone stubs are properties on the navigator.mediaDevices DOM wrapper. WebKit can collect an
+    // unreferenced wrapper and return a new one without them, so each page load must keep it alive.
+    func keepMediaDevicesAlive() async throws {
+        _ = try await js("window.testMediaDevices = navigator.mediaDevices; true")
+    }
     func waitFor(_ label: String, _ expression: String) async throws {
         for _ in 0..<100 {
             if try await js(expression) as? Bool == true { return }
@@ -190,6 +195,7 @@ final class SmokeDelegate: NSObject, NSApplicationDelegate {
     }
 
     func runLiveTranscriptionChecks() async throws {
+        try await keepMediaDevicesAlive()
         workspace.selectView("asr")
         _ = try await js("document.getElementById('asrModel').value = 'nemotron'; document.getElementById('asrModel').dispatchEvent(new Event('change')); true")
         _ = try await js("document.getElementById('asrLiveMode').click(); true")
@@ -294,6 +300,7 @@ final class SmokeDelegate: NSObject, NSApplicationDelegate {
         workspace.selectView("clone")
         _ = try await js("document.getElementById('targetText').value = 'Desktop draft recovery test.'; document.getElementById('targetText').dispatchEvent(new Event('input', {bubbles:true})); true")
         try await waitFor("singular English segment estimate", "document.getElementById('segmentEstimate').textContent.includes('1 segment ·')")
+        try await keepMediaDevicesAlive()
         _ = try await js("""
           window.originalGetUserMedia = navigator.mediaDevices.getUserMedia;
           navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Synthetic denial', 'NotAllowedError'); };
