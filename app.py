@@ -24,7 +24,7 @@ from timbreloom.asr_service import ASRService
 from timbreloom.dubbing_api import DubbingContext, create_router as create_dubbing_router
 from timbreloom.tts_service import GenerationJob, TTSService
 from timbreloom.api_models import (
-    TranscriptPatch, GeminiTransformRequest,
+    TranscriptPatch, GeminiTransformRequest, HistoryRenameRequest,
 )
 from timbreloom.audio import stitch_wav_files, wav_duration
 from timbreloom.dub_projects import (
@@ -798,6 +798,25 @@ def get_voice_conversion(job_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.patch("/api/voice-conversions/{job_id}")
+def rename_voice_conversion(job_id: str, request: HistoryRenameRequest) -> dict[str, Any]:
+    try:
+        return _public_voice_conversion(_vc_service.rename(job_id, request.title.strip()))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.delete("/api/voice-conversions/{job_id}")
+def delete_voice_conversion(job_id: str) -> dict[str, bool]:
+    try:
+        _vc_service.delete(job_id)
+        return {"ok": True}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.post("/api/voice-conversions/{job_id}/cancel")
 def cancel_voice_conversion(job_id: str) -> dict[str, Any]:
     try:
@@ -1292,6 +1311,41 @@ async def create_generation_job(
     except Exception:
         shutil.rmtree(job_dir, ignore_errors=True)
         raise
+
+
+@app.get("/api/jobs")
+def list_generation_jobs() -> dict[str, Any]:
+    return {"jobs": _tts_jobs.list()}
+
+
+@app.patch("/api/jobs/{job_id}")
+def rename_generation_job(job_id: str, request: HistoryRenameRequest) -> dict[str, Any]:
+    try:
+        return _tts_jobs.snapshot(_tts_jobs.rename(job_id, request.title.strip()))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.delete("/api/jobs/{job_id}")
+def delete_generation_job(job_id: str) -> dict[str, bool]:
+    try:
+        _tts_jobs.delete(job_id)
+        return {"ok": True}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/jobs/{job_id}/reference")
+def get_generation_reference(job_id: str) -> FileResponse:
+    try:
+        job = _tts_jobs.get_job(job_id)
+        if not job.reference_source.is_file():
+            raise FileNotFoundError("The reference recording is no longer available.")
+        return FileResponse(job.reference_source)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/jobs/{job_id}")

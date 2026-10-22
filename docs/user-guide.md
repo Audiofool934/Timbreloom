@@ -38,6 +38,19 @@ Completed segments become available for continuous playback immediately.
 The player waits for the next segment and continues when it arrives.
 Stopping pauses generation after the current model call or segment reaches a safe stopping point.
 
+### Revisit and manage recordings
+
+**Cloning history** lists saved jobs, including completed, stopped, and failed generations.
+Open an entry to read its full script, replay available audio, and download its completed WAV.
+Choose **Edit and regenerate** to restore the script, language, and reference voice in the form, then make changes and generate a new entry.
+The original recording stays in history.
+An uploaded reference, or the reference from a saved voice that has since been deleted, can be restored from the job's own recording.
+
+Use **Rename** to give an entry a recognizable name.
+Use **Delete** to remove the entry and its stored reference, segments, and generated WAV after confirmation.
+Saved voices and files already exported elsewhere are kept.
+Stop an active job and wait for it to finish stopping before deleting it.
+
 ### Write for expression
 
 The Base cloning model does not support hidden emotion tags or `instruct` commands.
@@ -74,6 +87,9 @@ After successful completion, rebuildable normalized audio and intermediate chunk
 
 Records live in `data/conversions/<id>/` and contain the original media, results, logs, and job metadata.
 Jobs interrupted by an app restart are marked for a safe manual retry.
+Open an entry in **Conversion history** to replay its source and result or retry an interrupted conversion.
+Use **Rename** to label an entry, or **Delete** to remove its history record and stored source, results, and intermediate files after confirmation.
+Deletion keeps the saved target voice and exported copies, and is unavailable while the conversion is running.
 
 ## Transcription
 

@@ -1,6 +1,10 @@
 from pydantic import BaseModel, Field
 
 
+class HistoryRenameRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=160, pattern=r"\S")
+
+
 class TranscriptSegmentPatch(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     text: str = Field(min_length=1, max_length=10_000)

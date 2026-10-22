@@ -88,6 +88,7 @@ class VoiceConversionJob:
     voice_name: str
     preset: str
     created_at: str
+    title: str = ""
     status: str = "queued"
     phase: str = "queued"
     message: str = "Waiting for voice conversion"
@@ -115,7 +116,8 @@ class VoiceConversionService:
         self.load_voice = load_voice
         self.conversion_root.mkdir(parents=True, exist_ok=True)
         self._jobs: dict[str, VoiceConversionJob] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._threads: dict[str, threading.Thread] = {}
 
     def has_active_jobs(self) -> bool:
         with self._lock:
@@ -132,6 +134,7 @@ class VoiceConversionService:
         return {
             "schema_version": 1,
             "id": job.job_id,
+            "title": job.title or job.source_filename,
             "status": job.status,
             "phase": job.phase,
             "message": job.message,
@@ -199,12 +202,18 @@ class VoiceConversionService:
         return job
 
     def launch(self, job: VoiceConversionJob) -> None:
-        threading.Thread(
-            target=self._process_job,
-            args=(job,),
-            name=f"vc-job-{job.job_id[:8]}",
-            daemon=True,
-        ).start()
+        with self._lock:
+            thread = self._threads.get(job.job_id)
+            if thread and thread.is_alive():
+                return
+            thread = threading.Thread(
+                target=self._process_job,
+                args=(job,),
+                name=f"vc-job-{job.job_id[:8]}",
+                daemon=True,
+            )
+            self._threads[job.job_id] = thread
+            thread.start()
 
     def _progress(self, job: VoiceConversionJob, progress: float, message: str) -> None:
         overall = 0.18 + min(1.0, max(0.0, progress)) * 0.72
@@ -612,6 +621,7 @@ class VoiceConversionService:
             voice_name=str(data.get("voice_name", "Saved voice")),
             preset=str(data.get("preset", "balanced")),
             created_at=str(data["created_at"]),
+            title=str(data.get("title", "")),
             status=str(data.get("status", "error")),
             phase=str(data.get("phase", "error")),
             message=str(data.get("message", "")),
@@ -629,12 +639,27 @@ class VoiceConversionService:
     def get_job(self, job_id: str) -> VoiceConversionJob:
         with self._lock:
             job = self._jobs.get(job_id)
-        if job is not None:
-            return job
-        job = self._load_from_disk(job_id)
-        with self._lock:
+            if job is not None:
+                return job
+            job = self._load_from_disk(job_id)
             self._jobs[job_id] = job
-        return job
+            return job
+
+    def rename(self, job_id: str, title: str) -> VoiceConversionJob:
+        with self._lock:
+            job = self.get_job(job_id)
+            self._update(job, title=title)
+            return job
+
+    def delete(self, job_id: str) -> None:
+        with self._lock:
+            job = self.get_job(job_id)
+            thread = self._threads.get(job_id)
+            if job.status in {"queued", "running"} or (thread and thread.is_alive()):
+                raise ValueError("Stop this conversion and wait for it to finish before deleting it.")
+            shutil.rmtree(job.job_dir)
+            self._jobs.pop(job_id, None)
+            self._threads.pop(job_id, None)
 
     def list(self) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
@@ -656,23 +681,25 @@ class VoiceConversionService:
         return job
 
     def retry(self, job_id: str) -> VoiceConversionJob:
-        job = self.get_job(job_id)
-        if job.status not in {"error", "cancelled"}:
-            raise ValueError("Only failed or canceled jobs can be retried.")
-        job.cancel_event = threading.Event()
-        self._update(
-            job,
-            status="queued",
-            phase="queued",
-            message="Waiting for voice conversion",
-            progress=0.0,
-            error=None,
-            result=None,
-            chunks_completed=0,
-            current_chunk=0,
-        )
-        self.launch(job)
-        return job
+        with self._lock:
+            job = self.get_job(job_id)
+            thread = self._threads.get(job_id)
+            if job.status not in {"error", "cancelled"} or (thread and thread.is_alive()):
+                raise ValueError("Only finished, failed or canceled jobs can be retried.")
+            job.cancel_event = threading.Event()
+            self._update(
+                job,
+                status="queued",
+                phase="queued",
+                message="Waiting for voice conversion",
+                progress=0.0,
+                error=None,
+                result=None,
+                chunks_completed=0,
+                current_chunk=0,
+            )
+            self.launch(job)
+            return job
 
     def recover(self) -> int:
         recovered = 0

@@ -48,6 +48,10 @@ html.desktop {
 }
 .desktop select { padding-right: 32px; background-position: calc(100% - 17px) 17px, calc(100% - 12px) 17px; }
 .desktop textarea { padding: 12px; line-height: 1.8; font-weight: 400; }
+.desktop .history-item { border-radius: 8px; overflow: hidden; }
+.desktop .history-item.is-active { background: var(--selection); border-color: var(--focus); }
+.desktop .history-dialog { border-color: var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 12px 48px #20251f24; }
+.desktop .history-dialog .danger-button { background: #a23727; border-color: #a23727; color: white; }
 .desktop input::placeholder, .desktop textarea::placeholder { color: #858d7e; opacity: 1; font-weight: 400; }
 .desktop textarea:focus, .desktop select:focus, .desktop input:focus-visible { border-color: var(--focus); box-shadow: 0 0 0 3px #789a4020; outline: none; }
 .desktop .target-field textarea { min-height: 286px; padding-bottom: 12px; font-size: 15px; }

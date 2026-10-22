@@ -7,7 +7,7 @@
     <title>Timbreloom</title>
     <link rel="icon" href="/static/app-icon.png" type="image/png" />
     <link rel="stylesheet" href="/static/styles.css?v=18" />
-    <link rel="stylesheet" href="/static/desktop.css?v=3" />
+    <link rel="stylesheet" href="/static/desktop.css?v=4" />
     <link rel="stylesheet" href="/static/model-manager.css?v=1" />
     <script>if (window.timbreloomDesktop) document.documentElement.classList.add("desktop");</script>
   </head>
@@ -187,6 +187,34 @@
           </div>
         </section>
       </form>
+
+      <section class="panel-card clone-history" aria-labelledby="cloneHistoryHeading">
+        <div class="library-heading">
+          <div>
+            <span class="result-kicker">SAVED ON THIS MAC</span>
+            <h2 id="cloneHistoryHeading">Cloning history</h2>
+          </div>
+          <button id="refreshCloneJobs" class="icon-button" type="button" aria-label="Refresh cloning history">↻</button>
+        </div>
+        <p class="history-help">Revisit a recording, reuse its script, or make room for something new.</p>
+        <div id="cloneJobList" class="transcript-list clone-history-list">
+          <p class="empty-copy">No voice cloning jobs yet.</p>
+        </div>
+        <section id="cloneHistoryDetail" class="history-detail" hidden aria-labelledby="cloneHistoryTitle">
+          <div class="library-heading">
+            <div>
+              <h3 id="cloneHistoryTitle"></h3>
+              <p id="cloneHistoryMeta" class="history-help"></p>
+            </div>
+            <button id="editCloneJob" class="quiet-button" type="button">Edit and regenerate</button>
+          </div>
+          <label class="field">
+            <span>Saved script</span>
+            <textarea id="cloneHistoryText" rows="5" readonly></textarea>
+          </label>
+          <p class="history-help">Editing opens a new generation. The original recording stays in your history.</p>
+        </section>
+      </section>
 
       <section id="progressCard" class="result-card progress-card" hidden aria-live="polite">
         <div class="progress-header">
@@ -871,6 +899,21 @@
         <span>Downloads continue when this panel closes. Quitting the app pauses them and saves progress for later.</span>
       </div>
     </dialog>
-    <script type="module" src="/static/app.js?v=22" defer></script>
+    <dialog id="historyDialog" class="history-dialog" aria-labelledby="historyDialogTitle" aria-describedby="historyDialogDescription">
+      <form id="historyDialogForm">
+        <h2 id="historyDialogTitle"></h2>
+        <p id="historyDialogDescription"></p>
+        <label id="historyTitleField" class="field">
+          <span>Name</span>
+          <input id="historyTitleInput" type="text" maxlength="160" required />
+        </label>
+        <p id="historyDialogError" class="history-dialog-error" role="alert" hidden></p>
+        <div class="history-dialog-actions">
+          <button id="historyDialogCancel" class="quiet-button" type="button">Cancel</button>
+          <button id="historyDialogSubmit" class="quiet-button" type="submit">Save name</button>
+        </div>
+      </form>
+    </dialog>
+    <script type="module" src="/static/app.js?v=27" defer></script>
   </body>
 </html>

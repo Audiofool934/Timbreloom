@@ -27,6 +27,7 @@ class GenerationJob:
     segments: list[TextSegment]
     job_dir: Path
     created_at: str
+    title: str = ""
     status: str = "queued"
     phase: str = "queued"
     message: str = "Waiting to generate"
@@ -124,6 +125,7 @@ class TTSService:
                     for item in fields(GenerationJob)
                     if item.name
                     not in {"job_dir", "reference_source", "cancel_event", "segments"}
+                    and item.name in payload
                 }
                 job = GenerationJob(
                     **kwargs,
@@ -217,7 +219,36 @@ class TTSService:
                 for job in self._jobs.values()
             )
 
-    def snapshot(self, job: GenerationJob) -> dict[str, Any]:
+    def list(self) -> list[dict[str, Any]]:
+        with self._lock:
+            items = []
+            for path in self.root.glob("*/job.json"):
+                try:
+                    items.append(self.snapshot(self.get_job(path.parent.name), include_input=False))
+                except FileNotFoundError:
+                    continue
+            return sorted(items, key=lambda item: item["created_at"], reverse=True)
+
+    def rename(self, job_id: str, title: str) -> GenerationJob:
+        with self._lock:
+            job = self.get_job(job_id)
+            self._update(job, title=title)
+            return job
+
+    def delete(self, job_id: str) -> None:
+        with self._lock:
+            job = self.get_job(job_id)
+            thread = self._threads.get(job_id)
+            if job.status in {"queued", "running"} or (thread and thread.is_alive()):
+                raise ValueError("Stop this generation and wait for it to finish before deleting it.")
+            # Derive owned exports from the ID, never from a filename in metadata.
+            for name in (f"timbreloom-long-{job_id}.wav", f"timbreloom-long-{job_id}.tmp.wav"):
+                (self.output_root / name).unlink(missing_ok=True)
+            shutil.rmtree(job.job_dir)
+            self._jobs.pop(job_id, None)
+            self._threads.pop(job_id, None)
+
+    def snapshot(self, job: GenerationJob, *, include_input: bool = True) -> dict[str, Any]:
         with self._lock:
             stream_chunks = [
                 {
@@ -230,6 +261,7 @@ class TTSService:
             ]
             snapshot = {
                 "job_id": job.job_id,
+                "title": job.title or " ".join("".join(segment.text for segment in job.segments).split())[:80] or "Untitled speech",
                 "status": job.status,
                 "phase": job.phase,
                 "message": job.message,
@@ -250,6 +282,15 @@ class TTSService:
                     "chunks": stream_chunks,
                 },
             }
+            if include_input:
+                snapshot.update(
+                    target_text="".join(segment.text for segment in job.segments),
+                    voice_id=job.voice_id,
+                    language=job.language,
+                    reference_text=job.reference_text,
+                    reference_url=f"/api/jobs/{job.job_id}/reference",
+                    reference_filename=job.reference_source.name,
+                )
         return snapshot
 
     def process(self, job: GenerationJob) -> None:

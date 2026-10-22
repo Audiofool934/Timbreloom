@@ -5,6 +5,7 @@ import { readJob, JobConnectionError } from "./job-client.js?v=2";
 import { installDesktop, notifyDesktop } from "./desktop.js?v=6";
 import { installModelManager } from "./model-manager.js?v=2";
 import { countLabel } from "./text-format.js?v=1";
+import { renderHistoryList } from "./history.js?v=1";
 
 const form = document.querySelector("#cloneForm");
 const audioInput = document.querySelector("#referenceAudio");
@@ -161,6 +162,12 @@ let statusTimer;
 let previewTimer;
 let pollTimer;
 let currentJobId = null;
+let cloneJobs = [];
+let selectedCloneJob = null;
+let cloneOpenVersion = 0;
+let cloneListVersion = 0;
+let vcOpenVersion = 0;
+let vcListVersion = 0;
 let asrPollTimer;
 let currentAsrJobId = null;
 let vcJobs = [];
@@ -500,7 +507,124 @@ function resetJobControls() {
   buttonText.textContent = "Generate speech";
   cancelButton.disabled = false;
   cancelButton.textContent = "Stop job";
+  renderCloneJobList();
 }
+
+function renderCloneJobList() {
+  renderHistoryList({
+    element: document.querySelector("#cloneJobList"), jobs: cloneJobs,
+    selectedId: selectedCloneJob?.job_id || currentJobId, endpoint: "/api/jobs",
+    emptyText: "No voice cloning jobs yet.", formatDate: formatTranscriptDate, readError, showError,
+    openDisabled: Boolean(currentJobId), onOpen: openCloneJob,
+    onRename: async job => {
+      if (selectedCloneJob?.job_id === job.job_id) showCloneHistoryDetail(job);
+      await loadCloneJobs();
+    },
+    onDelete: async id => {
+      cloneOpenVersion += 1;
+      if (selectedCloneJob?.job_id === id) {
+        selectedCloneJob = null;
+        document.querySelector("#cloneHistoryDetail").hidden = true;
+        audioPlayer.pause();
+        audioPlayer.removeAttribute("src");
+        audioPlayer.load();
+        cloneStreamPlayer.reset();
+        resultCard.hidden = true;
+        progressCard.hidden = true;
+        downloadLink.removeAttribute("href");
+      }
+      await loadCloneJobs();
+    },
+  });
+}
+
+async function loadCloneJobs() {
+  const version = ++cloneListVersion;
+  const response = await fetch("/api/jobs", { cache: "no-store" });
+  if (!response.ok) throw new Error(await readError(response));
+  const payload = await response.json();
+  if (version !== cloneListVersion) return;
+  cloneJobs = payload.jobs || [];
+  renderCloneJobList();
+}
+
+function showCloneHistoryDetail(job) {
+  selectedCloneJob = job;
+  document.querySelector("#cloneHistoryTitle").textContent = job.title;
+  document.querySelector("#cloneHistoryMeta").textContent = `${job.voice_name} · ${job.language} · ${formatTranscriptDate(job.created_at)}`;
+  document.querySelector("#cloneHistoryText").value = job.target_text;
+  document.querySelector("#editCloneJob").disabled = ["queued", "running"].includes(job.status);
+  document.querySelector("#cloneHistoryDetail").hidden = false;
+}
+
+async function openCloneJob(id) {
+  if (currentJobId) return;
+  const version = ++cloneOpenVersion;
+  const job = await readJob(`/api/jobs/${id}`);
+  if (version !== cloneOpenVersion || currentJobId) return;
+  audioPlayer.pause();
+  cloneStreamPlayer.reset();
+  resultCard.hidden = true;
+  errorCard.hidden = true;
+  showCloneHistoryDetail(job);
+  renderJob(job);
+  if (["queued", "running"].includes(job.status)) {
+    currentJobId = job.job_id;
+    window.localStorage.setItem("voiceCloneCurrentJob", currentJobId);
+    progressCard.hidden = false;
+    generateButton.disabled = true;
+    buttonText.textContent = "Generating";
+    pollTimer = window.setTimeout(pollJob, 500);
+  } else if (job.status === "complete" && job.result) {
+    showResult(job.result);
+    cloneStreamPlayer.reset();
+  } else {
+    progressCard.hidden = true;
+    showError(job.error || job.message);
+  }
+  renderCloneJobList();
+  document.querySelector("#cloneHistoryDetail").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+document.querySelector("#refreshCloneJobs").addEventListener("click", () => loadCloneJobs().catch(error => showError(error.message)));
+document.querySelector("#editCloneJob").addEventListener("click", async event => {
+  const job = selectedCloneJob;
+  if (!job || currentJobId) return;
+  if (targetText.value.trim() && targetText.value !== job.target_text && !window.confirm("Replace the script currently in the form with this saved script?")) return;
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    await loadVoices();
+    const voice = voices.find(item => item.id === job.voice_id);
+    let referenceFile;
+    if (!voice) {
+      const response = await fetch(job.reference_url);
+      if (!response.ok) throw new Error(await readError(response));
+      const blob = await response.blob();
+      referenceFile = new File([blob], job.reference_filename, { type: blob.type });
+    }
+    if (selectedCloneJob?.job_id !== job.job_id || currentJobId) return;
+    cancelRecordingFor("clone", "Opened a saved recording. Recording canceled.");
+    voiceSelect.value = voice?.id || "";
+    applyVoiceMode();
+    if (referenceFile) {
+      const transfer = new DataTransfer();
+      transfer.items.add(referenceFile);
+      audioInput.files = transfer.files;
+      audioInput.dispatchEvent(new Event("change", { bubbles: true }));
+      referenceText.value = job.reference_text;
+    }
+    targetText.value = job.target_text;
+    language.value = job.language;
+    targetText.dispatchEvent(new Event("input", { bubbles: true }));
+    targetText.focus();
+    targetText.scrollIntoView({ behavior: "smooth", block: "center" });
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
 
 function renderJob(job) {
   const percent = Math.max(0, Math.min(100, Math.round(job.progress * 100)));
@@ -545,21 +669,28 @@ function showResult(result) {
 
 async function pollJob() {
   if (!currentJobId) return;
+  const jobId = currentJobId;
   try {
-    const job = await readJob(`/api/jobs/${currentJobId}`);
+    const job = await readJob(`/api/jobs/${jobId}`);
+    if (currentJobId !== jobId) return;
     renderJob(job);
     if (job.status === "complete") {
+      showCloneHistoryDetail(job);
       showResult(job.result);
+      loadCloneJobs().catch(error => showError(error.message));
       return;
     }
     if (job.status === "error" || job.status === "cancelled") {
       progressCard.hidden = true;
       showError(job.error || job.message);
       resetJobControls();
+      showCloneHistoryDetail(job);
+      loadCloneJobs().catch(error => showError(error.message));
       return;
     }
     pollTimer = window.setTimeout(pollJob, 750);
   } catch (error) {
+    if (currentJobId !== jobId) return;
     if (error instanceof JobConnectionError && currentJobId) {
       progressCard.hidden = false;
       progressTitle.textContent = "Waiting for local service to reconnect";
@@ -577,6 +708,10 @@ form.addEventListener("submit", async (event) => {
     event.preventDefault();
   if (!await modelManager.ensure("qwen")) return;
   if (currentJobId) return;
+  cloneOpenVersion += 1;
+  selectedCloneJob = null;
+  document.querySelector("#cloneHistoryDetail").hidden = true;
+  audioPlayer.pause();
   errorCard.hidden = true;
   resultCard.hidden = true;
   progressCard.hidden = false;
@@ -610,6 +745,7 @@ form.addEventListener("submit", async (event) => {
     currentJobId = job.job_id;
     window.localStorage.setItem("voiceCloneCurrentJob", currentJobId);
     renderJob(job);
+    loadCloneJobs().catch(error => showError(error.message));
     pollTimer = window.setTimeout(pollJob, 500);
   } catch (error) {
     progressCard.hidden = true;
@@ -777,56 +913,59 @@ function renderVcJob(job) {
 }
 
 function renderVcJobList() {
-  vcJobList.replaceChildren();
-  if (!vcJobs.length) {
-    const empty = document.createElement("p");
-    empty.className = "empty-copy";
-    empty.textContent = "No voice conversions yet.";
-    vcJobList.append(empty);
-    return;
-  }
-  const statusNames = {
-    queued: "Queued",
-    running: "Processing",
-    complete: "Complete",
-    cancelled: "Stopped",
-    error: "Failed",
-  };
-  for (const job of vcJobs) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "transcript-list-item";
-    if (job.id === currentVcJobId) button.classList.add("is-active");
-    const title = document.createElement("strong");
-    title.textContent = job.source_filename;
-    const meta = document.createElement("span");
-    meta.textContent = `${job.voice_name} · ${statusNames[job.status] || job.status}`;
-    const date = document.createElement("small");
-    date.textContent = formatTranscriptDate(job.created_at);
-    button.append(title, meta, date);
-    button.addEventListener("click", () => openVcJob(job.id));
-    vcJobList.append(button);
-  }
+  renderHistoryList({
+    element: vcJobList, jobs: vcJobs, selectedId: currentVcJobId, endpoint: "/api/voice-conversions",
+    emptyText: "No voice conversions yet.", formatDate: formatTranscriptDate, readError, showError,
+    onOpen: openVcJob, onRename: loadVcJobs,
+    onDelete: async id => {
+      vcOpenVersion += 1;
+      if (currentVcJobId === id) {
+        window.clearTimeout(vcPollTimer);
+        currentVcJobId = null;
+        window.localStorage.removeItem("timbreloomCurrentVcJob");
+        vcJobRunning = false;
+        for (const player of [vcSourceAudio, vcSourceVideo, vcOutputAudio]) {
+          player.pause(); player.removeAttribute("src"); player.load();
+        }
+        vcStreamPlayer.reset();
+        vcResultCard.hidden = vcProgressCard.hidden = true;
+        vcDownloadAudio.removeAttribute("href");
+        vcDownloadVideo.removeAttribute("href");
+        updateVcControls();
+      }
+      await loadVcJobs();
+      if (vcJobRunning && currentVcJobId) {
+        window.clearTimeout(vcPollTimer);
+        vcPollTimer = window.setTimeout(pollVcJob, 700);
+      }
+    },
+  });
 }
 
 async function loadVcJobs() {
+  const version = ++vcListVersion;
   const response = await fetch("/api/voice-conversions", { cache: "no-store" });
   if (!response.ok) throw new Error(await readError(response));
   const payload = await response.json();
+  if (version !== vcListVersion) return;
   vcJobs = payload.conversions || [];
   renderVcJobList();
 }
 
 async function openVcJob(jobId, keepPolling = true) {
+  const version = ++vcOpenVersion;
   window.clearTimeout(vcPollTimer);
   const response = await fetch(`/api/voice-conversions/${jobId}`, { cache: "no-store" });
+  if (version !== vcOpenVersion) return null;
   if (!response.ok) throw new Error(await readError(response));
   const job = await response.json();
+  if (version !== vcOpenVersion) return null;
   currentVcJobId = job.id;
   window.localStorage.setItem("timbreloomCurrentVcJob", job.id);
   errorCard.hidden = true;
   renderVcJob(job);
   await loadVcJobs();
+  if (version !== vcOpenVersion) return null;
   if (keepPolling && ["queued", "running"].includes(job.status)) {
     vcPollTimer = window.setTimeout(pollVcJob, 700);
   }
@@ -835,14 +974,17 @@ async function openVcJob(jobId, keepPolling = true) {
 
 async function pollVcJob() {
   if (!currentVcJobId) return;
+  const jobId = currentVcJobId;
   try {
     const job = await openVcJob(currentVcJobId, false);
+    if (!job) return;
     if (["queued", "running"].includes(job.status)) {
       vcPollTimer = window.setTimeout(pollVcJob, 700);
     } else if (job.status === "error") {
       showError(job.error || job.message);
     }
   } catch (error) {
+    if (currentVcJobId !== jobId) return;
     vcJobRunning = false;
     updateVcControls();
     showError(error.message);
@@ -1454,6 +1596,7 @@ Promise.all([
   loadProviders(),
   loadVoices(),
   loadVcJobs(),
+  loadCloneJobs(),
   restoreVcJob(),
   restoreJob(),
   loadTranscripts(),
