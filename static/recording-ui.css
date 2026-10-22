@@ -1,0 +1,33 @@
+.recording-input-meter {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 13px 14px 12px;
+  border: 1px solid var(--soft-line, #e3e7dc);
+  border-radius: 9px;
+  background: var(--panel, #fffefa);
+}
+.recording-input-meter[hidden], .live-follow-button[hidden] { display: none !important; }
+.input-meter-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 9px; font-size: 11px; font-weight: 550; color: var(--ink, #20251f); }
+.input-meter-value { flex-shrink: 0; color: var(--muted, #6b7267); font-variant-numeric: tabular-nums; font-weight: 450; }
+.input-meter-track { position: relative; height: 7px; overflow: hidden; border-radius: 3px; background: #e8eddf; }
+.input-meter-fill { position: absolute; inset: 0; background: var(--focus, #6e854a); transform: scaleX(0); transform-origin: left center; }
+.input-meter-peak { position: absolute; top: 0; bottom: 0; width: 2px; background: #344b2d; }
+.input-meter-hint { margin: 8px 0 0; min-height: 2.8em; color: var(--muted, #6b7267); font-size: 11px; line-height: 1.4; }
+.recording-input-meter[data-input-state="clipping"] .input-meter-fill { background: #b44e3d; }
+.recording-input-meter[data-input-state="clipping"] .input-meter-hint { color: #9a4333; }
+.recording-input-meter[data-input-state="silent"] .input-meter-hint { color: var(--ink, #20251f); }
+.live-transcription > .recording-input-meter { margin-bottom: 14px; }
+.live-follow-button { display: block; margin: 10px 0 0 auto; padding: 7px 12px; border: 1px solid #c5d1b5; border-radius: 7px; background: var(--selection, #eef5de); color: #344b2d; font: inherit; font-size: 12px; cursor: pointer; }
+.live-follow-button:hover { background: #e3edcf; }
+.live-follow-button:focus-visible { outline: 2px solid var(--focus, #6e854a); outline-offset: 3px; }
+.recorder-panel.is-recording, .desktop .recorder-panel.is-recording { background: #f2f6eb; border-color: #bacba4; }
+.recorder-panel.is-recording .record-dot, .desktop .recorder-panel.is-recording .record-dot { background: var(--focus, #6e854a); border-color: var(--focus, #6e854a); animation: none; }
+.live-transcription[data-state="listening"] .live-listening-indicator { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .recording-input-meter *, .live-follow-button { animation: none !important; transition: none !important; }
+}
+@media (prefers-contrast: more) {
+  .recording-input-meter, .live-follow-button { border-color: #6b795b; }
+  .input-meter-track { background: #d6ddcd; }
+  .input-meter-fill { background: #405d31; }
+}

@@ -21,6 +21,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from timbreloom.asr_service import ASRService
+from timbreloom.live_asr import LiveASRService
+from timbreloom.live_asr_api import create_router as create_live_asr_router
 from timbreloom.dubbing_api import DubbingContext, create_router as create_dubbing_router
 from timbreloom.tts_service import GenerationJob, TTSService
 from timbreloom.api_models import (
@@ -41,6 +43,7 @@ from timbreloom.providers import (
     LocalWhisperASRProvider,
     TTSRequest,
 )
+from timbreloom.providers.streaming_asr import LocalStreamingASRProvider
 from timbreloom.segmentation import (
     AUDIO_TOKENS_PER_SECOND,
     GENERATION_TOKEN_LIMIT,
@@ -155,6 +158,13 @@ _asr_provider = LocalWhisperASRProvider(
     before_load=_tts_provider.unload,
     model_available=(lambda: _model_store.ready("whisper")) if ASR_MODEL_SOURCE == DEFAULT_ASR_MODEL_DIR else None,
 )
+STREAMING_ASR_RUNTIME = Path(os.getenv("TIMBRELOOM_STREAMING_ASR_RUNTIME", str(APP_ROOT / "runtime/streaming-asr")))
+_streaming_asr_providers = {
+    key: LocalStreamingASRProvider(
+        key, MODEL_DIR / _model_store.catalog[key]["directory"], STREAMING_ASR_RUNTIME / ".venv/bin/python",
+        _accelerator, model_available=lambda model_key=key: _model_store.ready(model_key), before_load=_tts_provider.unload,
+    ) for key in ("nemotron", "moonshine-en", "moonshine-zh")
+}
 _vc_provider = LocalSeedVCProvider(
     runtime_python=SEED_VC_RUNTIME_DIR / ".venv" / "bin" / "python",
     source_dir=SEED_VC_RUNTIME_DIR / "source",
@@ -169,7 +179,8 @@ _vc_provider = LocalSeedVCProvider(
     model_available=(lambda: _model_store.ready("seed-vc")) if SEED_VC_MODEL_DIR == MODEL_DIR / "Seed-VC" else None,
 )
 _gemini_provider = GeminiTextProvider()
-_asr_service = ASRService(TRANSCRIPT_DIR, _asr_provider)
+_asr_service = ASRService(TRANSCRIPT_DIR, _asr_provider, _streaming_asr_providers)
+_live_asr_service = LiveASRService(_asr_service)
 _dub_store = DubProjectStore(PROJECT_DIR)
 _voice_storage_lock = threading.Lock()
 
@@ -199,6 +210,7 @@ async def lifespan(_: FastAPI):
         try:
             yield
         finally:
+            await asyncio.to_thread(_live_asr_service.close)
             _model_store.close()
 
 
@@ -231,6 +243,7 @@ async def local_workspace_only(request: Request, call_next):
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
+app.include_router(create_live_asr_router(_live_asr_service, set(ASR_LANGUAGES)))
 
 
 @app.get("/", include_in_schema=False)
@@ -259,6 +272,7 @@ def health(library: bool = True) -> dict[str, Any]:
         "providers": [
             tts_descriptor.public(),
             asr_descriptor.public(),
+            *(provider.descriptor.public() for provider in _streaming_asr_providers.values()),
             vc_descriptor.public(),
             gemini_descriptor.public(),
         ],
@@ -291,6 +305,21 @@ def runtime_status() -> dict[str, Any]:
 @app.get("/api/models")
 def list_models() -> dict[str, Any]:
     return _model_store.snapshot()
+
+
+@app.get("/api/asr/models")
+def asr_models() -> dict[str, Any]:
+    models = []
+    for key in ("whisper", "nemotron", "moonshine-en", "moonshine-zh"):
+        provider = _asr_service.provider_for(key)
+        catalog = _model_store.catalog[key]
+        language = key.rsplit("-", 1)[1] if key.startswith("moonshine-") else None
+        models.append({"id": key, "name": provider.descriptor.name, "ready": provider.descriptor.ready,
+                       "description": catalog["description"], "bytes": catalog["bytes"],
+                       "languages": [language] if language else list(ASR_LANGUAGES),
+                       "supports_hints": key != "nemotron",
+                       "timestamps": "word" if key == "whisper" else "segment"})
+    return {"default": "whisper", "models": models}
 
 
 @app.post("/api/models/{model_id}/download", status_code=202)
@@ -661,6 +690,7 @@ def list_providers() -> dict[str, Any]:
         "providers": [
             _tts_provider.descriptor.public(),
             _asr_provider.descriptor.public(),
+            *(provider.descriptor.public() for provider in _streaming_asr_providers.values()),
             _vc_provider.descriptor.public(),
             _gemini_provider.descriptor.public(),
         ],
@@ -877,19 +907,21 @@ async def create_asr_job(
     media: UploadFile = File(...),
     language: str = Form("auto"),
     initial_prompt: str = Form(""),
+    model: str = Form("whisper"),
 ) -> dict[str, Any]:
-    if not _asr_provider.descriptor.configured:
-        await media.close()
-        raise HTTPException(status_code=409, detail="Download Whisper from Models before starting transcription.")
     try:
         language = _validate_asr_language(language)
         suffix = _validate_asr_suffix(media.filename)
         initial_prompt = " ".join(initial_prompt.strip().split())
         if len(initial_prompt) > 1_000:
             raise ValueError("Vocabulary hints cannot exceed 1,000 characters.")
+        provider = _asr_service.validate_model(model, language, initial_prompt)
     except ValueError as exc:
         await media.close()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not provider.descriptor.configured:
+        await media.close()
+        raise HTTPException(status_code=409, detail=f"Download {provider.descriptor.name} from Models before starting transcription.")
 
     job_id = uuid.uuid4().hex
     transcript_dir = TRANSCRIPT_DIR / job_id
@@ -910,6 +942,7 @@ async def create_asr_job(
             source_bytes=source_bytes,
             requested_language=language,
             initial_prompt=initial_prompt,
+            model_key=model,
         )
         _asr_service.launch(job)
         return _public_asr_job(job)

@@ -59,6 +59,11 @@ On restart, TTS, ASR, dubbing generation, and export recover according to their 
 
 ## Workspace controls
 
+Recording and live transcription show a real microphone input meter.
+The bar shows RMS level in dBFS, with a separate peak indicator.
+The meter warns about near-full-scale peaks and sustained silence without modifying the recorded audio.
+Live transcripts follow new text until you scroll upward; **Jump to latest** resumes following.
+
 Use the dubbing timeline's **+**, **-**, and **Fit** buttons to inspect timing.
 When the timeline has keyboard focus, use + or - to zoom, 0 to fit, and arrow keys to scroll.
 Option-scroll zooms around the pointer.
@@ -66,7 +71,7 @@ Zoom and scrolling preserve the playhead time and selected segments.
 
 ## Models and optional tools
 
-Open **Models** to manage three independent downloads: Qwen for cloning and dubbing, Whisper for transcription, and Seed-VC with its supporting models for conversion.
+Open **Models** to manage independent downloads: Qwen for cloning and dubbing; Whisper, Nemotron, and two language-specific Moonshine models for transcription; and Seed-VC with its supporting models for conversion.
 Approximate sizes are 2.52 GB, 464 MB, and 1.88 GB respectively.
 Downloads use fixed Hugging Face revisions and verify each file's SHA-256 before enabling the model.
 
@@ -113,7 +118,7 @@ Omit it to produce an ad-hoc local build without Hardened Runtime validation.
 Public distribution requires an appropriate Developer ID signature and Apple notarization; see [release validation](release-readiness.md).
 
 Each release build creates temporary production environments rather than copying installed development packages.
-The main service installs runtime dependencies from `uv.lock`; Seed-VC uses pinned versions and distribution hashes in `packaging/seed-vc-runtime.lock`.
+The main service installs runtime dependencies from `uv.lock`; Seed-VC and streaming ASR use pinned versions and distribution hashes in `packaging/seed-vc-runtime.lock` and `packaging/streaming-asr-runtime.lock`.
 The build leaves development environments unchanged and removes its temporary environments on completion or failure.
 A first build may need to download locked dependencies.
 

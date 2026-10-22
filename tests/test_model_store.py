@@ -39,6 +39,26 @@ def test_fresh_status_has_no_network_or_filesystem_side_effects(tmp_path):
     store.close()
 
 
+def test_pinned_moonshine_download_uses_cdn_and_verifies_hash(tmp_path):
+    content = b"pinned Moonshine model"
+    catalog = catalog_for({"moonshine-en": content})
+    artifact = catalog["moonshine-en"]["files"][0]
+    artifact["download_url"] = "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/encoder.ort"
+    requests = []
+    def respond(request):
+        requests.append(str(request.url))
+        return httpx.Response(200, content=content if len(requests) > 1 else b"x" * len(content))
+    store = ModelStore(tmp_path, catalog=catalog, transport=httpx.MockTransport(respond))
+    try:
+        store.start("moonshine-en")
+        assert wait_idle(store)["state"] == "error" and not store.ready("moonshine-en")
+        store.start("moonshine-en")
+        assert wait_idle(store)["state"] == "ready"
+        assert requests == [artifact["download_url"]] * 2
+    finally:
+        store.close()
+
+
 def test_only_explicitly_selected_model_downloads_and_activates(tmp_path):
     requests = []
     def respond(request):

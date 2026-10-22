@@ -63,6 +63,9 @@ def test_health_does_not_load_model() -> None:
         "local-qwen-tts",
         "local-seed-vc",
         "local-whisper-asr",
+        "local-nemotron-asr",
+        "local-moonshine-en-asr",
+        "local-moonshine-zh-asr",
         "gemini-text",
     }
 

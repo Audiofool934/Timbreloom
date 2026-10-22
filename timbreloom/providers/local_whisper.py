@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from threading import Event
 from typing import Any, Callable
@@ -47,6 +48,7 @@ class LocalWhisperASRProvider(ASRProvider):
                 "segment-timestamps",
                 "word-timestamps",
                 "offline",
+                "live-transcription",
             ),
             configured=model_ready,
             ready=model_ready,
@@ -116,3 +118,18 @@ class LocalWhisperASRProvider(ASRProvider):
         if not request.raw_output_path.is_file():
             raise RuntimeError("Local Whisper did not produce a transcript.")
         return json.loads(request.raw_output_path.read_text(encoding="utf-8"))
+
+    @contextmanager
+    def live_engine(self, directory: Path, cancel_event: Event):
+        from .live_whisper import LiveWhisperProcess
+
+        if not self.descriptor.ready:
+            raise RuntimeError("Download Whisper from Models before starting live transcription.")
+        with self.coordinator.session("asr", wait=False):
+            if self.before_load:
+                self.before_load()
+            engine = LiveWhisperProcess(self.model_source, directory, cancel_event)
+            try:
+                yield engine
+            finally:
+                engine.close()

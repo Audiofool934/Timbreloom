@@ -1,9 +1,11 @@
 import { createProgressiveAudioPlayer } from "./audio-player.js?v=2";
-import { createAudioRecorder, cancelRecordingOutside, cancelActiveRecording, cancelRecordingFor } from "./audio-recorder.js?v=4";
+import { createAudioRecorder, cancelRecordingOutside, cancelActiveRecording, cancelRecordingFor } from "./audio-recorder.js?v=6";
+import { createLiveTranscription } from "./live-transcription.js?v=4";
+import { installAsrModels } from "./asr-models.js?v=1";
 import { createDubbingWorkspace } from "./dubbing.js?v=5";
 import { readJob, JobConnectionError } from "./job-client.js?v=2";
-import { installDesktop, notifyDesktop } from "./desktop.js?v=6";
-import { installModelManager } from "./model-manager.js?v=2";
+import { installDesktop, notifyDesktop } from "./desktop.js?v=8";
+import { installModelManager } from "./model-manager.js?v=4";
 import { countLabel } from "./text-format.js?v=1";
 import { renderHistoryList } from "./history.js?v=1";
 
@@ -184,6 +186,7 @@ const segmentRows = new Map();
 let cloneRecorderController;
 let vcRecorderController;
 let asrRecorderController;
+let asrLiveController;
 
 const cloneStreamPlayer = createProgressiveAudioPlayer({
   card: cloneStreamCard,
@@ -208,6 +211,7 @@ const asrStreamPlayer = createProgressiveAudioPlayer({
 });
 function switchView(view) {
   cancelRecordingOutside(view);
+  if (view !== "asr") void asrLiveController?.stop("Microphone off. Saving your transcript before leaving...");
   cloneView.hidden = view !== "clone";
   vcView.hidden = view !== "vc";
   asrView.hidden = view !== "asr";
@@ -1147,7 +1151,7 @@ function renderAsrJob(job) {
     queued: "Job created",
     probing: "Checking media",
     preparing: "Preparing audio",
-    transcribing: "Whisper is transcribing",
+    transcribing: "Transcribing on this Mac",
     saving: "Saving timestamps",
     complete: "Transcription complete",
     cancelled: "Job stopped",
@@ -1172,6 +1176,7 @@ function resetAsrControls() {
   asrButtonText.textContent = "Transcribe";
   asrCancelButton.disabled = false;
   asrCancelButton.textContent = "Stop job";
+  asrModels.setBusy(Boolean(asrLiveController?.busy));
 }
 
 async function pollAsrJob() {
@@ -1210,8 +1215,13 @@ async function pollAsrJob() {
 
 asrForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!await modelManager.ensure("whisper")) return;
+  if (asrLiveController?.busy) return;
   if (currentAsrJobId) return;
+  await asrModels.ready;
+  let settings;
+  try { settings = asrModels.settings(); }
+  catch (error) { showError(error.message); return; }
+  if (!await modelManager.ensure(settings.model)) return;
   const file = asrMedia.files[0];
   if (!file) {
     showError("Choose audio or video to transcribe.");
@@ -1221,12 +1231,14 @@ asrForm.addEventListener("submit", async (event) => {
   asrProgressCard.hidden = false;
   asrStreamPlayer.reset();
   asrStartButton.disabled = true;
+  asrModels.setBusy(true);
   asrButtonText.textContent = "Transcribing";
 
   const payload = new FormData();
   payload.append("media", file);
-  payload.append("language", asrLanguage.value);
-  payload.append("initial_prompt", asrPrompt.value);
+  payload.append("model", settings.model);
+  payload.append("language", settings.language);
+  payload.append("initial_prompt", settings.prompt);
   renderAsrJob({
     phase: "queued",
     message: "Saving media in the local project",
@@ -1269,6 +1281,7 @@ async function restoreAsrJob() {
   currentAsrJobId = savedJobId;
   asrProgressCard.hidden = false;
   asrStartButton.disabled = true;
+  asrModels.setBusy(true);
   asrButtonText.textContent = "Transcribing";
   await pollAsrJob();
 }
@@ -1582,6 +1595,39 @@ window.addEventListener("beforeunload", () => {
 });
 
 const modelManager = installModelManager();
+const asrModels = installAsrModels(modelManager);
+asrLiveController = createLiveTranscription({
+  beforeStart: async () => {
+    if (currentAsrJobId) throw new Error("Finish the current transcription job before starting the microphone.");
+    cancelActiveRecording();
+    await asrModels.ready;
+    return modelManager.ensure(asrModels.settings().model);
+  },
+  getOptions: () => asrModels.settings(),
+  onBusy: busy => {
+    const disabled = busy || Boolean(currentAsrJobId);
+    asrStartButton.disabled = disabled;
+    asrModels.setBusy(disabled);
+  },
+  onSaved: async id => { await loadTranscripts(id); await loadTranscript(id, !asrView.hidden); },
+});
+for (const mode of ["File", "Live"]) {
+  document.getElementById(`asr${mode}Mode`).addEventListener("click", () => {
+    const live = mode === "Live";
+    if (live) cancelRecordingFor("asr");
+    else void asrLiveController.stop();
+    document.getElementById("asrFileControls").hidden = live;
+    document.getElementById("asrLiveControls").hidden = !live;
+    asrMedia.disabled = live;
+    asrStartButton.hidden = live;
+    document.getElementById("asrFileMode").setAttribute("aria-pressed", String(!live));
+    document.getElementById("asrLiveMode").setAttribute("aria-pressed", String(live));
+    document.getElementById("asrInputTitle").textContent = live ? "Live microphone" : "Import media";
+    document.getElementById("asrInputDescription").textContent = live
+      ? "Speak naturally. Transcribe on this Mac while you record."
+      : "Common audio and video formats · Up to 8 hours and 2 GB.";
+  });
+}
 window.addEventListener("timbreloom-models-changed", refreshHealth);
 const dubWorkspace = createDubbingWorkspace({
   getVoices: () => voices,

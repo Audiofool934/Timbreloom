@@ -181,11 +181,17 @@ export function installDesktop({ switchView, hasUnsavedEdits }) {
         picker.click();
         return;
       }
+      if (view === "asr") byId("asrFileMode").click();
       const inputs = { clone: "referenceAudio", vc: "vcMedia", asr: "asrMedia", dub: "dubBundleImport" };
       byId(inputs[view]).click();
     },
     primaryAction() {
       if (document.querySelector("dialog[open]")) return;
+      if (currentView() === "asr" && !byId("asrLiveControls").hidden) {
+        const liveButton = byId(byId("asrLiveStart").hidden ? "asrLiveStop" : "asrLiveStart");
+        if (!liveButton.disabled) liveButton.click();
+        return;
+      }
       const buttons = { clone: "generateButton", vc: "vcStartButton", asr: "asrStartButton", dub: byId("dubEditor").hidden ? "createDubButton" : "dubGenerateAll" };
       const button = byId(buttons[currentView()]);
       if (button && !button.disabled && button.getClientRects().length) button.click();

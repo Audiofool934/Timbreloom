@@ -8,8 +8,9 @@
     <link rel="icon" href="/static/app-icon.png" type="image/png" />
     <link rel="stylesheet" href="/static/styles.css?v=18" />
     <link rel="stylesheet" href="/static/desktop.css?v=4" />
+    <link rel="stylesheet" href="/static/recording-ui.css?v=1" />
     <link rel="stylesheet" href="/static/timeline-ui.css?v=1" />
-    <link rel="stylesheet" href="/static/model-manager.css?v=1" />
+    <link rel="stylesheet" href="/static/model-manager.css?v=2" />
     <script>if (window.timbreloomDesktop) document.documentElement.classList.add("desktop");</script>
   </head>
   <body>
@@ -433,7 +434,7 @@
             <p class="eyebrow">Offline · Timestamped · Editable</p>
             <h1>Every word.<br />In its place.</h1>
           </div>
-          <p class="lede">Transcribe audio and video with Whisper on this Mac. Edit the words, keep the original timestamps, export subtitles, or save a clear passage as a reusable voice.</p>
+          <p class="lede">Choose a local model for live speech, audio, or video. Edit the words, keep the original timestamps, export subtitles, or save a clear passage as a reusable voice.</p>
         </section>
 
         <div class="asr-workspace">
@@ -441,11 +442,17 @@
             <div class="panel-heading compact-heading">
               <span class="step">01</span>
               <div>
-                <h2>Import Media</h2>
-                <p>Common audio and video formats · Up to 8 hours and 2 GB.</p>
+                <h2 id="asrInputTitle">Import media</h2>
+                <p id="asrInputDescription">Common audio and video formats · Up to 8 hours and 2 GB.</p>
               </div>
             </div>
 
+            <div class="asr-input-modes" aria-label="Transcription input">
+              <button id="asrFileMode" type="button" aria-pressed="true">Audio or video file</button>
+              <button id="asrLiveMode" type="button" aria-pressed="false">Live microphone</button>
+            </div>
+
+            <div id="asrFileControls">
             <label class="dropzone asr-dropzone" id="asrDropzone" for="asrMedia">
               <input
                 id="asrMedia"
@@ -474,6 +481,18 @@
               </div>
               <audio id="asrRecordPreview" class="record-preview" controls preload="metadata" hidden></audio>
             </section>
+            </div>
+
+            <div class="asr-model-picker">
+              <label class="select-field" for="asrModel">
+                <span>Transcription model</span>
+                <select id="asrModel" aria-describedby="asrModelDescription" disabled>
+                  <option value="whisper">Loading models...</option>
+                </select>
+              </label>
+              <button id="asrManageModel" class="quiet-button" type="button">Manage models</button>
+              <p id="asrModelDescription" class="asr-model-description" role="status">Choose the model for files and live microphone input.</p>
+            </div>
 
             <div class="asr-options">
               <label class="select-field">
@@ -490,16 +509,31 @@
                 </select>
               </label>
               <label class="field">
-                <span>Vocabulary hints <small>Optional</small></span>
+                <span>Vocabulary hints <small id="asrHintsAvailability">Optional</small></span>
                 <input id="asrPrompt" type="text" maxlength="1000" placeholder="Names, technical terms, project names" />
               </label>
             </div>
 
+            <section id="asrLiveControls" class="live-transcription" data-state="idle" aria-label="Live microphone transcription" hidden>
+              <div class="live-transcription-heading">
+                <span class="live-listening-indicator" aria-hidden="true"></span>
+                <p id="asrLiveStatus" role="status">Ready when you are.</p>
+                <span id="asrLiveTimer" class="recorder-timer">00:00</span>
+              </div>
+              <div id="asrLiveTranscript" class="live-transcript-text" tabindex="0" role="region" aria-label="Live transcript">
+                <span id="asrLivePlaceholder">Your words will appear here as you speak.</span><span id="asrLiveStable"></span><span id="asrLiveDraft" class="live-draft"></span>
+              </div>
+              <p class="live-transcription-hint">Lighter words are still being revised. Stop to save an editable transcript and recording.</p>
+              <a id="asrLiveRecording" class="download-link secondary-link" href="#" download hidden>Download recording</a>
+              <button id="asrLiveStart" type="button" class="generate-button wide-button">Start live transcription</button>
+              <button id="asrLiveStop" type="button" class="generate-button wide-button" hidden>Stop and save</button>
+            </section>
+
             <div class="local-engine-note">
               <span class="state-dot"></span>
               <div>
-                <strong>Whisper Large v3 Turbo Q4</strong>
-                <p>Local models · Word timestamps · Offline processing</p>
+                <strong id="asrEngineName">Local transcription</strong>
+                <p id="asrEngineDetail">Timestamped · Offline processing</p>
               </div>
             </div>
 
@@ -881,7 +915,7 @@
       </section>
 
       <footer>
-        <p>TIMBRELOOM 1.1 · QWEN3-TTS · SEED-VC · WHISPER LARGE V3 TURBO · GEMINI OPTIONAL</p>
+        <p>TIMBRELOOM · QWEN3-TTS · SEED-VC · WHISPER LARGE V3 TURBO · GEMINI OPTIONAL</p>
         <p>Clone only your own voice or a voice you have explicit permission to use.</p>
       </footer>
     </main>
@@ -891,7 +925,7 @@
         <button id="closeModelManager" class="quiet-button" type="button" autofocus>Done</button>
       </div>
       <h2 id="modelManagerTitle">Choose what you need.</h2>
-      <p class="model-manager-intro">Models are stored separately from the app. Download the ones you need from Hugging Face, then process audio entirely on this Mac.</p>
+      <p class="model-manager-intro">Models are stored separately from the app. Download the models you need, then process audio entirely on this Mac.</p>
       <p id="modelDownloadError" role="alert" hidden></p>
       <div id="modelCatalog"></div>
       <div class="model-manager-storage">

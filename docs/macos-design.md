@@ -27,7 +27,7 @@ The English interface preserves the existing visual identity, with concise label
 | Startup | Deferred model loading, connection explanation, retry, and log access |
 | Import dialogs | Separate allowed types and descriptions for references, media, and project bundles |
 | Drop area | Empty, dragging, selected-file, and keyboard-focus states; long filenames can wrap |
-| Recording | Permission request, timer, stop, cancel, and permission-error feedback |
+| Recording | Permission request, timer, real input RMS and peak meter, clipping and sustained silence feedback, stop, cancel, and permission-error feedback |
 | Saved voice | Reference details remain intact when an import is canceled |
 | Script | Readable text, a separate character count, and punctuation guidance |
 | Quality and language | Consistent selectors, radio presets, and visible focus |
@@ -37,6 +37,8 @@ The English interface preserves the existing visual identity, with concise label
 | Metrics | Conversion time divided by displayed audio duration, avoiding stale historical ratio fields |
 | Transcript editor | Timestamp seeking, selection, text edits, save, subtitles, and optional text tools |
 | Dubbing editor | Original text and dialogue, roles, voices, zoomable timeline, timing inputs, generation, export state, and focus mode |
+| Live transcript | Automatic follow at the bottom, protected upward reading, and a keyboard-accessible Jump to latest control |
+| Model manager | Fixed heading, scrollable catalog, explicit model states, byte progress, and focus restoration |
 | Pending renders | Neutral preparation states; actual generation failures retain error feedback |
 | Sticky toolbar | Horizontal controls that wrap at narrow widths; segment scrolling reserves toolbar space |
 | Errors and drafts | Dismissible errors and draft-save status |

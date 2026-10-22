@@ -78,6 +78,15 @@ def model_manifest(notices: Path) -> list[dict]:
     cache = ROOT / "build/release-metadata"
     for model in models:
         for source in model["sources"]:
+            if source.get("notice_url"):
+                name = f"{model['id']}-LICENSE.txt"
+                payload = fetch(source["notice_url"], cache / name)
+                if hashlib.sha256(payload).hexdigest() != source["notice_sha256"]:
+                    raise RuntimeError(f"Model license differs from its pinned source: {model['id']}")
+                target = notices / "models" / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(payload)
+                continue
             repository, revision = source["repository"], source["revision"]
             key = repository.replace("/", "--")
             metadata = json.loads(fetch(f"https://huggingface.co/api/models/{repository}/revision/{revision}?blobs=true",
@@ -158,6 +167,7 @@ def assemble(resources: Path) -> dict:
     with production_environments() as environments:
         main_runtime = python_runtime(environments["main"], backend / ".venv")
         seed_runtime = python_runtime(environments["seed-vc"], backend / "runtime/seed-vc/.venv")
+        streaming_runtime = python_runtime(environments["streaming-asr"], backend / "runtime/streaming-asr/.venv")
     source = ROOT / "runtime/seed-vc/source"
     source_revision = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
     if source_revision != "51383efd921027683c89e5348211d93ff12ac2a8" or subprocess.check_output(["git", "-C", str(source), "diff", "HEAD"], text=True):
@@ -190,7 +200,8 @@ def assemble(resources: Path) -> dict:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(payload)
         sndfile.append({"version": version, "source_url": url, "sha256": hashlib.sha256(payload).hexdigest()})
-    for root, label in ((backend / ".venv", "python-main"), (backend / "runtime/seed-vc/.venv", "python-seed-vc")):
+    for root, label in ((backend / ".venv", "python-main"), (backend / "runtime/seed-vc/.venv", "python-seed-vc"),
+                        (backend / "runtime/streaming-asr/.venv", "python-streaming-asr")):
         for path in root.rglob("*"):
             if path.is_file() and path.name.upper().startswith(("LICENSE", "COPYING", "NOTICE", "AUTHORS")):
                 target = notices / label / path.relative_to(root)
@@ -206,13 +217,14 @@ def assemble(resources: Path) -> dict:
     manifest = {"format": 2, "architecture": "arm64", "models_embedded": False,
                 "model_download_policy": "user-initiated",
                 "runtime_locks": lock_provenance(),
-                "runtimes": {"main": main_runtime, "seed-vc": seed_runtime},
+                "runtimes": {"main": main_runtime, "seed-vc": seed_runtime, "streaming-asr": streaming_runtime},
                 "seed_vc_source": {"url": "https://github.com/Plachtaa/seed-vc", "revision": source_revision},
                 "models": models, "ffmpeg": json.loads((media.parent / "manifest.json").read_text()),
                 "libsndfile_sources": sndfile}
     # Precompile with relative embedded filenames, so first launch does not write into a signed app.
     for runtime, target in ((backend / ".venv", backend / ".venv"),
                             (backend / "runtime/seed-vc/.venv", backend / "runtime/seed-vc"),
+                            (backend / "runtime/streaming-asr/.venv", backend / "runtime/streaming-asr"),
                             (backend / ".venv", backend / "timbreloom"),
                             (backend / ".venv", backend / "app.py")):
         subprocess.run([str(runtime / "bin/python"), "-m", "compileall", "-q", "-s", str(backend), "-p", "timbreloom", str(target)], check=True)

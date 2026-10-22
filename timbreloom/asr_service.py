@@ -34,6 +34,7 @@ class ASRJob:
     requested_language: str
     initial_prompt: str
     created_at: str
+    model_key: str = "whisper"
     status: str = "queued"
     phase: str = "queued"
     message: str = "Waiting to transcribe"
@@ -48,14 +49,29 @@ class ASRJob:
 
 
 class ASRService:
-    def __init__(self, transcript_root: Path, provider: ASRProvider) -> None:
+    def __init__(self, transcript_root: Path, provider: ASRProvider, providers: dict[str, ASRProvider] | None = None) -> None:
         self.transcript_root = transcript_root
         self.provider = provider
+        self.providers = providers or {}
         self.transcript_root.mkdir(parents=True, exist_ok=True)
         self._jobs: dict[str, ASRJob] = {}
         self._jobs_lock = threading.RLock()
         self._threads: dict[str, threading.Thread] = {}
         self._transcript_lock = threading.Lock()
+
+    def provider_for(self, model_key: str = "whisper") -> ASRProvider:
+        if model_key == "whisper":
+            return self.provider
+        try:
+            return self.providers[model_key]
+        except (KeyError, TypeError) as exc:
+            raise ValueError("Choose an available transcription model.") from exc
+
+    def validate_model(self, model_key: str, language: str, prompt: str) -> ASRProvider:
+        provider = self.provider_for(model_key)
+        if hasattr(provider, "validate_request"):
+            provider.validate_request(language, prompt)
+        return provider
 
     def has_active_jobs(self) -> bool:
         with self._jobs_lock:
@@ -71,7 +87,9 @@ class ASRService:
         source_bytes: int,
         requested_language: str,
         initial_prompt: str,
+        model_key: str = "whisper",
     ) -> ASRJob:
+        self.validate_model(model_key, requested_language, initial_prompt)
         job = ASRJob(
             job_id=job_id,
             transcript_dir=transcript_dir,
@@ -81,6 +99,7 @@ class ASRService:
             requested_language=requested_language,
             initial_prompt=initial_prompt,
             created_at=datetime.now(timezone.utc).isoformat(),
+            model_key=model_key,
         )
         with self._jobs_lock:
             self._jobs[job_id] = job
@@ -107,7 +126,7 @@ class ASRService:
         payload.update(
             schema_version=1, source_path=job.source_path.name,
             cancel_requested=job.cancel_event.is_set(),
-            model=getattr(self.provider, "model_id", self.provider.descriptor.name),
+            model=getattr(self.provider_for(job.model_key), "model_id", self.provider_for(job.model_key).descriptor.name),
         )
         atomic_json(job.transcript_dir / "job.json", payload)
 
@@ -129,6 +148,7 @@ class ASRService:
                 "duration_seconds": round(job.duration_seconds, 3),
                 "audio_ready": job.audio_ready,
                 "created_at": job.created_at,
+                "model_key": job.model_key,
                 "result": job.result,
                 "error": job.error,
             }
@@ -145,11 +165,12 @@ class ASRService:
                     raise ValueError("Unsupported transcription job format.")
                 source = local_file(directory, payload["source_path"])
                 kwargs = {
-                    item.name: payload[item.name] for item in fields(ASRJob)
+                    item.name: (payload.get("model_key", "whisper") if item.name == "model_key" else payload[item.name]) for item in fields(ASRJob)
                     if item.name not in {"transcript_dir", "source_path", "cancel_event"}
                 }
                 job = ASRJob(**kwargs, transcript_dir=directory, source_path=source)
-                if payload.get("model") != getattr(self.provider, "model_id", self.provider.descriptor.name):
+                provider = self.provider_for(job.model_key)
+                if payload.get("model") != getattr(provider, "model_id", provider.descriptor.name):
                     job.raw_ready = False
                 if payload.get("cancel_requested"):
                     job.cancel_event.set()
@@ -189,8 +210,9 @@ class ASRService:
     def _process_job(self, job: ASRJob) -> None:
         started = time.perf_counter()
         audio_path = job.transcript_dir / "audio.wav"
-        raw_path = job.transcript_dir / "raw" / "whisper.json"
+        raw_path = job.transcript_dir / "raw" / f"{job.model_key}.json"
         try:
+            provider = self.provider_for(job.model_key)
             self._update(
                 job,
                 status="running",
@@ -228,7 +250,7 @@ class ASRService:
             self._update(
                 job,
                 phase="transcribing",
-                message="Transcribing with local Whisper. Audio stays on this Mac.",
+                message=f"Transcribing with {provider.descriptor.name}. Audio stays on this Mac.",
                 progress=0.24,
             )
             language = None if job.requested_language == "auto" else job.requested_language
@@ -241,7 +263,7 @@ class ASRService:
                 except (OSError, ValueError):
                     pass
             if raw_result is None:
-                raw_result = self.provider.transcribe(
+                raw_result = provider.transcribe(
                     ASRRequest(
                         audio_path=audio_path,
                         language=language,
@@ -268,8 +290,8 @@ class ASRService:
                 source_filename=job.source_filename,
                 source_bytes=job.source_bytes,
                 duration_seconds=media_info.duration_seconds,
-                engine=self.provider.descriptor.provider_id,
-                model=getattr(self.provider, "model_id", self.provider.descriptor.name),
+                engine=provider.descriptor.provider_id,
+                model=getattr(provider, "model_id", provider.descriptor.name),
                 requested_language=job.requested_language,
             )
             save_transcript(job.transcript_dir, transcript)

@@ -46,7 +46,7 @@ def production_environments():
     """Never install into, prune, or copy packages from the developer environments."""
     with tempfile.TemporaryDirectory(prefix="production-", dir=ROOT / "build") as temporary:
         stage = Path(temporary)
-        main, seed = stage / "main", stage / "seed-vc"
+        main, seed, streaming = stage / "main", stage / "seed-vc", stage / "streaming-asr"
         environment = os.environ.copy()
         environment.pop("VIRTUAL_ENV", None)
         environment["UV_PROJECT_ENVIRONMENT"] = str(main)
@@ -59,11 +59,16 @@ def production_environments():
         subprocess.run(["uv", "pip", "sync", "--python", str(seed / "bin/python"), "--require-hashes",
                         "--strict", str(ROOT / "packaging/seed-vc-runtime.lock")],
                        env=environment, cwd=ROOT, check=True)
-        for runtime in (main, seed):
+        subprocess.run(["uv", "venv", "--python", str(ROOT / ".venv/bin/python"),
+                        "--no-python-downloads", str(streaming)], env=environment, cwd=ROOT, check=True)
+        subprocess.run(["uv", "pip", "sync", "--python", str(streaming / "bin/python"), "--require-hashes",
+                        "--strict", str(ROOT / "packaging/streaming-asr-runtime.lock")],
+                       env=environment, cwd=ROOT, check=True)
+        for runtime in (main, seed, streaming):
             subprocess.run(["uv", "pip", "check", "--python", str(runtime / "bin/python")],
                            cwd=ROOT, check=True)
             assert_production_packages(distributions(runtime / "bin/python"))
-        yield {"main": main, "seed-vc": seed}
+        yield {"main": main, "seed-vc": seed, "streaming-asr": streaming}
 
 
 def prune_runtime(runtime: Path, version: str) -> dict:
@@ -101,4 +106,5 @@ def prune_runtime(runtime: Path, version: str) -> dict:
 
 def lock_provenance() -> dict:
     return {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in (ROOT / "uv.lock", ROOT / "packaging/seed-vc-runtime.lock")}
+            for path in (ROOT / "uv.lock", ROOT / "packaging/seed-vc-runtime.lock",
+                         ROOT / "packaging/streaming-asr-runtime.lock")}

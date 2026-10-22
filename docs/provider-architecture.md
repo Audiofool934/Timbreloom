@@ -8,7 +8,7 @@ The interfaces live in `timbreloom/providers/base.py`.
 | Interface | Current implementation | Product responsibility |
 | --- | --- | --- |
 | `TTSProvider` | `LocalQwenTTSProvider` | Turn a reference voice and target text into one audio segment. |
-| `ASRProvider` | `LocalWhisperASRProvider` | Turn normalized local audio into provider-native timestamped output. |
+| `ASRProvider` | `LocalWhisperASRProvider`, `LocalStreamingASRProvider` | Turn normalized local audio into provider-native timestamped output. |
 | `VCProvider` | `LocalSeedVCProvider` | Transfer a source performance into a saved target timbre. |
 | `TextModelProvider` | `GeminiTextProvider` | Transform selected transcript text after explicit cloud confirmation. |
 
@@ -58,8 +58,11 @@ The frontend uses native JavaScript modules for dubbing, recording, progressive 
 ## Apple Silicon lifecycle
 
 `AcceleratorCoordinator` serializes all local accelerator workloads.
-Before Whisper starts, the Qwen Provider releases its model and clears the MLX cache.
+Before any ASR engine starts, the Qwen Provider releases its model and clears the MLX cache.
 Whisper runs in a short-lived subprocess with `HF_HUB_OFFLINE=1`, writes its raw JSON atomically and exits after each job.
+Nemotron and Moonshine use a separate Python 3.12 runtime pinned by `packaging/streaming-asr-runtime.lock`, preserving the main service's MLX and Whisper versions.
+Live sessions keep one inference process for the recording and release it after finalization.
+Each job records a model key, so changing the next transcription's selection never reroutes an existing or recovered job.
 Before Seed-VC starts, Qwen is also released.
 Seed-VC runs in an isolated Python 3.10 and PyTorch subprocess with pinned project-local dependencies and offline model paths.
 The next TTS request reloads Qwen on demand.

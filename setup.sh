@@ -32,3 +32,4 @@ fi
 
 uv run python scripts/preload_model.py
 "$SCRIPT_DIR/scripts/setup_seed_vc.sh"
+"$SCRIPT_DIR/scripts/setup_streaming_asr.sh"

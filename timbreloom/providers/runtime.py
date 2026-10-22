@@ -14,8 +14,10 @@ class AcceleratorCoordinator:
         self._active: str | None = None
 
     @contextmanager
-    def session(self, workload: str) -> Iterator[None]:
-        with self._lock:
+    def session(self, workload: str, *, wait: bool = True) -> Iterator[None]:
+        if not self._lock.acquire(blocking=wait):
+            raise RuntimeError("Another local model is busy. Finish that job before starting live transcription.")
+        try:
             with self._state_lock:
                 self._active = workload
             try:
@@ -23,6 +25,8 @@ class AcceleratorCoordinator:
             finally:
                 with self._state_lock:
                     self._active = None
+        finally:
+            self._lock.release()
 
     @property
     def active(self) -> str | None:

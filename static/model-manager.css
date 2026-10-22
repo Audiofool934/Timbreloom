@@ -1,45 +1,84 @@
 .model-management-entry { display: flex; align-items: center; gap: 18px; }
-.model-required { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 24px; padding: 18px 22px; border: 1px solid #d6ddbc; border-radius: 13px; background: #f3f5e7; }
+.model-required { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 24px; padding: 16px 20px; border: 1px solid #d6ddbc; border-radius: 12px; background: #f3f5e7; }
 .model-required[hidden] { display: none; }
-.model-required strong { display: block; font-size: 14px; color: #283126; }
-.model-required p { margin: 5px 0 0; color: #717769; font-size: 12px; line-height: 1.65; }
+.model-required strong { display: block; font-size: 13px; color: var(--ink); }
+.model-required p { margin: 5px 0 0; color: #616b56; font-size: 12px; line-height: 1.65; }
 .model-required button { flex-shrink: 0; }
-#modelManager { width: min(680px, calc(100vw - 40px)); max-height: calc(100dvh - 48px); box-sizing: border-box; margin: auto; padding: 28px; border: 1px solid #d8dcd2; border-radius: 20px; color: #283126; background: #f9faf6; box-shadow: 0 24px 80px #14200f35; }
+#modelManager { width: min(740px, calc(100vw - 40px)); max-height: calc(100dvh - 48px); box-sizing: border-box; margin: auto; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: var(--paper); box-shadow: 0 24px 80px #14200f35; }
+#modelManager[open] { display: flex; flex-direction: column; }
 #modelManager::backdrop { background: #141d1548; backdrop-filter: blur(3px); }
+.model-manager-header { flex: 0 0 auto; padding: 20px 24px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .model-manager-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.model-manager-heading > span { color: #6d7565; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
-#modelManager h2 { font-size: 25px; letter-spacing: -.035em; line-height: 1.3; margin: 21px 0 10px; }
-.model-manager-intro { margin: 0 0 23px; font-size: 13px; line-height: 1.8; color: #717769; max-width: 52ch; }
-#modelCatalog { display: grid; gap: 13px; }
-.model-download-card { background: #fff; border: 1px solid #dde1d6; border-radius: 13px; padding: 20px; }
-.model-download-card[data-state="ready"] { border-color: #cad4b3; }
-.model-download-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.model-purpose { margin: 0 0 5px; color: #778066; font-size: 11px; }
-.model-download-card h3 { font-size: 18px; line-height: 1.3; margin: 0; font-weight: 650; letter-spacing: -.02em; }
-.model-download-size { color: #758067; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.model-download-description { margin: 12px 0 15px; color: #717769; font-size: 12px; line-height: 1.7; }
+.model-manager-heading > span { color: #616b56; font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+#modelManager h2 { font-size: 23px; letter-spacing: -.035em; line-height: 1.3; margin: 12px 0 8px; }
+.model-manager-intro { margin: 0; font-size: 12px; line-height: 1.65; color: var(--muted); max-width: 64ch; }
+.model-manager-overview { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; margin-top: 16px; padding-top: 13px; border-top: 1px solid var(--soft-line); font-size: 12px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.model-manager-overview strong { font-weight: 600; }
+.model-manager-overview > span { color: var(--muted); font-size: 11px; }
+#modelCatalog { display: grid; gap: 12px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 20px 24px; scroll-padding-block: 20px; }
+.model-download-card { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.model-download-card[data-state="ready"] { border-color: #cbd7bb; }
+.model-download-card[data-state="downloading"], .model-download-card[data-state="verifying"], .model-download-card[data-state="installing"] { border-color: #9cae83; }
+.model-download-card[data-state="error"] { border-color: #d8b6a8; }
+.model-download-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.model-download-heading > div:first-child { min-width: 0; }
+.model-purpose { margin: 0 0 5px; color: #616b56; font-size: 11px; line-height: 1.45; }
+.model-download-card h3 { font-size: 16px; line-height: 1.35; margin: 0; font-weight: 650; letter-spacing: -.015em; overflow-wrap: anywhere; }
+.model-download-metadata { display: flex; flex-shrink: 0; align-items: flex-end; flex-direction: column; gap: 6px; }
+.model-state-badge { border: 1px solid #dce1d5; border-radius: 5px; padding: 3px 7px; background: #f1f3ec; color: #606958; font-size: 10px; line-height: 1.4; font-weight: 600; white-space: nowrap; }
+.model-download-card[data-state="ready"] .model-state-badge { color: #486132; background: #eef5e4; border-color: #d2e0c2; }
+.model-download-card[data-state="downloading"] .model-state-badge, .model-download-card[data-state="verifying"] .model-state-badge, .model-download-card[data-state="installing"] .model-state-badge { color: #40582c; background: #eaf2dc; border-color: #cbd9b7; }
+.model-download-card[data-state="error"] .model-state-badge { color: #93412f; background: #fff0e9; border-color: #ebcebf; }
+.model-download-size { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.model-download-description { margin: 12px 0 15px; color: var(--muted); font-size: 12px; line-height: 1.65; }
 .model-download-card progress { appearance: none; border: 0; border-radius: 8px; width: 100%; height: 5px; display: block; margin: 12px 0; overflow: hidden; background: #e8ecdf; }
 .model-download-card progress[hidden] { display: none; }
 .model-download-card progress::-webkit-progress-bar { background: #e8ecdf; }
-.model-download-card progress::-webkit-progress-value { background: #94a76b; }
-.model-download-card progress::-moz-progress-bar { background: #94a76b; }
-.model-download-bottom { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.model-download-card progress::-webkit-progress-value { background: #6e854a; }
+.model-download-card progress::-moz-progress-bar { background: #6e854a; }
+.model-download-card[data-state="paused"] progress::-webkit-progress-value { background: #9aa58b; }
+.model-download-card[data-state="paused"] progress::-moz-progress-bar { background: #9aa58b; }
+.model-download-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .model-download-status { min-width: 0; }
-.model-download-status p { margin: 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-.model-download-status small { display: block; margin-top: 3px; font-size: 11px; color: #8a9181; font-variant-numeric: tabular-nums; }
-.model-download-action { flex-shrink: 0; white-space: nowrap; min-width: 116px; }
-.model-download-card[data-state="error"] .model-download-status p { color: #a04836; }
-.model-download-sources { margin-top: 15px; color: #838c79; font-size: 11px; }
-.model-download-sources summary { cursor: pointer; width: fit-content; }
+.model-download-status p { margin: 0; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.model-download-status small { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.5; }
+#modelManager .model-download-action { flex-shrink: 0; white-space: nowrap; min-height: 34px; min-width: 100px; }
+#modelManager .model-download-action[hidden] { display: none; }
+#modelManager .model-download-action[data-primary="true"] { border-color: #d0dfb8; color: #26361c; background: #e8f2d7; }
+#modelManager .model-download-action[data-primary="true"]:hover:not(:disabled) { border-color: #9caf7f; background: #dfecc8; }
+.model-download-card[data-state="error"] .model-download-status p { color: #93412f; }
+.model-download-sources { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--soft-line); color: var(--muted); font-size: 11px; }
+.model-download-sources summary, .model-storage-location summary { cursor: pointer; width: fit-content; border-radius: 3px; line-height: 1.5; }
 .model-download-sources p { margin: 8px 0 0; overflow-wrap: anywhere; line-height: 1.6; }
-.model-download-sources a { color: #647450; text-decoration: underline; text-underline-offset: 2px; }
-.model-manager-storage { margin-top: 21px; color: #7a8370; font-size: 11px; line-height: 1.7; }
-.model-manager-storage code { display: block; font-size: 11px; overflow-wrap: anywhere; margin: 4px 0 8px; }
-#modelDownloadError { padding: 12px 14px; border-radius: 9px; background: #fcf0e9; color: #934c37; font-size: 12px; line-height: 1.7; }
+.model-download-sources a { color: #52673d; text-decoration: underline; text-underline-offset: 2px; }
+.model-manager-storage { flex: 0 0 auto; padding: 13px 24px 16px; border-top: 1px solid var(--line); color: var(--muted); background: var(--panel); font-size: 11px; line-height: 1.6; }
+.model-storage-location { margin-bottom: 6px; }
+.model-storage-location summary { color: #526047; font-weight: 550; }
+.model-manager-storage code { display: block; font-size: 10px; overflow-wrap: anywhere; margin: 7px 0; color: var(--ink); }
+#modelDownloadError { margin: 12px 0 0; padding: 10px 12px; border: 1px solid #ebcebf; border-radius: 8px; background: #fff0e9; color: #93412f; font-size: 12px; line-height: 1.6; }
+#modelManager :is(button, summary, a):focus-visible, .model-download-card:focus-visible { outline: 2px solid var(--focus, #6e854a); outline-offset: 3px; }
 @media (max-width: 520px) {
-  #modelManager { padding: 20px; max-height: calc(100dvh - 24px); width: calc(100vw - 24px); }
-  .model-required { align-items: flex-start; flex-direction: column; gap: 12px; padding: 17px; }
-  .model-download-card { padding: 16px; }
+  #modelManager { max-height: calc(100dvh - 24px); width: calc(100vw - 24px); border-radius: 12px; }
+  .model-manager-header { padding: 16px; }
+  #modelManager h2 { font-size: 21px; }
+  #modelCatalog { padding: 14px; gap: 10px; }
+  .model-manager-storage { padding: 12px 16px; }
+  .model-required { align-items: flex-start; flex-direction: column; gap: 12px; padding: 16px; }
+  .model-download-card { padding: 14px; }
+  .model-download-heading { gap: 10px; }
+  .model-download-card h3 { font-size: 15px; }
   .model-download-bottom { align-items: flex-start; flex-direction: column; gap: 12px; }
+  #modelManager .model-download-action { align-self: stretch; }
   .model-management-entry { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (max-height: 620px) {
+  .model-manager-header { padding-top: 12px; padding-bottom: 12px; }
+  .model-manager-intro { display: none; }
+  #modelManager h2 { margin-top: 6px; font-size: 20px; }
+  .model-manager-overview { margin-top: 10px; padding-top: 10px; }
+  .model-manager-storage { padding-top: 10px; padding-bottom: 10px; }
+}
+@media (prefers-contrast: more) {
+  #modelManager .model-state-badge, #modelManager .model-download-card, .model-required, #modelManager { border-color: #6b7267; }
+  .model-purpose, .model-download-size, .model-download-description, .model-download-status small, .model-download-sources { color: #444d3c; }
 }

@@ -242,6 +242,191 @@
         }
       ],
       "bytes": 1884762319
+    },
+    {
+      "id": "nemotron",
+      "name": "Nemotron 3.5 ASR",
+      "purpose": "Multilingual file and live transcription",
+      "description": "Fast live transcription in multiple languages, including mixed English and Mandarin. Subtitle timings are approximate.",
+      "directory": "Nemotron-3.5-ASR-0.6B-8bit",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 159605,
+          "sha256": "f30c7bc469fc01fd5483172b4d7c75075030ddb60f347589c44e216b0a5ea9b6",
+          "repository": "mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit",
+          "revision": "7279359e4481b5e9e185a318bd618e429c6d86cd",
+          "filename": "config.json"
+        },
+        {
+          "path": "model.safetensors",
+          "size": 755598923,
+          "sha256": "a64a4da048e7d28dde4cd4ff61ce59308a63314bb5563e73e06c24aae50ea941",
+          "repository": "mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit",
+          "revision": "7279359e4481b5e9e185a318bd618e429c6d86cd",
+          "filename": "model.safetensors"
+        },
+        {
+          "path": "tokenizer.model",
+          "size": 406554,
+          "sha256": "ce3895e40806f02a26c3a225161b96ef682d6c0054bae32a245dec4258d7d291",
+          "repository": "mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit",
+          "revision": "7279359e4481b5e9e185a318bd618e429c6d86cd",
+          "filename": "tokenizer.model"
+        },
+        {
+          "path": "vocab.txt",
+          "size": 78294,
+          "sha256": "d74b60edd1cad792cfce25dcb7e1048d78d717cf4f29acaae2854262d5189f4f",
+          "repository": "mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit",
+          "revision": "7279359e4481b5e9e185a318bd618e429c6d86cd",
+          "filename": "vocab.txt"
+        }
+      ],
+      "sources": [
+        {
+          "repository": "mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit",
+          "revision": "7279359e4481b5e9e185a318bd618e429c6d86cd",
+          "license": "NVIDIA Open Model License (conversion metadata)"
+        }
+      ],
+      "bytes": 756243376
+    },
+    {
+      "id": "moonshine-en",
+      "name": "Moonshine English",
+      "purpose": "English file and live transcription",
+      "description": "A compact English streaming model. Choose a multilingual model for conversations that switch languages.",
+      "directory": "Moonshine-Small-Streaming-English",
+      "files": [
+        {
+          "path": "adapter.ort",
+          "size": 2870368,
+          "sha256": "c665f742364febad597cc9ac1e0b341ffbee0e24a1466e2f3bde95e6e4771762",
+          "download_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/adapter.ort"
+        },
+        {
+          "path": "cross_kv.ort",
+          "size": 5356536,
+          "sha256": "e2d3417144e9514055ebfefe8dcc4c0a55a55adcb8530435844c75c53e352bf6",
+          "download_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/cross_kv.ort"
+        },
+        {
+          "path": "decoder_kv.ort",
+          "size": 81878600,
+          "sha256": "1a05465b1dd955858dfcbee039c0020fb5dd982b0f5094c34e61735d518d771b",
+          "download_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/decoder_kv.ort"
+        },
+        {
+          "path": "encoder.ort",
+          "size": 44148576,
+          "sha256": "2d4d973e91e8aca08c51e7e7efa28a46ab265b63d809d5294d18b86bcd85b993",
+          "download_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/encoder.ort"
+        },
+        {
+          "path": "frontend.model.ort",
+          "size": 26944,
+          "sha256": "09b1210ae30dc5f0f3e45f0ebab914c254741323114f53fbbe5ae62cca35058f",
+          "download_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/frontend.model.ort"
+        },
+        {
+          "path": "frontend.weights.ort",
+          "size": 7769464,
+          "sha256": "7ef97521bd4bad3928f5bb6808586f4fcc6e92bd5990394112eed7d4052ec338",
+          "download_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/frontend.weights.ort"
+        },
+        {
+          "path": "streaming_config.json",
+          "size": 512,
+          "sha256": "26f02b6afb22d60871a5efd85c3d38e569cc0ddb6c5eb6e93d3260152ae8a47a",
+          "download_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/streaming_config.json"
+        },
+        {
+          "path": "tokenizer.bin",
+          "size": 249974,
+          "sha256": "6884b35fd6377d4c4d32336a0bc152f36b64d1e45b6503683cdc238250a8472d",
+          "download_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/tokenizer.bin"
+        }
+      ],
+      "sources": [
+        {
+          "repository": "moonshine-ai/moonshine",
+          "revision": "234f60faa0eb388b01cdf7e60aca232af37aefda",
+          "url": "https://github.com/moonshine-ai/moonshine/tree/234f60faa0eb388b01cdf7e60aca232af37aefda",
+          "license": "MIT",
+          "notice_url": "https://raw.githubusercontent.com/moonshine-ai/moonshine/234f60faa0eb388b01cdf7e60aca232af37aefda/LICENSE",
+          "notice_sha256": "fa7d1174dd8af6a7cd280be20b80d10095ed4c19b5b20b61a7715c3ad790dc5f"
+        }
+      ],
+      "bytes": 142300974
+    },
+    {
+      "id": "moonshine-zh",
+      "name": "Moonshine Mandarin",
+      "purpose": "Mandarin file and live transcription",
+      "description": "A very small Mandarin streaming model. Choose a multilingual model for conversations that switch languages.",
+      "directory": "Moonshine-Tiny-Streaming-Mandarin",
+      "files": [
+        {
+          "path": "adapter.ort",
+          "size": 1318472,
+          "sha256": "84d1bed88310f5b6dd452203bcaffb765f017a7d06da8d84a898235ef5c90e12",
+          "download_url": "https://download.moonshine.ai/model/tiny-streaming-zh/quantized_26_08_24/adapter.ort"
+        },
+        {
+          "path": "cross_kv.ort",
+          "size": 1288120,
+          "sha256": "22c2261f3120b766a91deceb4f32ca0bef0a8f2b181509ad0dc9fe6adbd0c23a",
+          "download_url": "https://download.moonshine.ai/model/tiny-streaming-zh/quantized_26_08_24/cross_kv.ort"
+        },
+        {
+          "path": "decoder_kv.ort",
+          "size": 19717336,
+          "sha256": "5caf9e4e9eaa39b93122338bfbad2917630afc51293f6229b935ae7df28bed33",
+          "download_url": "https://download.moonshine.ai/model/tiny-streaming-zh/quantized_26_08_24/decoder_kv.ort"
+        },
+        {
+          "path": "encoder.ort",
+          "size": 7772792,
+          "sha256": "4270ca0e1ecd10e78d658b08b91d81c7f913511177e1ad461c8a9d9d0903503d",
+          "download_url": "https://download.moonshine.ai/model/tiny-streaming-zh/quantized_26_08_24/encoder.ort"
+        },
+        {
+          "path": "frontend.model.ort",
+          "size": 27608,
+          "sha256": "d27a9c994b43fa6568121f502e8b99d511ffd0425d4090ffddcc82c9a5667971",
+          "download_url": "https://download.moonshine.ai/model/tiny-streaming-zh/quantized_26_08_24/frontend.model.ort"
+        },
+        {
+          "path": "frontend.weights.ort",
+          "size": 2090728,
+          "sha256": "ac56e8ee7780e1f254ee26f2d9c9a3b3c6cfd2f6822cb3944924ae321f86dc50",
+          "download_url": "https://download.moonshine.ai/model/tiny-streaming-zh/quantized_26_08_24/frontend.weights.ort"
+        },
+        {
+          "path": "streaming_config.json",
+          "size": 509,
+          "sha256": "d31afd7c2dd5ee9ae3fa232312c5b42cb3e4fe1c6e9c53d885f2bea63023790a",
+          "download_url": "https://download.moonshine.ai/model/tiny-streaming-zh/quantized_26_08_24/streaming_config.json"
+        },
+        {
+          "path": "tokenizer.bin",
+          "size": 74587,
+          "sha256": "f172da002a818b9968d5c7a995cc7c51acf2168331ab5f914b5b0860ceab8236",
+          "download_url": "https://download.moonshine.ai/model/tiny-streaming-zh/quantized_26_08_24/tokenizer.bin"
+        }
+      ],
+      "sources": [
+        {
+          "repository": "moonshine-ai/moonshine",
+          "revision": "234f60faa0eb388b01cdf7e60aca232af37aefda",
+          "url": "https://github.com/moonshine-ai/moonshine/tree/234f60faa0eb388b01cdf7e60aca232af37aefda",
+          "license": "MIT",
+          "notice_url": "https://raw.githubusercontent.com/moonshine-ai/moonshine/234f60faa0eb388b01cdf7e60aca232af37aefda/LICENSE",
+          "notice_sha256": "fa7d1174dd8af6a7cd280be20b80d10095ed4c19b5b20b61a7715c3ad790dc5f"
+        }
+      ],
+      "bytes": 32290152
     }
   ]
 }

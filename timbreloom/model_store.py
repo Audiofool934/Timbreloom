@@ -14,7 +14,7 @@ import uuid
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from typing import Callable
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -36,7 +36,13 @@ def model_catalog() -> dict[str, dict]:
         for file in model["files"]:
             if not re.fullmatch(r"[a-f0-9]{64}", file["sha256"]) or file["size"] < 1:
                 raise ValueError("Invalid model digest or size")
-            if not re.fullmatch(r"[a-f0-9]{40}", file["revision"]):
+            if "download_url" in file:
+                source = urlsplit(file["download_url"])
+                if (source.scheme != "https" or source.netloc != "download.moonshine.ai"
+                        or not re.fullmatch(r"/model/[a-z-]+/quantized_\d{2}_\d{2}_\d{2}/[a-z0-9_.-]+", source.path)
+                        or source.query or source.fragment):
+                    raise ValueError("Invalid pinned Moonshine artifact URL")
+            elif not re.fullmatch(r"[a-f0-9]{40}", file["revision"]):
                 raise ValueError("Model revisions must be immutable commits")
         result[model["id"]] = model
     return result
@@ -196,7 +202,7 @@ class ModelStore:
             offset = 0
         if cancel.is_set():
             raise InterruptedError()
-        url = f"https://huggingface.co/{file['repository']}/resolve/{file['revision']}/{quote(file['filename'], safe='/')}"
+        url = file.get("download_url") or f"https://huggingface.co/{file['repository']}/resolve/{file['revision']}/{quote(file['filename'], safe='/')}"
         headers = {"Accept-Encoding": "identity"}
         if offset:
             headers["Range"] = f"bytes={offset}-"

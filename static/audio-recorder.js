@@ -1,6 +1,8 @@
+import { createInputMeter } from "./input-meter.js?v=1";
+
 let activeRecordingController = null;
 
-function formatRecordingTime(seconds) {
+export function formatRecordingTime(seconds) {
   const wholeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
   const hours = Math.floor(wholeSeconds / 3600);
   const minutes = Math.floor((wholeSeconds % 3600) / 60);
@@ -26,7 +28,7 @@ function recordingFilename(extension) {
   return `recording-${stamp}.${extension}`;
 }
 
-function recordingErrorMessage(error) {
+export function recordingErrorMessage(error) {
   if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
     return window.timbreloomDesktop ? "Microphone permission is required. Allow Timbreloom to use the microphone and try again." : "Microphone permission is required. Allow access in your browser and try again.";
   }
@@ -62,8 +64,10 @@ export function createAudioRecorder({
   let previewUrl = "";
   let previewSeconds = 0;
   let permissionRequest = 0;
+  const inputMeter = createInputMeter({ panel, before: preview });
 
   function releaseStream() {
+    inputMeter.stop();
     if (stream) {
       for (const track of stream.getTracks()) track.stop();
     }
@@ -153,6 +157,7 @@ export function createAudioRecorder({
 
   function stop() {
     if (!recorder || recorder.state === "inactive") return;
+    inputMeter.stop();
     stopButton.disabled = true;
     status.textContent = "Preparing recording...";
     recorder.stop();
@@ -203,6 +208,7 @@ export function createAudioRecorder({
       recorder.onstop = finishRecording;
       recorder.onerror = (event) => { cancel(recordingErrorMessage(event.error)); panel.dataset.state = "error"; };
       recorder.start(250);
+      void inputMeter.start({ stream });
       startedAt = performance.now();
       activeRecordingController = controller;
       setRecordingControls(true);

@@ -94,18 +94,41 @@ Deletion keeps the saved target voice and exported copies, and is unavailable wh
 ## Transcription
 
 1. Open **Transcription** and import audio or video, or record directly.
-2. Select the spoken language or use **Auto-detect**.
+2. Choose a **Transcription model**, then the spoken language or **Auto-detect** when supported.
 3. Optionally provide vocabulary hints for names, terms, or project names.
 4. Start transcription, then edit the timestamped segments.
 5. Export TXT, SRT, or VTT, or select 2 to 30 consecutive seconds to save a voice.
 
-Whisper runs locally and records word timestamps when available.
+The model choice applies to files and live microphone input and is remembered between sessions.
+Whisper supports multilingual speech and word timestamps when available.
+Nemotron supports multilingual streaming, including mixed English and Chinese, with segment timestamps and no vocabulary hints.
+Moonshine English and Moonshine Mandarin are smaller models for their respective languages, with segment timestamps and vocabulary hints.
+Use **Manage models** to download any missing model; selecting one never starts a download automatically.
 The prepared source audio becomes playable before recognition finishes.
-Each record in `data/transcripts/<id>/` retains the source, normalized audio, original Whisper output, editable transcript, and QA summary.
+Each record in `data/transcripts/<id>/` retains the source, normalized audio, original model output, editable transcript, and QA summary.
 Editing text preserves the existing timestamps.
 
 Use **Save text changes** or **⌘S** in the Mac app to keep edits.
 Optional Gemini actions operate on selected text after confirmation; review their results before saving.
+
+### Live microphone
+
+Choose **Live microphone**, select a language if known, and choose **Start live transcription**.
+Wait for **Listening** before speaking; the selected model loads once for the session.
+Text appears while you record, with lighter draft words that can change as more speech arrives.
+Choose **Stop and save** to release the microphone and save the recording and editable transcript to **Transcripts**.
+In the Mac app, **⌘↩** starts or stops the live session.
+Switching workspaces stops capture and saves received audio; switching back to file input does the same.
+You can cancel a pending microphone permission request without starting a late recording.
+
+Live transcription stays local with every model.
+The streaming models can show words sooner than Whisper; accuracy, latency, and punctuation depend on speech, noise, and available compute.
+Another active local model must finish before a live session can start.
+Only one live session can run at a time.
+If no speech is recognized, a download link keeps the recording available for later file transcription.
+A dropped connection preserves audio already received by the local service and finishes that session when possible.
+An interrupted service recovers the saved recording through the normal file-transcription pipeline on restart.
+See [live transcription implementation and validation](live-transcription.md) for the measured prototype behavior and testing limits.
 
 ## Dubbing studio
 
@@ -151,9 +174,9 @@ Matching voice IDs with identical content are reused; conflicting voice content 
 ## Recording and playback
 
 Voice cloning can record up to 30 seconds, voice conversion up to 30 minutes, and transcription up to 8 hours.
-Microphone permission is requested when you choose **Record**.
+Microphone permission is requested when you choose **Record** or **Start live transcription**.
 Use **Stop and use** to preview the result or continue to processing; **Cancel** preserves the previous file.
-Changing workspaces cancels an active recording and releases the microphone.
+Changing workspaces cancels a file recording and releases the microphone; live transcription saves its received audio instead.
 Closing the Mac window keeps the app running and does not itself stop a recording.
 
 The Mac audio player supports playback, pause, seeking with the keyboard, and speeds from 0.75x to 2x.

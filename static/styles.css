@@ -1005,6 +1005,22 @@ audio {
   align-items: start;
 }
 
+.asr-input-modes { display: flex; gap: 4px; padding: 4px; margin-bottom: 20px; border: 1px solid var(--soft-line); border-radius: 9px; background: var(--paper, #f4f5f1); }
+.asr-input-modes button { flex: 1; min-width: 0; padding: 10px 8px; border: 0; border-radius: 6px; color: var(--muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+.asr-input-modes button[aria-pressed="true"] { background: var(--card, #fffefa); color: var(--ink); box-shadow: 0 1px 3px #20251f18; }
+.asr-input-modes button:focus-visible { outline: 2px solid #6e854a; outline-offset: 1px; }
+.live-transcription { margin: 16px 0 20px; }
+.live-transcription-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.live-transcription-heading p { flex: 1; min-width: 0; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.live-listening-indicator { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: #a5ada0; }
+.live-transcription[data-state="listening"] .live-listening-indicator { background: #b44e3d; box-shadow: 0 0 0 4px #b44e3d12; }
+.live-transcription[data-state="error"] .live-transcription-heading p { color: #9a513b; }
+.live-transcript-text { min-height: 150px; max-height: 280px; overflow-y: auto; overflow-wrap: anywhere; border: 1px solid var(--soft-line); border-radius: 10px; padding: 16px; background: #fffefa; font-size: 16px; line-height: 1.8; }
+#asrLiveStable, #asrLiveDraft { white-space: pre-wrap; }
+.live-draft, #asrLivePlaceholder { color: var(--muted); }
+.live-transcription-hint { margin: 10px 0 16px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.live-transcription .download-link { display: inline-flex; margin-bottom: 12px; }
+
 .vc-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.7fr);
@@ -1140,6 +1156,24 @@ audio {
 
 .asr-dropzone {
   min-height: 178px;
+}
+
+.asr-model-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 12px;
+  align-items: end;
+  margin: 20px 0 16px;
+}
+
+.asr-model-picker select { width: 100%; min-width: 0; }
+.asr-model-picker .quiet-button { min-height: 50px; }
+.asr-model-description {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .asr-options {

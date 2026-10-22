@@ -19,7 +19,7 @@ Clone a voice. Keep a performance. Turn speech into text. Bring dialogue to pict
 ![Timbreloom dubbing studio with a generated English project and a shared waveform timeline](docs/assets/dubbing-studio.png)
 
 Timbreloom brings four audio workflows into a native Mac app, with a shared local library and an English interface.
-Audio processing runs on your Mac using Qwen3-TTS, Whisper, and Seed-VC.
+Audio processing runs on your Mac using Qwen3-TTS, Whisper, Nemotron, Moonshine, and Seed-VC.
 Download the models you need once, then work offline.
 
 ## Four ways to work with a voice
@@ -53,7 +53,7 @@ See [release validation](docs/release-readiness.md) for the exact status and tes
 ### Run from source
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and FFmpeg, then clone this repository.
-The main environment uses Python 3.12; Seed-VC uses an isolated Python 3.10 environment.
+The main environment uses Python 3.12; Seed-VC uses an isolated Python 3.10 environment, and the streaming transcription models use a separate Python 3.12 environment.
 
 ```bash
 brew install uv ffmpeg
@@ -64,7 +64,8 @@ cd Timbreloom
 ```
 
 Open [localhost:7865](http://127.0.0.1:7865).
-The developer setup downloads all three model groups and prepares the environments, so allow several gigabytes of disk space.
+The developer setup downloads Qwen, Whisper, and Seed-VC and prepares the environments, so allow several gigabytes of disk space.
+Download the optional Nemotron and Moonshine models from **Models**.
 Models and your library are excluded from Git.
 
 ### Build the Mac app
@@ -88,8 +89,15 @@ Existing library items remain available to view and edit while a model is missin
 | Model | Enables | Download size |
 | --- | --- | ---: |
 | Qwen3-TTS 0.6B Base, BF16 | Voice cloning and dubbing | About 2.52 GB |
-| Whisper Large v3 Turbo, Q4 | Transcription | About 464 MB |
+| Whisper Large v3 Turbo, Q4 | Multilingual transcription with word timestamps | About 464 MB |
+| Nemotron 3.5 ASR 0.6B, 8-bit | Multilingual streaming transcription | About 756 MB |
+| Moonshine Small Streaming English | English streaming transcription | About 142 MB |
+| Moonshine Tiny Streaming Mandarin | Mandarin streaming transcription | About 32 MB |
 | Seed-VC and supporting models | Voice conversion | About 1.88 GB |
+
+Select a **Transcription model** for both imported files and live microphone input.
+Timbreloom remembers your choice, with Whisper as the initial default.
+Nemotron and Moonshine provide segment timestamps; Whisper provides word timestamps when available.
 
 <details>
 <summary>See the model manager and storage locations</summary>

@@ -27,7 +27,7 @@ def main() -> None:
     manifest = json.loads((app / "Contents/Resources/ReleaseManifest.json").read_text())
     if manifest.get("models_embedded") is not False or (app / "Contents/Resources/backend/models").exists():
         parser.error("Release apps must contain the runtime and download catalog only; model weights stay separate")
-    if not all(manifest["runtimes"][name].get("production_only") for name in ("main", "seed-vc")):
+    if not all(manifest["runtimes"][name].get("production_only") for name in ("main", "seed-vc", "streaming-asr")):
         parser.error("Release apps must be assembled from locked production-only environments")
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     output.parent.mkdir(parents=True, exist_ok=True)
