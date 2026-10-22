@@ -1,0 +1,873 @@
+{
+  "date": "2026-10-03",
+  "machine": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.12.12",
+    "hardware": "Apple M2 Pro",
+    "memory_bytes": 17179869184
+  },
+  "model_artifacts": {
+    "moonshine-en": {
+      "total_bytes": 142300974,
+      "files": [
+        {
+          "path": "adapter.ort",
+          "bytes": 2870368,
+          "sha256": "c665f742364febad597cc9ac1e0b341ffbee0e24a1466e2f3bde95e6e4771762"
+        },
+        {
+          "path": "cross_kv.ort",
+          "bytes": 5356536,
+          "sha256": "e2d3417144e9514055ebfefe8dcc4c0a55a55adcb8530435844c75c53e352bf6"
+        },
+        {
+          "path": "decoder_kv.ort",
+          "bytes": 81878600,
+          "sha256": "1a05465b1dd955858dfcbee039c0020fb5dd982b0f5094c34e61735d518d771b"
+        },
+        {
+          "path": "encoder.ort",
+          "bytes": 44148576,
+          "sha256": "2d4d973e91e8aca08c51e7e7efa28a46ab265b63d809d5294d18b86bcd85b993"
+        },
+        {
+          "path": "frontend.model.ort",
+          "bytes": 26944,
+          "sha256": "09b1210ae30dc5f0f3e45f0ebab914c254741323114f53fbbe5ae62cca35058f"
+        },
+        {
+          "path": "frontend.weights.ort",
+          "bytes": 7769464,
+          "sha256": "7ef97521bd4bad3928f5bb6808586f4fcc6e92bd5990394112eed7d4052ec338"
+        },
+        {
+          "path": "streaming_config.json",
+          "bytes": 512,
+          "sha256": "26f02b6afb22d60871a5efd85c3d38e569cc0ddb6c5eb6e93d3260152ae8a47a"
+        },
+        {
+          "path": "tokenizer.bin",
+          "bytes": 249974,
+          "sha256": "6884b35fd6377d4c4d32336a0bc152f36b64d1e45b6503683cdc238250a8472d"
+        }
+      ]
+    },
+    "moonshine-zh": {
+      "total_bytes": 32290152,
+      "files": [
+        {
+          "path": "adapter.ort",
+          "bytes": 1318472,
+          "sha256": "84d1bed88310f5b6dd452203bcaffb765f017a7d06da8d84a898235ef5c90e12"
+        },
+        {
+          "path": "cross_kv.ort",
+          "bytes": 1288120,
+          "sha256": "22c2261f3120b766a91deceb4f32ca0bef0a8f2b181509ad0dc9fe6adbd0c23a"
+        },
+        {
+          "path": "decoder_kv.ort",
+          "bytes": 19717336,
+          "sha256": "5caf9e4e9eaa39b93122338bfbad2917630afc51293f6229b935ae7df28bed33"
+        },
+        {
+          "path": "encoder.ort",
+          "bytes": 7772792,
+          "sha256": "4270ca0e1ecd10e78d658b08b91d81c7f913511177e1ad461c8a9d9d0903503d"
+        },
+        {
+          "path": "frontend.model.ort",
+          "bytes": 27608,
+          "sha256": "d27a9c994b43fa6568121f502e8b99d511ffd0425d4090ffddcc82c9a5667971"
+        },
+        {
+          "path": "frontend.weights.ort",
+          "bytes": 2090728,
+          "sha256": "ac56e8ee7780e1f254ee26f2d9c9a3b3c6cfd2f6822cb3944924ae321f86dc50"
+        },
+        {
+          "path": "streaming_config.json",
+          "bytes": 509,
+          "sha256": "d31afd7c2dd5ee9ae3fa232312c5b42cb3e4fe1c6e9c53d885f2bea63023790a"
+        },
+        {
+          "path": "tokenizer.bin",
+          "bytes": 74587,
+          "sha256": "f172da002a818b9968d5c7a995cc7c51acf2168331ab5f914b5b0860ceab8236"
+        }
+      ]
+    },
+    "nemotron": {
+      "total_bytes": 756247988,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1519,
+          "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361"
+        },
+        {
+          "path": "README.md",
+          "bytes": 3093,
+          "sha256": "e18ee191195ea5087a2e9d789a0b6da50df56c55144ca36418b0dd608e13f93a"
+        },
+        {
+          "path": "config.json",
+          "bytes": 159605,
+          "sha256": "f30c7bc469fc01fd5483172b4d7c75075030ddb60f347589c44e216b0a5ea9b6"
+        },
+        {
+          "path": "model.safetensors",
+          "bytes": 755598923,
+          "sha256": "a64a4da048e7d28dde4cd4ff61ce59308a63314bb5563e73e06c24aae50ea941"
+        },
+        {
+          "path": "tokenizer.model",
+          "bytes": 406554,
+          "sha256": "ce3895e40806f02a26c3a225161b96ef682d6c0054bae32a245dec4258d7d291"
+        },
+        {
+          "path": "vocab.txt",
+          "bytes": 78294,
+          "sha256": "d74b60edd1cad792cfce25dcb7e1048d78d717cf4f29acaae2854262d5189f4f"
+        }
+      ],
+      "revision": "7279359e4481b5e9e185a318bd618e429c6d86cd"
+    },
+    "whisper": {
+      "total_bytes": 463666861,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1519,
+          "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361"
+        },
+        {
+          "path": "README.md",
+          "bytes": 337,
+          "sha256": "42fee20c9ac40aa2a75a121293ddf10f350b1ca97ab95fe1da7783cc19bda5b4"
+        },
+        {
+          "path": "config.json",
+          "bytes": 341,
+          "sha256": "538e24557b8f9bc504700add5e7bbe32087c2353001ff563e64772ad4398671a"
+        },
+        {
+          "path": "weights.npz",
+          "bytes": 463664664,
+          "sha256": "862bbc832b05f3f4ec19dd632b701d61a6d3f5c7906360a10d72a79870642a80"
+        }
+      ],
+      "revision": "660c343bbf4e52ac257f0b7d952e5388e6f93bef"
+    }
+  },
+  "runtime": {
+    "candidates": {
+      "moonshine-voice": "0.1.5",
+      "mlx-audio": "0.5.7",
+      "mlx": "0.32.3",
+      "psutil": "7.2.2"
+    },
+    "whisper": {
+      "mlx-whisper": "0.4.3",
+      "mlx": "0.32.2"
+    }
+  },
+  "fixtures": [
+    {
+      "id": "english",
+      "language": "en",
+      "audio": "english.wav",
+      "reference": "Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript.",
+      "voices": [
+        "Samantha"
+      ],
+      "rate_wpm": 165,
+      "duration_seconds": 18.2953125,
+      "sha256": "ea3bc885c845b8e7bf0a8a5998377d4828ef2f1a51b5dcee028b04964438de34",
+      "synthetic": true,
+      "leading_silence_seconds": 0.3
+    },
+    {
+      "id": "mandarin",
+      "language": "zh",
+      "audio": "mandarin.wav",
+      "reference": "今天我们测试实时语音转写。说话的时候，文字应该持续出现在屏幕上。请保留停顿前后的内容，也不要丢掉录音结束时的最后一句。我们希望这个工具反应快，中文准确，而且能够随时修改。",
+      "voices": [
+        "Tingting"
+      ],
+      "rate_wpm": 165,
+      "duration_seconds": 19.5531875,
+      "sha256": "a9eadfab747d894cacb3c7bbd362e23bb27a0dd34963cf7e50aca6ff91a3eba3",
+      "synthetic": true,
+      "leading_silence_seconds": 0.3
+    },
+    {
+      "id": "mixed",
+      "language": "auto",
+      "audio": "mixed.wav",
+      "reference": "Please open the transcription workspace and start recording. 现在切换到中文，保留原来的意思，不要自动翻译。 Then save the final transcript and keep the original audio.",
+      "voices": [
+        "Samantha",
+        "Tingting",
+        "Samantha"
+      ],
+      "rate_wpm": 165,
+      "duration_seconds": 12.520875,
+      "sha256": "cebb1e7711f289fe026b1c9c7e68a6c87803a4cf1ffdca35a9c9bb25edbb4f02",
+      "synthetic": true,
+      "leading_silence_seconds": 0.3
+    },
+    {
+      "id": "long_english",
+      "language": "en",
+      "audio": "long_english.wav",
+      "reference": "This is the first part of a longer recording. Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript. We are now starting the second part. Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript. This is the final part. Please keep every word until the recording ends.",
+      "voices": [
+        "Samantha"
+      ],
+      "rate_wpm": 165,
+      "duration_seconds": 45.1220625,
+      "sha256": "2b2aaec037254e7f55a3d009a97ff03f41468bc83b0653344b343057df2e0d40",
+      "synthetic": true,
+      "leading_silence_seconds": 0.3
+    },
+    {
+      "id": "stop_tail",
+      "language": "en",
+      "audio": "stop_tail.wav",
+      "reference": "Keep the last words when I stop recording: silver mountain garden.",
+      "voices": [
+        "Samantha"
+      ],
+      "rate_wpm": 165,
+      "duration_seconds": 4.1379375,
+      "sha256": "d3bb9dbf7b437052d9fa76549acf884df42c3ce02a953b8a343bea42cfc0b08d",
+      "synthetic": true,
+      "leading_silence_seconds": 0.3
+    },
+    {
+      "id": "silence",
+      "language": "auto",
+      "audio": "silence.wav",
+      "reference": "",
+      "voices": [],
+      "rate_wpm": 165,
+      "duration_seconds": 5.0,
+      "sha256": "262d1f34f300560a4c82ba8127ddea9e1d72946f187fdbd3e8f70ee096077aec",
+      "synthetic": true,
+      "leading_silence_seconds": 5.0
+    }
+  ],
+  "runs": [
+    {
+      "duration_seconds": 18.2953125,
+      "startup_seconds": 0.8695274170022458,
+      "first_text_seconds": 1.3292,
+      "finish_seconds_after_audio": 0.18612291603349007,
+      "text": "Today we are testing live transcription in timberloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop. I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript.",
+      "max_capture_lateness_seconds": 0.0074962080107070506,
+      "max_packet_consume_lag_seconds": 0.950827291037422,
+      "settings": {
+        "packet_ms": 100,
+        "moonshine_update_floor_seconds": 0.5,
+        "moonshine_options": {}
+      },
+      "engine": "moonshine-en",
+      "case": "english",
+      "language": "en",
+      "audio_sha256": "ea3bc885c845b8e7bf0a8a5998377d4828ef2f1a51b5dcee028b04964438de34",
+      "reference": "Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 742.21875,
+      "accuracy": {
+        "metric": "WER",
+        "errors": 3,
+        "reference_units": 52,
+        "error_rate": 0.057692307692307696
+      },
+      "evidence_directory": "results/moonshine-en-english"
+    },
+    {
+      "duration_seconds": 45.1220625,
+      "startup_seconds": 0.12967629201011732,
+      "first_text_seconds": 1.1887,
+      "finish_seconds_after_audio": 0.23676729200687419,
+      "text": "This is the first part of a longer recording today we are testing live transcription in timbrelloon the microphone sends small pieces of audio while the words appear on screen screen, please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the video. the rest of the transcript we are now starting the second part today we are testing live transcription in Timberloom the microphone sends small pieces of audio while the words words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name with name without losing the rest of the transcript. This is the final part. Please keep every word until the recording ends.",
+      "max_capture_lateness_seconds": 0.055070833035280486,
+      "max_packet_consume_lag_seconds": 2.2018053330015377,
+      "settings": {
+        "packet_ms": 100,
+        "moonshine_update_floor_seconds": 0.5,
+        "moonshine_options": {}
+      },
+      "engine": "moonshine-en",
+      "case": "long_english",
+      "language": "en",
+      "audio_sha256": "2b2aaec037254e7f55a3d009a97ff03f41468bc83b0653344b343057df2e0d40",
+      "reference": "This is the first part of a longer recording. Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript. We are now starting the second part. Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript. This is the final part. Please keep every word until the recording ends.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 862.453125,
+      "accuracy": {
+        "metric": "WER",
+        "errors": 11,
+        "reference_units": 133,
+        "error_rate": 0.08270676691729323
+      },
+      "evidence_directory": "results/moonshine-en-long_english"
+    },
+    {
+      "duration_seconds": 12.520875,
+      "startup_seconds": 0.12657983403187245,
+      "first_text_seconds": 1.236,
+      "finish_seconds_after_audio": 0.15392208301834742,
+      "text": "Please open the transcription workspace and start recording. 不要自动车意, then save the final transcript and keep the original audio.",
+      "max_capture_lateness_seconds": 0.005076415999792472,
+      "max_packet_consume_lag_seconds": 0.46361491597490456,
+      "settings": {
+        "packet_ms": 100,
+        "moonshine_update_floor_seconds": 0.5,
+        "moonshine_options": {}
+      },
+      "engine": "moonshine-en",
+      "case": "mixed",
+      "language": "auto",
+      "audio_sha256": "cebb1e7711f289fe026b1c9c7e68a6c87803a4cf1ffdca35a9c9bb25edbb4f02",
+      "reference": "Please open the transcription workspace and start recording. 现在切换到中文，保留原来的意思，不要自动翻译。 Then save the final transcript and keep the original audio.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 785.421875,
+      "accuracy": {
+        "metric": "qualitative_mixed_language",
+        "error_rate": null
+      },
+      "evidence_directory": "results/moonshine-en-mixed"
+    },
+    {
+      "duration_seconds": 5.0,
+      "startup_seconds": 1.3594646250130609,
+      "first_text_seconds": null,
+      "finish_seconds_after_audio": 0.0019880830077454448,
+      "text": "",
+      "max_capture_lateness_seconds": 0.00504529098980111,
+      "max_packet_consume_lag_seconds": 0.008886333007831038,
+      "settings": {
+        "packet_ms": 100,
+        "moonshine_update_floor_seconds": 0.5,
+        "moonshine_options": {}
+      },
+      "engine": "moonshine-en",
+      "case": "silence",
+      "language": "auto",
+      "audio_sha256": "262d1f34f300560a4c82ba8127ddea9e1d72946f187fdbd3e8f70ee096077aec",
+      "reference": "",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 388.09375,
+      "accuracy": {
+        "metric": "silence",
+        "passed": true
+      },
+      "evidence_directory": "results/moonshine-en-silence"
+    },
+    {
+      "duration_seconds": 4.1379375,
+      "startup_seconds": 0.6213522089528851,
+      "first_text_seconds": 1.224,
+      "finish_seconds_after_audio": 0.13372449998464475,
+      "text": "Keep the last words when I stop recording Silver Mountain Buzz",
+      "max_capture_lateness_seconds": 0.005068457976449281,
+      "max_packet_consume_lag_seconds": 0.13014250000892247,
+      "settings": {
+        "packet_ms": 100,
+        "moonshine_update_floor_seconds": 0.5,
+        "moonshine_options": {}
+      },
+      "engine": "moonshine-en",
+      "case": "stop_tail",
+      "language": "en",
+      "audio_sha256": "d3bb9dbf7b437052d9fa76549acf884df42c3ce02a953b8a343bea42cfc0b08d",
+      "reference": "Keep the last words when I stop recording: silver mountain garden.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 649.5625,
+      "accuracy": {
+        "metric": "WER",
+        "errors": 1,
+        "reference_units": 11,
+        "error_rate": 0.09090909090909091
+      },
+      "evidence_directory": "results/moonshine-en-stop_tail"
+    },
+    {
+      "duration_seconds": 19.5531875,
+      "startup_seconds": 0.2572253330145031,
+      "first_text_seconds": 1.1304,
+      "finish_seconds_after_audio": 0.05790004196902743,
+      "text": "今天我们测试实时语音转写,说话的时候,文字应该持续出现在屏幕上,请保留停顿前后的内容。 内容 也不要丢掉录音结束时的最后依据我们希望这个工具反应快中文准确而且能够随时修改",
+      "max_capture_lateness_seconds": 0.005107667006086558,
+      "max_packet_consume_lag_seconds": 0.1011932499706738,
+      "settings": {
+        "packet_ms": 100,
+        "moonshine_update_floor_seconds": 0.5,
+        "moonshine_options": {
+          "max_tokens_per_second": 13
+        }
+      },
+      "engine": "moonshine-zh",
+      "case": "mandarin",
+      "language": "zh",
+      "audio_sha256": "a9eadfab747d894cacb3c7bbd362e23bb27a0dd34963cf7e50aca6ff91a3eba3",
+      "reference": "今天我们测试实时语音转写。说话的时候，文字应该持续出现在屏幕上。请保留停顿前后的内容，也不要丢掉录音结束时的最后一句。我们希望这个工具反应快，中文准确，而且能够随时修改。",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 189.6875,
+      "accuracy": {
+        "metric": "CER",
+        "errors": 4,
+        "reference_units": 77,
+        "error_rate": 0.05194805194805195
+      },
+      "evidence_directory": "results/moonshine-zh-mandarin"
+    },
+    {
+      "duration_seconds": 12.520875,
+      "startup_seconds": 0.09469491697382182,
+      "first_text_seconds": 1.1504,
+      "finish_seconds_after_audio": 0.05884912504022921,
+      "text": "Please open the transcription works pays in start recording现在切换到中文 保留原来的意思不要自动翻译",
+      "max_capture_lateness_seconds": 0.024639666022267193,
+      "max_packet_consume_lag_seconds": 0.2984041250427252,
+      "settings": {
+        "packet_ms": 100,
+        "moonshine_update_floor_seconds": 0.5,
+        "moonshine_options": {
+          "max_tokens_per_second": 13
+        }
+      },
+      "engine": "moonshine-zh",
+      "case": "mixed",
+      "language": "auto",
+      "audio_sha256": "cebb1e7711f289fe026b1c9c7e68a6c87803a4cf1ffdca35a9c9bb25edbb4f02",
+      "reference": "Please open the transcription workspace and start recording. 现在切换到中文，保留原来的意思，不要自动翻译。 Then save the final transcript and keep the original audio.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 160.015625,
+      "accuracy": {
+        "metric": "qualitative_mixed_language",
+        "error_rate": null
+      },
+      "evidence_directory": "results/moonshine-zh-mixed"
+    },
+    {
+      "duration_seconds": 5.0,
+      "startup_seconds": 0.08556962496368214,
+      "first_text_seconds": null,
+      "finish_seconds_after_audio": 0.006339500017929822,
+      "text": "",
+      "max_capture_lateness_seconds": 0.005116707994602621,
+      "max_packet_consume_lag_seconds": 0.01131587502313769,
+      "settings": {
+        "packet_ms": 100,
+        "moonshine_update_floor_seconds": 0.5,
+        "moonshine_options": {
+          "max_tokens_per_second": 13
+        }
+      },
+      "engine": "moonshine-zh",
+      "case": "silence",
+      "language": "auto",
+      "audio_sha256": "262d1f34f300560a4c82ba8127ddea9e1d72946f187fdbd3e8f70ee096077aec",
+      "reference": "",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 156.625,
+      "accuracy": {
+        "metric": "silence",
+        "passed": true
+      },
+      "evidence_directory": "results/moonshine-zh-silence"
+    },
+    {
+      "duration_seconds": 18.2953125,
+      "startup_seconds": 1.9563137920340523,
+      "first_text_seconds": 1.0453,
+      "finish_seconds_after_audio": 0.09040741701610244,
+      "text": "Today we are testing live transcription in timberloom.  The microphone sends small pieces of audio while the words appear on screen.  Please preserve the final sentence when I stop recording.  A useful voice tool should respond quickly handle pauses and let me correct a name without losing the rest of the transcript. ",
+      "max_capture_lateness_seconds": 0.006239792017731838,
+      "max_packet_consume_lag_seconds": 0.16856920899590477,
+      "settings": {
+        "packet_ms": 100,
+        "att_context_size": [
+          56,
+          3
+        ],
+        "max_decode_tokens": 4
+      },
+      "engine": "nemotron",
+      "case": "english",
+      "language": "en",
+      "audio_sha256": "ea3bc885c845b8e7bf0a8a5998377d4828ef2f1a51b5dcee028b04964438de34",
+      "reference": "Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 479.5,
+      "accuracy": {
+        "metric": "WER",
+        "errors": 1,
+        "reference_units": 52,
+        "error_rate": 0.019230769230769232
+      },
+      "evidence_directory": "results/nemotron-english"
+    },
+    {
+      "duration_seconds": 45.1220625,
+      "startup_seconds": 1.464823208982125,
+      "first_text_seconds": 0.7413,
+      "finish_seconds_after_audio": 0.16891945896949778,
+      "text": "This is the first part of a longer recording today.  We are testing live transcription in timberloom.  The microphone sent small pieces of audio while the words appear on screen.  Please preserve the final sentence when I stop recording a useful voice tool should respond quickly handle pauses and let me correct a name without losing the rest of the transcript.  We are now starting the second part today.  We are testing live transcription in timberloom, the microphone sent small pieces of audio while the words appear on screen.  Please preserve the final sentence when I stop recording a useful voice tool should respond quickly handle pauses and let me correct a name without losing the rest of the transcript.  This is the final part please keep every word until the recording ends. ",
+      "max_capture_lateness_seconds": 0.009898124996107066,
+      "max_packet_consume_lag_seconds": 0.1602584589854814,
+      "settings": {
+        "packet_ms": 100,
+        "att_context_size": [
+          56,
+          3
+        ],
+        "max_decode_tokens": 4
+      },
+      "engine": "nemotron",
+      "case": "long_english",
+      "language": "en",
+      "audio_sha256": "2b2aaec037254e7f55a3d009a97ff03f41468bc83b0653344b343057df2e0d40",
+      "reference": "This is the first part of a longer recording. Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript. We are now starting the second part. Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript. This is the final part. Please keep every word until the recording ends.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 829.234375,
+      "accuracy": {
+        "metric": "WER",
+        "errors": 4,
+        "reference_units": 133,
+        "error_rate": 0.03007518796992481
+      },
+      "evidence_directory": "results/nemotron-long_english"
+    },
+    {
+      "duration_seconds": 19.5531875,
+      "startup_seconds": 1.762740499980282,
+      "first_text_seconds": 1.0385,
+      "finish_seconds_after_audio": 0.07258158298069617,
+      "text": "今天我们测试时时语音转写, 说话的时候, 文字应该持续出现在屏幕上, 请保留停顿前后的内容, 也不要丢掉录音结束时的最后依据。  我们希望这个工具反应快, 中文准确, 而且能够随时修改。 ",
+      "max_capture_lateness_seconds": 0.005083665985146979,
+      "max_packet_consume_lag_seconds": 0.16792174999136478,
+      "settings": {
+        "packet_ms": 100,
+        "att_context_size": [
+          56,
+          3
+        ],
+        "max_decode_tokens": 4
+      },
+      "engine": "nemotron",
+      "case": "mandarin",
+      "language": "zh",
+      "audio_sha256": "a9eadfab747d894cacb3c7bbd362e23bb27a0dd34963cf7e50aca6ff91a3eba3",
+      "reference": "今天我们测试实时语音转写。说话的时候，文字应该持续出现在屏幕上。请保留停顿前后的内容，也不要丢掉录音结束时的最后一句。我们希望这个工具反应快，中文准确，而且能够随时修改。",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 691.109375,
+      "accuracy": {
+        "metric": "CER",
+        "errors": 3,
+        "reference_units": 77,
+        "error_rate": 0.03896103896103896
+      },
+      "evidence_directory": "results/nemotron-mandarin"
+    },
+    {
+      "duration_seconds": 12.520875,
+      "startup_seconds": 1.4599054159480147,
+      "first_text_seconds": 1.0379,
+      "finish_seconds_after_audio": 0.05002454102411846,
+      "text": "Please open the transcription workspace and start recording。 现在切换到中文, 保留原来的意思, 不要自动翻译, then save the final transcript and keep the original audio. ",
+      "max_capture_lateness_seconds": 0.015072790975683148,
+      "max_packet_consume_lag_seconds": 0.06261558301048353,
+      "settings": {
+        "packet_ms": 100,
+        "att_context_size": [
+          56,
+          3
+        ],
+        "max_decode_tokens": 4
+      },
+      "engine": "nemotron",
+      "case": "mixed",
+      "language": "auto",
+      "audio_sha256": "cebb1e7711f289fe026b1c9c7e68a6c87803a4cf1ffdca35a9c9bb25edbb4f02",
+      "reference": "Please open the transcription workspace and start recording. 现在切换到中文，保留原来的意思，不要自动翻译。 Then save the final transcript and keep the original audio.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 835.046875,
+      "accuracy": {
+        "metric": "qualitative_mixed_language",
+        "error_rate": null
+      },
+      "evidence_directory": "results/nemotron-mixed"
+    },
+    {
+      "duration_seconds": 5.0,
+      "startup_seconds": 1.4806596669950522,
+      "first_text_seconds": null,
+      "finish_seconds_after_audio": 0.03676495898980647,
+      "text": "",
+      "max_capture_lateness_seconds": 0.005050166964065461,
+      "max_packet_consume_lag_seconds": 0.03301441698567942,
+      "settings": {
+        "packet_ms": 100,
+        "att_context_size": [
+          56,
+          3
+        ],
+        "max_decode_tokens": 4
+      },
+      "engine": "nemotron",
+      "case": "silence",
+      "language": "auto",
+      "audio_sha256": "262d1f34f300560a4c82ba8127ddea9e1d72946f187fdbd3e8f70ee096077aec",
+      "reference": "",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 834.0,
+      "accuracy": {
+        "metric": "silence",
+        "passed": true
+      },
+      "evidence_directory": "results/nemotron-silence"
+    },
+    {
+      "duration_seconds": 4.1379375,
+      "startup_seconds": 5.7586312079802155,
+      "first_text_seconds": 2.0367,
+      "finish_seconds_after_audio": 0.06066783397877629,
+      "text": "Keek the last words when I stop recording silver mountain garden. ",
+      "max_capture_lateness_seconds": 0.005043124989606462,
+      "max_packet_consume_lag_seconds": 1.171680416970048,
+      "settings": {
+        "packet_ms": 100,
+        "att_context_size": [
+          56,
+          3
+        ],
+        "max_decode_tokens": 4
+      },
+      "engine": "nemotron",
+      "case": "stop_tail",
+      "language": "en",
+      "audio_sha256": "d3bb9dbf7b437052d9fa76549acf884df42c3ce02a953b8a343bea42cfc0b08d",
+      "reference": "Keep the last words when I stop recording: silver mountain garden.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 785.890625,
+      "accuracy": {
+        "metric": "WER",
+        "errors": 1,
+        "reference_units": 11,
+        "error_rate": 0.09090909090909091
+      },
+      "evidence_directory": "results/nemotron-stop_tail"
+    },
+    {
+      "language": "en",
+      "duration_seconds": 18.295312499999987,
+      "startup_seconds": 1.896,
+      "first_text_seconds": 4.317,
+      "finish_seconds_after_audio": 1.439,
+      "text": "Today we are testing live transcription in Timberloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when i stop recording. A useful voice tool should respond quickly. Handle pauses. And let me correct a name without losing the rest of the transcript.",
+      "engine": "whisper",
+      "case": "english",
+      "audio_sha256": "ea3bc885c845b8e7bf0a8a5998377d4828ef2f1a51b5dcee028b04964438de34",
+      "reference": "Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 763.453125,
+      "accuracy": {
+        "metric": "WER",
+        "errors": 1,
+        "reference_units": 52,
+        "error_rate": 0.019230769230769232
+      },
+      "evidence_directory": "results/whisper-english"
+    },
+    {
+      "language": "en",
+      "duration_seconds": 45.12206250000037,
+      "startup_seconds": 1.989,
+      "first_text_seconds": 4.972,
+      "finish_seconds_after_audio": 3.794,
+      "text": "This is the first part of a longer recording. Today we are testing live transcription in Timberloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly. Handle pauses. And let me correct a name without losing the rest of the transcript. transcript we are now starting the second part today we are testing live transcription in Timberloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when i stop recording. A useful voice tool should respond quickly. Handle pauses, and let me correct a name without losing the rest of the transcript. This is the final part. Please keep every word until the recording ends.",
+      "engine": "whisper",
+      "case": "long_english",
+      "audio_sha256": "2b2aaec037254e7f55a3d009a97ff03f41468bc83b0653344b343057df2e0d40",
+      "reference": "This is the first part of a longer recording. Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript. We are now starting the second part. Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript. This is the final part. Please keep every word until the recording ends.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 807.84375,
+      "accuracy": {
+        "metric": "WER",
+        "errors": 3,
+        "reference_units": 133,
+        "error_rate": 0.022556390977443608
+      },
+      "evidence_directory": "results/whisper-long_english"
+    },
+    {
+      "language": "zh",
+      "duration_seconds": 19.553187500000007,
+      "startup_seconds": 1.954,
+      "first_text_seconds": 4.573,
+      "finish_seconds_after_audio": 2.216,
+      "text": "今天我们测试时时语音转写说话的时候文字应该持续出现在屏幕上请保留停顿前后的内容也不要丢掉录音结束时的最后一举我们希望这个工具反应快中文准确而且能够随时修改",
+      "engine": "whisper",
+      "case": "mandarin",
+      "audio_sha256": "a9eadfab747d894cacb3c7bbd362e23bb27a0dd34963cf7e50aca6ff91a3eba3",
+      "reference": "今天我们测试实时语音转写。说话的时候，文字应该持续出现在屏幕上。请保留停顿前后的内容，也不要丢掉录音结束时的最后一句。我们希望这个工具反应快，中文准确，而且能够随时修改。",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 805.765625,
+      "accuracy": {
+        "metric": "CER",
+        "errors": 2,
+        "reference_units": 77,
+        "error_rate": 0.025974025974025976
+      },
+      "evidence_directory": "results/whisper-mandarin"
+    },
+    {
+      "language": "auto",
+      "duration_seconds": 12.520874999999972,
+      "startup_seconds": 4.284,
+      "first_text_seconds": 6.16,
+      "finish_seconds_after_audio": 4.787,
+      "text": "请开启的通知workspace and start recording.现在切换到中文,保留原来的意思,不要自动翻译。Then save the final transcript and keep the original audio.",
+      "engine": "whisper",
+      "case": "mixed",
+      "audio_sha256": "cebb1e7711f289fe026b1c9c7e68a6c87803a4cf1ffdca35a9c9bb25edbb4f02",
+      "reference": "Please open the transcription workspace and start recording. 现在切换到中文，保留原来的意思，不要自动翻译。 Then save the final transcript and keep the original audio.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 626.59375,
+      "accuracy": {
+        "metric": "qualitative_mixed_language",
+        "error_rate": null
+      },
+      "evidence_directory": "results/whisper-mixed"
+    },
+    {
+      "duration_seconds": 5.0,
+      "startup_seconds": 2.144,
+      "first_text_seconds": null,
+      "finish_seconds_after_audio": 0.08300000000000018,
+      "text": "",
+      "terminal_status": "no_speech",
+      "timing_source": "ready event approximation for silence only",
+      "baseline_helper_exit_code": 1,
+      "baseline_helper_limitation": "Expected no-speech result has no saved transcript; legacy helper tries to read one.",
+      "engine": "whisper",
+      "case": "silence",
+      "language": "auto",
+      "audio_sha256": "262d1f34f300560a4c82ba8127ddea9e1d72946f187fdbd3e8f70ee096077aec",
+      "reference": "",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 533.0625,
+      "accuracy": {
+        "metric": "silence",
+        "passed": true
+      },
+      "evidence_directory": "results/whisper-silence-retry"
+    },
+    {
+      "language": "en",
+      "duration_seconds": 4.137937500000001,
+      "startup_seconds": 4.02,
+      "first_text_seconds": 4.671,
+      "finish_seconds_after_audio": 2.064,
+      "text": "Keep the last words when I stop recording. Silver Mountain Garden.",
+      "engine": "whisper",
+      "case": "stop_tail",
+      "audio_sha256": "d3bb9dbf7b437052d9fa76549acf884df42c3ce02a953b8a343bea42cfc0b08d",
+      "reference": "Keep the last words when I stop recording: silver mountain garden.",
+      "synthetic": true,
+      "peak_process_tree_rss_mib": 735.234375,
+      "accuracy": {
+        "metric": "WER",
+        "errors": 0,
+        "reference_units": 11,
+        "error_rate": 0.0
+      },
+      "evidence_directory": "results/whisper-stop_tail"
+    }
+  ],
+  "limits": [
+    "Synthetic smoke fixtures only",
+    "One main run per engine and applicable fixture",
+    "RSS is not total unified GPU memory",
+    "No real microphone or UI latency measurement"
+  ],
+  "raw_artifacts": "build/asr-comparison-20261003/",
+  "assembly_audit": {
+    "duration_seconds": 18.2953125,
+    "startup_seconds": 1.3517481660237536,
+    "first_text_seconds": 1.3091,
+    "finish_seconds_after_audio": 0.23759966696379564,
+    "text": "Today we are testing live transcription in Timberloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop. I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript.",
+    "max_capture_lateness_seconds": 0.013530416984576021,
+    "max_packet_consume_lag_seconds": 0.37366491699358484,
+    "settings": {
+      "packet_ms": 100,
+      "moonshine_update_floor_seconds": 0.5,
+      "moonshine_options": {}
+    },
+    "native_final_lines": [
+      {
+        "line_id": 5195729757728424078,
+        "start_time": 0.09599995613098145,
+        "duration": 10.04800033569336,
+        "text": "Today we are testing live transcription in Timberloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop.",
+        "is_complete": true
+      },
+      {
+        "line_id": 5195729757728424079,
+        "start_time": 9.663999557495117,
+        "duration": 8.607999801635742,
+        "text": "I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript.",
+        "is_complete": true
+      }
+    ],
+    "engine": "moonshine-en",
+    "case": "english",
+    "language": "en",
+    "audio_sha256": "ea3bc885c845b8e7bf0a8a5998377d4828ef2f1a51b5dcee028b04964438de34",
+    "reference": "Today we are testing live transcription in Timbreloom. The microphone sends small pieces of audio while the words appear on screen. Please preserve the final sentence when I stop recording. A useful voice tool should respond quickly, handle pauses, and let me correct a name without losing the rest of the transcript.",
+    "synthetic": true,
+    "peak_process_tree_rss_mib": 956.3125,
+    "accuracy": {
+      "metric": "WER",
+      "errors": 3,
+      "reference_units": 52,
+      "error_rate": 0.057692307692307696
+    },
+    "line_overlap_seconds": 0.48000073432922363,
+    "matches_native_final_transcript": true,
+    "evidence_directory": "results/moonshine-en-english-final-audit"
+  },
+  "sources": {
+    "retrieved_at": "2026-10-03T15:22:55.978683+00:00",
+    "sources": {
+      "moonshine": "https://raw.githubusercontent.com/moonshine-ai/moonshine/main/LICENSE",
+      "nemotron_upstream_card": "https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b/raw/main/README.md"
+    },
+    "moonshine_models": {
+      "en": {
+        "model_arch": 4,
+        "download_url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21",
+        "is_default": false,
+        "language": "en"
+      },
+      "zh": {
+        "model_arch": 2,
+        "download_url": "https://download.moonshine.ai/model/tiny-streaming-zh/quantized_26_08_24",
+        "is_default": true,
+        "language": "zh"
+      }
+    }
+  },
+  "harness_sha256": "e4c60afb52655fada6164fadf63c77a1739813f3e4904ca5554956a24fc93b66",
+  "cleanup": {
+    "worker_groups_checked": 22,
+    "alive_owned_processes": []
+  }
+}

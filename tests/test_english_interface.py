@@ -23,6 +23,8 @@ def test_maintained_source_and_documentation_have_no_han_copy() -> None:
     files = list(ROOT.glob("*.md")) + [ROOT / "app.py"]
     for folder in ("macos", "scripts", "static", "timbreloom", "docs", "tests", "packaging"):
         files.extend(path for path in (ROOT / folder).rglob("*")
-                     if path.suffix in {".py", ".js", ".mjs", ".swift", ".html", ".json", ".md", ".sh"})
+                     if path.suffix in {".py", ".js", ".mjs", ".swift", ".html", ".json", ".md", ".sh"}
+                     # Raw benchmark transcripts are multilingual evidence, not interface or documentation copy.
+                     and not (path.parent == ROOT / "docs/benchmarks" and path.suffix == ".json"))
     untranslated = [str(path.relative_to(ROOT)) for path in files if han.search(path.read_text())]
     assert not untranslated, f"Untranslated copy in: {untranslated}"
