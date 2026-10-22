@@ -1,5 +1,9 @@
 import { createProgressiveAudioPlayer } from "./audio-player.js?v=2";
 import { countLabel } from "./text-format.js?v=1";
+import {
+  timelineGeometry, timelineTimeAtX, timelineXAtTime, zoomTimeline,
+  timelineRuler, formatTimelineTime,
+} from "./timeline-viewport.js?v=1";
 
 export function createDubbingWorkspace({
   getVoices, getTranscripts, isGeminiConfigured, formatDuration,
@@ -80,6 +84,8 @@ export function createDubbingWorkspace({
   let dubProjectDirty = false;
   let dubWaveform = null;
   let dubPlayheadSeconds = 0;
+  let dubTimelineView = timelineGeometry();
+  let dubTimelineFrame = 0;
   const selectedDubSegments = new Set();
   const dirtyDubSegments = new Set();
   const dubSegmentRows = new Map();
@@ -91,6 +97,148 @@ export function createDubbingWorkspace({
     toggle: dubStreamToggle,
     waitingLabel: "Waiting for first segment",
   });
+
+  const dubTimelineTools = document.createElement("div");
+  dubTimelineTools.className = "dub-timeline-tools";
+  const dubTimelineZoom = document.createElement("div");
+  dubTimelineZoom.className = "dub-timeline-zoom";
+  dubTimelineZoom.setAttribute("role", "group");
+  dubTimelineZoom.setAttribute("aria-label", "Timeline zoom");
+  const dubTimelineZoomLabel = document.createElement("span");
+  dubTimelineZoomLabel.className = "dub-timeline-zoom-label";
+  dubTimelineZoomLabel.textContent = "Zoom";
+  function timelineButton(id, text, label) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.id = id;
+    button.textContent = text;
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    return button;
+  }
+  const dubTimelineZoomOut = timelineButton("dubTimelineZoomOut", "−", "Zoom out (-)");
+  const dubTimelineZoomIn = timelineButton("dubTimelineZoomIn", "+", "Zoom in (+)");
+  const dubTimelineFit = timelineButton("dubTimelineFit", "Fit", "Fit the full recording (0)");
+  const dubTimelineZoomLevel = document.createElement("output");
+  dubTimelineZoomLevel.id = "dubTimelineZoomLevel";
+  dubTimelineZoomLevel.setAttribute("aria-label", "Timeline zoom level");
+  dubTimelineZoomLevel.setAttribute("aria-live", "polite");
+  dubTimelineZoomLevel.textContent = "1×";
+  dubTimelineZoom.append(dubTimelineZoomLabel, dubTimelineZoomOut, dubTimelineZoomLevel, dubTimelineZoomIn, dubTimelineFit);
+  const dubTimelineRange = document.createElement("span");
+  dubTimelineRange.className = "dub-timeline-range";
+  dubTimelineRange.setAttribute("aria-label", "Visible time range");
+  dubTimelineTools.append(dubTimelineZoom, dubTimelineRange);
+  dubWaveformShell.before(dubTimelineTools);
+
+  const dubTimelineViewport = document.createElement("div");
+  dubTimelineViewport.id = "dubTimelineViewport";
+  dubTimelineViewport.className = "dub-timeline-viewport";
+  dubTimelineViewport.tabIndex = 0;
+  dubTimelineViewport.setAttribute("role", "region");
+  dubTimelineViewport.setAttribute("aria-label", "Scrollable audio timeline");
+  dubTimelineViewport.setAttribute("aria-describedby", "dubTimelineHelp");
+  const dubTimelineContent = document.createElement("div");
+  dubTimelineContent.className = "dub-timeline-content";
+  const dubTimelineRuler = document.createElement("div");
+  dubTimelineRuler.id = "dubTimelineRuler";
+  dubTimelineRuler.className = "dub-timeline-ruler";
+  dubTimelineRuler.setAttribute("aria-hidden", "true");
+  dubWaveformShell.before(dubTimelineViewport);
+  dubTimelineContent.append(dubTimelineRuler, dubWaveformShell);
+  dubTimelineViewport.append(dubTimelineContent);
+  const dubTimelineHelp = dubPlayheadTime.nextElementSibling;
+  if (dubTimelineHelp) {
+    dubTimelineHelp.id = "dubTimelineHelp";
+    dubTimelineHelp.textContent = "Click to seek. Select a segment to split at the playhead. Focus the timeline: + / - to zoom, arrow keys to scroll. Option + scroll zooms at the pointer.";
+  }
+
+  function currentTimelineGeometry() {
+    return timelineGeometry({
+      duration: currentDubProject?.duration_seconds,
+      viewportWidth: dubTimelineViewport.clientWidth || dubTimelineView.viewportWidth,
+      zoom: dubTimelineView.zoom,
+      scrollLeft: dubTimelineViewport.scrollLeft,
+    });
+  }
+
+  function drawDubTimelineRuler() {
+    const { step, ticks } = timelineRuler(dubTimelineView);
+    const fragment = document.createDocumentFragment();
+    for (const tick of ticks) {
+      const label = document.createElement("span");
+      label.className = "dub-timeline-tick";
+      if (tick.time === dubTimelineView.duration && tick.time > 0) label.classList.add("is-end");
+      label.style.left = `${tick.x}px`;
+      label.textContent = formatTimelineTime(tick.time, step < 1);
+      fragment.append(label);
+      for (let division = 1; division < 4; division += 1) {
+        const time = tick.time + step * division / 4;
+        if (time > dubTimelineView.duration) break;
+        const minor = document.createElement("span");
+        minor.className = "dub-timeline-tick is-minor";
+        minor.style.left = `${time * dubTimelineView.pixelsPerSecond}px`;
+        fragment.append(minor);
+      }
+    }
+    dubTimelineRuler.replaceChildren(fragment);
+    const zoom = dubTimelineView.zoom;
+    const zoomLabel = `${Number(zoom.toFixed(1))}×`;
+    if (dubTimelineZoomLevel.textContent !== zoomLabel) dubTimelineZoomLevel.textContent = zoomLabel;
+    dubTimelineZoomOut.disabled = zoom <= 1.001;
+    dubTimelineZoomIn.disabled = zoom >= dubTimelineView.maxZoom - 0.001;
+    dubTimelineFit.disabled = zoom <= 1.001;
+    dubTimelineRange.textContent = `${formatTimelineTime(dubTimelineView.startTime, step < 1)} - ${formatTimelineTime(dubTimelineView.endTime, step < 1)} visible`;
+  }
+
+  function applyDubTimelineGeometry(geometry) {
+    dubTimelineView = geometry;
+    // A relative width follows native window resizes before ResizeObserver runs.
+    dubTimelineContent.style.width = `${geometry.zoom * 100}%`;
+    dubTimelineViewport.scrollLeft = geometry.scrollLeft;
+    drawDubTimelineRuler();
+    drawDubWaveform();
+  }
+
+  function resizeDubTimeline(reset = false) {
+    const width = dubTimelineViewport.clientWidth;
+    if (reset) {
+      dubTimelineView = timelineGeometry({ duration: currentDubProject?.duration_seconds, viewportWidth: width || 1 });
+    }
+    if (!width) return;
+    const old = dubTimelineView;
+    let next = timelineGeometry({
+      duration: currentDubProject?.duration_seconds,
+      viewportWidth: width,
+      zoom: reset ? 1 : old.zoom,
+      scrollLeft: reset ? 0 : dubTimelineViewport.scrollLeft,
+    });
+    if (!reset && old.zoom > 1 && old.viewportWidth !== width) {
+      const centerTime = timelineTimeAtX(old, old.viewportWidth / 2);
+      next = zoomTimeline(next, next.zoom, width / 2, centerTime);
+    }
+    applyDubTimelineGeometry(next);
+  }
+
+  function zoomDubTimeline(zoom, pointerX = null) {
+    if (!currentDubProject) return;
+    const view = currentTimelineGeometry();
+    let anchorX = pointerX;
+    if (anchorX === null) {
+      const playheadX = timelineXAtTime(view, dubPlayheadSeconds);
+      const selected = currentDubProject.segments.find((segment) => selectedDubSegments.has(segment.id));
+      const selectedX = selected ? timelineXAtTime(view, (selected.start + selected.end) / 2) : -1;
+      anchorX = playheadX >= 0 && playheadX <= view.viewportWidth
+        ? playheadX
+        : selectedX >= 0 && selectedX <= view.viewportWidth ? selectedX : view.viewportWidth / 2;
+    }
+    applyDubTimelineGeometry(zoomTimeline(view, zoom, anchorX));
+  }
+
+  function timelineTimeForPointer(event) {
+    const bounds = dubTimelineViewport.getBoundingClientRect();
+    return timelineTimeAtX(currentTimelineGeometry(), event.clientX - bounds.left - dubTimelineViewport.clientLeft);
+  }
 
   function populateDubVoiceOptions() {
     const previous = dubDefaultVoice.value;
@@ -284,6 +432,16 @@ export function createDubbingWorkspace({
     updateDubPlayhead();
   }
 
+  function revealDubTime(seconds) {
+    const view = currentTimelineGeometry();
+    const x = timelineXAtTime(view, seconds);
+    const inset = Math.min(32, view.viewportWidth / 4);
+    if (x < inset || x > view.viewportWidth - inset) {
+      const scrollLeft = seconds * view.pixelsPerSecond - (x < inset ? inset : view.viewportWidth - inset);
+      applyDubTimelineGeometry(timelineGeometry({ ...view, scrollLeft }));
+    }
+  }
+
   function updateDubPlayhead(seconds = null) {
     if (seconds !== null) dubPlayheadSeconds = seconds;
     const duration = Math.max(0.001, Number(currentDubProject?.duration_seconds) || 0);
@@ -294,9 +452,13 @@ export function createDubbingWorkspace({
 
   function drawDubWaveform() {
     const peaks = dubWaveform?.peaks || [];
-    const width = Math.max(1, Math.round(dubWaveformShell.clientWidth));
+    // Draw only the visible slice. A long recording can be zoomed without
+    // allocating a canvas as wide as the entire recording.
+    const width = Math.max(1, Math.ceil(dubTimelineView.viewportWidth));
     const height = Math.max(1, Math.round(dubWaveformShell.clientHeight));
-    const scale = window.devicePixelRatio || 1;
+    const scale = Math.min(3, window.devicePixelRatio || 1);
+    dubWaveformCanvas.style.left = `${dubTimelineView.scrollLeft}px`;
+    dubWaveformCanvas.style.width = `${100 / dubTimelineView.zoom}%`;
     dubWaveformCanvas.width = Math.round(width * scale);
     dubWaveformCanvas.height = Math.round(height * scale);
     const context = dubWaveformCanvas.getContext("2d");
@@ -306,7 +468,12 @@ export function createDubbingWorkspace({
     context.fillStyle = "rgba(70, 82, 64, 0.55)";
     const center = height / 2;
     for (let x = 0; x < width; x += 1) {
-      const peak = peaks[Math.min(peaks.length - 1, Math.floor((x / width) * peaks.length))];
+      const start = (dubTimelineView.scrollLeft + x) / dubTimelineView.contentWidth;
+      const end = (dubTimelineView.scrollLeft + x + 1) / dubTimelineView.contentWidth;
+      const firstPeak = Math.min(peaks.length - 1, Math.floor(start * peaks.length));
+      const lastPeak = Math.min(peaks.length, Math.max(firstPeak + 1, Math.ceil(end * peaks.length)));
+      let peak = 0;
+      for (let index = firstPeak; index < lastPeak; index += 1) peak = Math.max(peak, peaks[index]);
       const amplitude = Math.max(1, peak * (height * 0.43));
       context.fillRect(x, center - amplitude, 1, amplitude * 2);
     }
@@ -336,7 +503,7 @@ export function createDubbingWorkspace({
     for (const segment of project.segments) {
       const left = Math.min(100, Math.max(0, (segment.start / duration) * 100));
       const slotDuration = Math.max(0, segment.end - segment.start);
-      const slotWidth = Math.max(0.35, Math.min(100 - left, (slotDuration / duration) * 100));
+      const slotWidth = Math.max(0, Math.min(100 - left, (slotDuration / duration) * 100));
       const slot = document.createElement("button");
       slot.type = "button";
       slot.className = "dub-timeline-slot";
@@ -353,16 +520,15 @@ export function createDubbingWorkspace({
       slot.addEventListener("click", (event) => {
         event.stopPropagation();
         setDubSegmentSelection(segment.id, true, true);
-        const bounds = dubWaveformShell.getBoundingClientRect();
-        const ratio = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
-        seekDubSource(ratio * duration);
+        // Keyboard activation has no pointer coordinate.
+        seekDubSource(event.detail === 0 ? segment.start : timelineTimeForPointer(event));
         dubSegmentRows.get(segment.id)?.row.scrollIntoView({ behavior: "smooth", block: "nearest" });
       });
       dubTimelineTrack.append(slot);
 
       if (segment.render.duration_seconds > 0) {
         const renderWidth = Math.max(
-          0.35,
+          0,
           Math.min(100 - left, ((segment.render.fitted_duration_seconds || segment.render.duration_seconds) / duration) * 100),
         );
         const rendered = document.createElement("span");
@@ -467,6 +633,7 @@ export function createDubbingWorkspace({
     dubExportResult.hidden = true;
     dubExportMp4.hidden = true;
     if (previousProjectId !== project.id) dubPlayheadSeconds = 0;
+    resizeDubTimeline(previousProjectId !== project.id);
     updateDubPlayhead();
     populateDubRoles(project);
     renderDubQuality(project);
@@ -509,6 +676,7 @@ export function createDubbingWorkspace({
       timeButton.addEventListener("click", () => {
         setDubSegmentSelection(segment.id, true, true);
         seekDubSource(segment.start);
+        revealDubTime(segment.start);
       });
 
       const source = document.createElement("div");
@@ -959,9 +1127,46 @@ export function createDubbingWorkspace({
 
   dubWaveformShell.addEventListener("click", (event) => {
     if (!currentDubProject) return;
-    const bounds = dubWaveformShell.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
-    seekDubSource(ratio * currentDubProject.duration_seconds);
+    seekDubSource(timelineTimeForPointer(event));
+  });
+
+  dubTimelineZoomIn.addEventListener("click", () => zoomDubTimeline(dubTimelineView.zoom * 1.5));
+  dubTimelineZoomOut.addEventListener("click", () => zoomDubTimeline(dubTimelineView.zoom / 1.5));
+  dubTimelineFit.addEventListener("click", () => zoomDubTimeline(1));
+  dubTimelineViewport.addEventListener("scroll", () => {
+    if (dubTimelineFrame) return;
+    dubTimelineFrame = window.requestAnimationFrame(() => {
+      dubTimelineFrame = 0;
+      dubTimelineView = currentTimelineGeometry();
+      drawDubTimelineRuler();
+      drawDubWaveform();
+    });
+  }, { passive: true });
+  dubTimelineViewport.addEventListener("wheel", (event) => {
+    if (!event.altKey || !currentDubProject || !event.deltaY) return;
+    event.preventDefault();
+    const bounds = dubTimelineViewport.getBoundingClientRect();
+    const anchorX = event.clientX - bounds.left - dubTimelineViewport.clientLeft;
+    const factor = Math.exp(-Math.max(-100, Math.min(100, event.deltaY)) * 0.006);
+    zoomDubTimeline(dubTimelineView.zoom * factor, anchorX);
+  }, { passive: false });
+  dubTimelineViewport.addEventListener("keydown", (event) => {
+    if (event.target !== dubTimelineViewport || event.altKey || event.ctrlKey || event.metaKey) return;
+    const view = currentTimelineGeometry();
+    const scrollBy = view.viewportWidth * (event.shiftKey ? 0.8 : 0.2);
+    let scrollLeft = null;
+    if (event.key === "ArrowLeft") scrollLeft = view.scrollLeft - scrollBy;
+    else if (event.key === "ArrowRight") scrollLeft = view.scrollLeft + scrollBy;
+    else if (event.key === "PageUp") scrollLeft = view.scrollLeft - view.viewportWidth * 0.8;
+    else if (event.key === "PageDown") scrollLeft = view.scrollLeft + view.viewportWidth * 0.8;
+    else if (event.key === "Home") scrollLeft = 0;
+    else if (event.key === "End") scrollLeft = view.maxScrollLeft;
+    else if (event.key === "+" || event.key === "=") zoomDubTimeline(view.zoom * 1.5);
+    else if (event.key === "-" || event.key === "_") zoomDubTimeline(view.zoom / 1.5);
+    else if (event.key === "0") zoomDubTimeline(1);
+    else return;
+    event.preventDefault();
+    if (scrollLeft !== null) applyDubTimelineGeometry(timelineGeometry({ ...view, scrollLeft }));
   });
 
   for (const player of [dubSourceAudio, dubSourceVideo]) {
@@ -974,7 +1179,11 @@ export function createDubbingWorkspace({
     });
   }
 
-  window.addEventListener("resize", drawDubWaveform);
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(() => resizeDubTimeline()).observe(dubTimelineViewport);
+  } else {
+    window.addEventListener("resize", () => resizeDubTimeline());
+  }
 
   dubSplitButton.addEventListener("click", async () => {
     if (!currentDubProject || selectedDubSegments.size !== 1) return;

@@ -57,6 +57,13 @@ A service started in Terminal remains owned by that terminal.
 A process supervisor cleans up app-owned Python, FFmpeg, ASR, and conversion subprocesses if the app exits unexpectedly.
 On restart, TTS, ASR, dubbing generation, and export recover according to their persisted state; interrupted voice conversions can be retried and reuse valid completed segments.
 
+## Workspace controls
+
+Use the dubbing timeline's **+**, **-**, and **Fit** buttons to inspect timing.
+When the timeline has keyboard focus, use + or - to zoom, 0 to fit, and arrow keys to scroll.
+Option-scroll zooms around the pointer.
+Zoom and scrolling preserve the playhead time and selected segments.
+
 ## Models and optional tools
 
 Open **Models** to manage three independent downloads: Qwen for cloning and dubbing, Whisper for transcription, and Seed-VC with its supporting models for conversion.

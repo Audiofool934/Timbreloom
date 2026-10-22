@@ -1,6 +1,6 @@
 import { createProgressiveAudioPlayer } from "./audio-player.js?v=2";
 import { createAudioRecorder, cancelRecordingOutside, cancelActiveRecording, cancelRecordingFor } from "./audio-recorder.js?v=4";
-import { createDubbingWorkspace } from "./dubbing.js?v=4";
+import { createDubbingWorkspace } from "./dubbing.js?v=5";
 import { readJob, JobConnectionError } from "./job-client.js?v=2";
 import { installDesktop, notifyDesktop } from "./desktop.js?v=6";
 import { installModelManager } from "./model-manager.js?v=2";

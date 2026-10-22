@@ -36,7 +36,7 @@ The English interface preserves the existing visual identity, with concise label
 | Audio preview | Play, pause, seek, speed, loading errors, and retry; video uses system controls |
 | Metrics | Conversion time divided by displayed audio duration, avoiding stale historical ratio fields |
 | Transcript editor | Timestamp seeking, selection, text edits, save, subtitles, and optional text tools |
-| Dubbing editor | Original text and dialogue, roles, voices, timeline, timing inputs, generation, and export state |
+| Dubbing editor | Original text and dialogue, roles, voices, zoomable timeline, timing inputs, generation, export state, and focus mode |
 | Pending renders | Neutral preparation states; actual generation failures retain error feedback |
 | Sticky toolbar | Horizontal controls that wrap at narrow widths; segment scrolling reserves toolbar space |
 | Errors and drafts | Dismissible errors and draft-save status |

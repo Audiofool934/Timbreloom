@@ -1,0 +1,171 @@
+.dub-timeline-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 14px 0 8px;
+}
+
+.dub-timeline-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dub-timeline-zoom-label {
+  margin-right: 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.dub-timeline-zoom button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  background: var(--panel, #fffefa);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dub-timeline-zoom button:hover:not(:disabled) {
+  border-color: var(--accent, #6e854a);
+  background: var(--accent-soft, #eef5de);
+}
+
+.dub-timeline-zoom button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.dub-timeline-zoom output {
+  min-width: 42px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.dub-timeline-range {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dub-timeline-viewport {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--panel, #fffefa);
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+
+.dub-timeline-viewport:focus-visible,
+.dub-timeline-zoom button:focus-visible {
+  outline: 2px solid var(--accent, #6e854a);
+  outline-offset: 3px;
+}
+
+.dub-timeline-content {
+  position: relative;
+  min-width: 100%;
+}
+
+.dub-timeline-ruler {
+  position: relative;
+  height: 29px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--soft-line);
+  color: var(--muted);
+  background: var(--panel, #fffefa);
+  pointer-events: none;
+  user-select: none;
+}
+
+.dub-timeline-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--soft-line);
+  padding: 4px 5px 0;
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+
+.dub-timeline-tick.is-minor {
+  top: auto;
+  height: 5px;
+  padding: 0;
+}
+
+.dub-timeline-tick.is-end {
+  transform: translateX(-100%);
+  border-left: 0;
+  border-right: 1px solid var(--soft-line);
+}
+
+.dub-timeline-content .dub-waveform-shell {
+  height: 104px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--panel, #fffefa);
+}
+
+.dub-timeline-content .dub-waveform-shell canvas {
+  right: auto;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.dub-timeline-content .dub-timeline-slot {
+  top: 10px;
+  height: 76px;
+  border-radius: 4px;
+  min-width: 3px;
+}
+
+.dub-timeline-content .dub-timeline-render {
+  bottom: 9px;
+  height: 5px;
+  border-radius: 2px;
+}
+
+.dub-timeline-content .dub-timeline-slot:focus-visible {
+  outline: 2px solid var(--accent, #6e854a);
+  outline-offset: -2px;
+}
+
+.dub-timeline-viewport + .dub-timeline-legend {
+  margin-top: 10px;
+}
+
+.dub-timeline .dub-time-readout > :first-child {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dub-timeline .dub-time-readout > :last-child {
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+@media (prefers-contrast: more) {
+  .dub-timeline-viewport,
+  .dub-timeline-ruler,
+  .dub-timeline-zoom button,
+  .dub-timeline-tick {
+    border-color: var(--ink);
+  }
+}
