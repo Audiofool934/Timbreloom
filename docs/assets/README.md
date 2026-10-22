@@ -7,11 +7,11 @@ The dialogue was written for the demonstration; no personal recordings or projec
 
 | File | Contents |
 | --- | --- |
-| `app-icon.png` | The existing native app icon, exported from the built icon set |
 | `voice-cloning.png` | A saved sample voice and an English script |
 | `transcription.png` | An editable English transcript with segment timestamps |
 | `dubbing-studio.png` | A generated project with roles, voices, and a shared timeline |
 | `models.png` | The model manager with separate Qwen, Whisper, and Seed-VC entries |
 
 Screenshots are direct window captures, without changes to the rendered interface.
+The current ear-and-fold app icon is shared by the native build, web interface, and README from [the canonical artwork](../../static/app-icon.png).
 Model quality and release validation are documented separately in [release validation](../release-readiness.md).

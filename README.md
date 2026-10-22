@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/app-icon.png" width="112" alt="Timbreloom app icon" />
+<img src="static/app-icon.png" width="112" alt="Timbreloom app icon" />
 
 # Timbreloom
 

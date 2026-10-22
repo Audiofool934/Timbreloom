@@ -65,7 +65,7 @@ def main() -> None:
         iconset = stage / "Timbreloom.iconset"
         iconset.mkdir()
         run("xcrun", "swiftc", ROOT / "macos/Icon.swift", "-o", stage / "draw-icon")
-        run(stage / "draw-icon", iconset, resources / "DesktopSymbols.json")
+        run(stage / "draw-icon", iconset, resources / "DesktopSymbols.json", ROOT / "static/app-icon.png")
         run("iconutil", "-c", "icns", iconset, "-o", resources / "Timbreloom.icns")
         if args.release:
             assemble(resources)

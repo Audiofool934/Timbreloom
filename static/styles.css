@@ -60,7 +60,13 @@ input {
   letter-spacing: 0.14em;
 }
 
-.brand-mark,
+.brand-mark {
+  display: block;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
 .progress-visual {
   display: inline-flex;
   align-items: center;
@@ -68,17 +74,12 @@ input {
   height: 22px;
 }
 
-.brand-mark i,
 .progress-visual i {
   display: block;
   width: 3px;
   background: currentColor;
   border-radius: 99px;
 }
-
-.brand-mark i:nth-child(1), .brand-mark i:nth-child(5) { height: 7px; }
-.brand-mark i:nth-child(2), .brand-mark i:nth-child(4) { height: 14px; }
-.brand-mark i:nth-child(3) { height: 21px; }
 
 .model-state {
   display: flex;

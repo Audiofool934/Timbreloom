@@ -59,9 +59,13 @@ final class WebWorkspace: NSViewController, WKNavigationDelegate, WKUIDelegate, 
         spinner.isDisplayedWhenStopped = false
         spinner.controlSize = .regular
         spinner.startAnimation(nil)
-        let symbol = NSImageView(image: NSImage(systemSymbolName: "waveform", accessibilityDescription: nil)!)
-        symbol.contentTintColor = NSColor(srgbRed: 0.32, green: 0.39, blue: 0.22, alpha: 1)
-        symbol.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 40, weight: .light)
+        let symbol = NSImageView(image: NSApp.applicationIconImage)
+        symbol.imageScaling = .scaleProportionallyUpOrDown
+        symbol.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            symbol.widthAnchor.constraint(equalToConstant: 72),
+            symbol.heightAnchor.constraint(equalToConstant: 72),
+        ])
         loadingTitle.font = .systemFont(ofSize: 22, weight: .semibold)
         loadingDetail.font = .systemFont(ofSize: 13)
         loadingDetail.textColor = .secondaryLabelColor
